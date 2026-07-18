@@ -49,9 +49,9 @@ NiriPendingReply *NiriActions::sendAction(const QJsonObject &action)
 static QJsonObject workspaceReferenceJson(const QVariant &reference)
 {
     if (reference.typeId() == QMetaType::QString) {
-        return QJsonObject{ { "Name", reference.toString() } };
+        return QJsonObject{{"Name", reference.toString()}};
     }
-    return QJsonObject{ { "Index", reference.toInt() } };
+    return QJsonObject{{"Index", reference.toInt()}};
 }
 
 // Convert QVariant size to niri SizeChange JSON.
@@ -63,9 +63,9 @@ static QJsonObject sizeChangeJson(const QVariant &change)
         return QJsonObject::fromVariantMap(change.toMap());
     }
     if (change.typeId() == QMetaType::Double) {
-        return QJsonObject{ { "SetProportion", change.toDouble() } };
+        return QJsonObject{{"SetProportion", change.toDouble()}};
     }
-    return QJsonObject{ { "SetFixed", change.toInt() } };
+    return QJsonObject{{"SetFixed", change.toInt()}};
 }
 
 NiriPendingReply *NiriActions::spawn(const QStringList &command)
@@ -73,59 +73,57 @@ NiriPendingReply *NiriActions::spawn(const QStringList &command)
     QJsonArray cmd;
     for (const QString &s : command)
         cmd.append(s);
-    return sendAction(QJsonObject{ { "Spawn", QJsonObject{ { "command", cmd } } } });
+    return sendAction(QJsonObject{{"Spawn", QJsonObject{{"command", cmd}}}});
 }
 
 NiriPendingReply *NiriActions::focusWindow(quint64 windowId)
 {
-    return sendAction(QJsonObject{ { "FocusWindow", QJsonObject{ { "id", qint64(windowId) } } } });
+    return sendAction(QJsonObject{{"FocusWindow", QJsonObject{{"id", qint64(windowId)}}}});
 }
 
 NiriPendingReply *NiriActions::closeWindow(quint64 windowId)
 {
-    return sendAction(QJsonObject{ { "CloseWindow", QJsonObject{ { "id", qint64(windowId) } } } });
+    return sendAction(QJsonObject{{"CloseWindow", QJsonObject{{"id", qint64(windowId)}}}});
 }
 
 NiriPendingReply *NiriActions::moveWindowToWorkspace(quint64 windowId, const QVariant &reference,
                                                      bool followFocus)
 {
-    return sendAction(
-            QJsonObject{ { "MoveWindowToWorkspace",
-                           QJsonObject{ { "window_id", qint64(windowId) },
-                                        { "reference", workspaceReferenceJson(reference) },
-                                        { "focus", followFocus } } } });
+    return sendAction(QJsonObject{{"MoveWindowToWorkspace",
+                                   QJsonObject{{"window_id", qint64(windowId)},
+                                               {"reference", workspaceReferenceJson(reference)},
+                                               {"focus", followFocus}}}});
 }
 
 NiriPendingReply *NiriActions::moveWindowToMonitor(quint64 windowId, const QString &output,
                                                    bool followFocus)
 {
-    return sendAction(QJsonObject{ { "MoveWindowToMonitor",
-                                     QJsonObject{ { "window_id", qint64(windowId) },
-                                                  { "output", output },
-                                                  { "focus", followFocus } } } });
+    return sendAction(QJsonObject{{"MoveWindowToMonitor",
+                                   QJsonObject{{"window_id", qint64(windowId)},
+                                               {"output", output},
+                                               {"focus", followFocus}}}});
 }
 
 NiriPendingReply *NiriActions::setWindowWidth(quint64 windowId, const QVariant &change)
 {
-    return sendAction(QJsonObject{ { "SetWindowWidth",
-                                     QJsonObject{ { "window_id", qint64(windowId) },
-                                                  { "change", sizeChangeJson(change) } } } });
+    return sendAction(QJsonObject{
+            {"SetWindowWidth",
+             QJsonObject{{"window_id", qint64(windowId)}, {"change", sizeChangeJson(change)}}}});
 }
 
 NiriPendingReply *NiriActions::setWindowHeight(quint64 windowId, const QVariant &change)
 {
-    return sendAction(QJsonObject{ { "SetWindowHeight",
-                                     QJsonObject{ { "window_id", qint64(windowId) },
-                                                  { "change", sizeChangeJson(change) } } } });
+    return sendAction(QJsonObject{
+            {"SetWindowHeight",
+             QJsonObject{{"window_id", qint64(windowId)}, {"change", sizeChangeJson(change)}}}});
 }
 
 NiriPendingReply *NiriActions::moveColumnToIndex(int index)
 {
-    return sendAction(QJsonObject{ { "MoveColumnToIndex", QJsonObject{ { "index", index } } } });
+    return sendAction(QJsonObject{{"MoveColumnToIndex", QJsonObject{{"index", index}}}});
 }
 
 NiriPendingReply *NiriActions::toggleWindowFloating(quint64 windowId)
 {
-    return sendAction(
-            QJsonObject{ { "ToggleWindowFloating", QJsonObject{ { "id", qint64(windowId) } } } });
+    return sendAction(QJsonObject{{"ToggleWindowFloating", QJsonObject{{"id", qint64(windowId)}}}});
 }

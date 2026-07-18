@@ -118,7 +118,7 @@ void NiriWorkspaceReactive::updateFrom(const NiriWorkspace &w)
 
 void NiriWorkspaceReactive::clear()
 {
-    m_data = NiriWorkspace{ };
+    m_data = NiriWorkspace{};
     m_valid = false;
 }
 

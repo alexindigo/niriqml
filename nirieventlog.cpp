@@ -32,7 +32,7 @@ int NiriEventLog::rowCount(const QModelIndex &parent) const
 QVariant NiriEventLog::data(const QModelIndex &index, int role) const
 {
     if (!index.isValid() || index.row() < 0 || index.row() >= m_events.size())
-        return { };
+        return {};
 
     const auto &event = m_events.at(index.row());
     switch (role) {
@@ -41,15 +41,15 @@ QVariant NiriEventLog::data(const QModelIndex &index, int role) const
     case PayloadRole:
         return QVariant(event.payload);
     default:
-        return { };
+        return {};
     }
 }
 
 QHash<int, QByteArray> NiriEventLog::roleNames() const
 {
     return {
-        { NameRole, "name" },
-        { PayloadRole, "payload" },
+            {NameRole, "name"},
+            {PayloadRole, "payload"},
     };
 }
 
@@ -59,6 +59,6 @@ void NiriEventLog::appendEvent(const QString &name, const QVariantMap &payload)
         m_events.removeFirst();
 
     beginInsertRows(QModelIndex(), m_events.size(), m_events.size());
-    m_events.append({ name, payload });
+    m_events.append({name, payload});
     endInsertRows();
 }

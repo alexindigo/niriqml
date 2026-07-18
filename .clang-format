@@ -100,6 +100,11 @@ ShortNamespaceLines: 1
 #   thelastlineislong;
 AlignEscapedNewlines: Left
 
+# Explicit Cpp11BracedListStyle to pin behavior across clang-format versions.
+# clang-format 20 vs 22 differ on the WebKit default for this key.
+# 'true' = no space inside empty braces ({} not { }).
+Cpp11BracedListStyle: true
+
 # Avoids the addition of a space between an identifier and the
 # initializer list in list-initialization.
 SpaceBeforeCpp11BracedList: false

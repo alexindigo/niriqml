@@ -94,7 +94,7 @@ void NiriWindowReactive::updateFrom(const NiriWindow &w)
 
 void NiriWindowReactive::clear()
 {
-    m_data = NiriWindow{ };
+    m_data = NiriWindow{};
     m_valid = false;
 }
 

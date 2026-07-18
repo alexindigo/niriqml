@@ -21,7 +21,7 @@ inline void setupNiriConnection()
     QByteArray sock = qgetenv("NIRI_SOCKET");
     if (sock.isEmpty()) {
         QDir runtimeDir(QStringLiteral("/run/user/%1/").arg(::getuid()));
-        auto socks = runtimeDir.entryList({ "niri.wayland-*.sock" }, QDir::System | QDir::Files);
+        auto socks = runtimeDir.entryList({"niri.wayland-*.sock"}, QDir::System | QDir::Files);
         if (!socks.isEmpty())
             sock = (runtimeDir.absolutePath() + "/" + socks.first()).toUtf8();
     }

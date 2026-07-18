@@ -93,7 +93,7 @@ void NiriRequests::sendJson(const QJsonValue &request, Callback callback)
         QJsonParseError err;
         QJsonDocument doc = QJsonDocument::fromJson(line, &err);
         if (err.error != QJsonParseError::NoError) {
-            completeRequest(pr, false, QJsonObject{ { "error", "Failed to parse reply" } });
+            completeRequest(pr, false, QJsonObject{{"error", "Failed to parse reply"}});
             return;
         }
 
@@ -101,17 +101,17 @@ void NiriRequests::sendJson(const QJsonValue &request, Callback callback)
         if (obj.contains("Ok"))
             completeRequest(pr, true, obj["Ok"].toObject());
         else if (obj.contains("Err"))
-            completeRequest(pr, false, QJsonObject{ { "error", obj["Err"].toString() } });
+            completeRequest(pr, false, QJsonObject{{"error", obj["Err"].toString()}});
         else
-            completeRequest(pr, false, QJsonObject{ { "error", "Unexpected reply format" } });
+            completeRequest(pr, false, QJsonObject{{"error", "Unexpected reply format"}});
     });
 
     connect(pr->socket, &QLocalSocket::errorOccurred, this,
             [this, pr](QLocalSocket::LocalSocketError) {
                 completeRequest(pr, false,
-                                QJsonObject{ { "error",
-                                               pr->socket ? pr->socket->errorString()
-                                                          : QStringLiteral("socket error") } });
+                                QJsonObject{{"error",
+                                             pr->socket ? pr->socket->errorString()
+                                                        : QStringLiteral("socket error")}});
             });
 
     pr->socket->connectToServer(socketPath());

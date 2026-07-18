@@ -49,7 +49,7 @@ static ListConverter findListConverter(QMetaType containerType)
         int containerTypeId;
         ListConverter fn;
     } table[] = {
-        { QMetaType::fromType<QList<NiriMode>>().id(), BRIDGE(NiriMode) },
+            {QMetaType::fromType<QList<NiriMode>>().id(), BRIDGE(NiriMode)},
     };
 #undef BRIDGE
     for (const auto &entry : table) {
@@ -95,7 +95,7 @@ static QVariant jsonArrayToTypedList(const QJsonArray &arr, QMetaType containerT
 static QVariant jsonValueToVariant(const QJsonValue &val, QMetaType targetType)
 {
     if (val.isNull())
-        return { };
+        return {};
 
     if (val.isObject()) {
         const QMetaObject *mo = targetType.metaObject();
@@ -117,7 +117,7 @@ QVariant jsonToGadget(const QJsonObject &json, QMetaType targetType)
     const QMetaObject *meta = targetType.metaObject();
     if (!meta) {
         qWarning() << "niriqml: jsonToGadget called on non-gadget type" << targetType.name();
-        return { };
+        return {};
     }
 
     QVariant result(targetType);

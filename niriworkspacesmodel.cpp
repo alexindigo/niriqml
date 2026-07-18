@@ -28,7 +28,7 @@ int NiriWorkspacesModel::rowCount(const QModelIndex &parent) const
 QVariant NiriWorkspacesModel::data(const QModelIndex &index, int role) const
 {
     if (!index.isValid() || index.row() < 0 || index.row() >= m_workspaces.size())
-        return { };
+        return {};
 
     const NiriWorkspace &w = m_workspaces.at(index.row());
     switch (role) {
@@ -51,22 +51,22 @@ QVariant NiriWorkspacesModel::data(const QModelIndex &index, int role) const
     case ActiveWindowIdRole:
         return QVariant::fromValue(w.activeWindowId);
     default:
-        return { };
+        return {};
     }
 }
 
 QHash<int, QByteArray> NiriWorkspacesModel::roleNames() const
 {
     return {
-        { WorkspaceRole, "workspace" },
-        { IdRole, "id" },
-        { IdxRole, "idx" },
-        { NameRole, "name" },
-        { OutputRole, "output" },
-        { IsUrgentRole, "isUrgent" },
-        { IsActiveRole, "isActive" },
-        { IsFocusedRole, "isFocused" },
-        { ActiveWindowIdRole, "activeWindowId" },
+            {WorkspaceRole, "workspace"},
+            {IdRole, "id"},
+            {IdxRole, "idx"},
+            {NameRole, "name"},
+            {OutputRole, "output"},
+            {IsUrgentRole, "isUrgent"},
+            {IsActiveRole, "isActive"},
+            {IsFocusedRole, "isFocused"},
+            {ActiveWindowIdRole, "activeWindowId"},
     };
 }
 
@@ -133,5 +133,5 @@ void NiriWorkspacesModel::onWorkspaceActiveWindowChanged(quint64 workspaceId, qu
     int row = *it;
     m_workspaces[row].activeWindowId = windowId;
     QModelIndex idx = index(row);
-    emit dataChanged(idx, idx, { ActiveWindowIdRole, WorkspaceRole });
+    emit dataChanged(idx, idx, {ActiveWindowIdRole, WorkspaceRole});
 }

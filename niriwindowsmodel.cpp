@@ -27,7 +27,7 @@ int NiriWindowsModel::rowCount(const QModelIndex &parent) const
 QVariant NiriWindowsModel::data(const QModelIndex &index, int role) const
 {
     if (!index.isValid() || index.row() < 0 || index.row() >= m_windows.size())
-        return { };
+        return {};
 
     const NiriWindow &w = m_windows.at(index.row());
     switch (role) {
@@ -50,22 +50,22 @@ QVariant NiriWindowsModel::data(const QModelIndex &index, int role) const
     case IsUrgentRole:
         return w.isUrgent;
     default:
-        return { };
+        return {};
     }
 }
 
 QHash<int, QByteArray> NiriWindowsModel::roleNames() const
 {
     return {
-        { WindowRole, "window" },
-        { IdRole, "id" },
-        { TitleRole, "title" },
-        { AppIdRole, "appId" },
-        { PidRole, "pid" },
-        { WorkspaceIdRole, "workspaceId" },
-        { IsFocusedRole, "isFocused" },
-        { IsFloatingRole, "isFloating" },
-        { IsUrgentRole, "isUrgent" },
+            {WindowRole, "window"},
+            {IdRole, "id"},
+            {TitleRole, "title"},
+            {AppIdRole, "appId"},
+            {PidRole, "pid"},
+            {WorkspaceIdRole, "workspaceId"},
+            {IsFocusedRole, "isFocused"},
+            {IsFloatingRole, "isFloating"},
+            {IsUrgentRole, "isUrgent"},
     };
 }
 
@@ -128,7 +128,7 @@ void NiriWindowsModel::onWindowFocusChanged(quint64 id)
         if (wasFocused != nowFocused) {
             m_windows[i].isFocused = nowFocused;
             QModelIndex idx = index(i);
-            emit dataChanged(idx, idx, { IsFocusedRole, WindowRole });
+            emit dataChanged(idx, idx, {IsFocusedRole, WindowRole});
         }
     }
 }

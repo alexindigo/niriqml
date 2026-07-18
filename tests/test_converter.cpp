@@ -48,20 +48,20 @@ void TestConverter::windowFromJson()
     json["is_floating"] = false;
     json["is_urgent"] = false;
 
-    QJsonArray posInScrolling{ 3, 1 };
-    QJsonArray tileSize{ 1420.0, 914.0 };
-    QJsonArray windowSize{ 1420, 914 };
-    QJsonArray offset{ 0.0, 0.0 };
+    QJsonArray posInScrolling{3, 1};
+    QJsonArray tileSize{1420.0, 914.0};
+    QJsonArray windowSize{1420, 914};
+    QJsonArray offset{0.0, 0.0};
     json["layout"] = QJsonObject{
-        { "pos_in_scrolling_layout", posInScrolling },
-        { "tile_size", tileSize },
-        { "window_size", windowSize },
-        { "tile_pos_in_workspace_view", QJsonValue::Null },
-        { "window_offset_in_tile", offset },
+            {"pos_in_scrolling_layout", posInScrolling},
+            {"tile_size", tileSize},
+            {"window_size", windowSize},
+            {"tile_pos_in_workspace_view", QJsonValue::Null},
+            {"window_offset_in_tile", offset},
     };
     json["focus_timestamp"] = QJsonObject{
-        { "secs", qint64(1000) },
-        { "nanos", 500 },
+            {"secs", qint64(1000)},
+            {"nanos", 500},
     };
 
     NiriWindow w = fromNiriJson<NiriWindow>(json);
@@ -75,15 +75,15 @@ void TestConverter::windowFromJson()
     QCOMPARE(w.isFloating, false);
     QCOMPARE(w.isUrgent, false);
 
-    QList<int> expectedPos{ 3, 1 };
+    QList<int> expectedPos{3, 1};
     QCOMPARE(w.layout.posInScrollingLayout, expectedPos);
-    QList<double> expectedTile{ 1420.0, 914.0 };
+    QList<double> expectedTile{1420.0, 914.0};
     QCOMPARE(w.layout.tileSize, expectedTile);
-    QList<int> expectedWSize{ 1420, 914 };
+    QList<int> expectedWSize{1420, 914};
     QCOMPARE(w.layout.windowSize, expectedWSize);
-    QList<double> expectedNullPos{ };
+    QList<double> expectedNullPos{};
     QCOMPARE(w.layout.tilePosInWorkspaceView, expectedNullPos);
-    QList<double> expectedOff{ 0.0, 0.0 };
+    QList<double> expectedOff{0.0, 0.0};
     QCOMPARE(w.layout.windowOffsetInTile, expectedOff);
 
     QCOMPARE(w.focusTimestamp.secs, 1000ull);
@@ -101,8 +101,8 @@ void TestConverter::windowNullFields()
     NiriWindow w = fromNiriJson<NiriWindow>(json);
 
     QCOMPARE(w.id, 1ull);
-    QCOMPARE(w.title, QString{ });
-    QCOMPARE(w.appId, QString{ });
+    QCOMPARE(w.title, QString{});
+    QCOMPARE(w.appId, QString{});
     QCOMPARE(w.workspaceId, 0ull);
 }
 
@@ -131,20 +131,20 @@ void TestConverter::workspaceFromJson()
 void TestConverter::windowLayoutFromJson()
 {
     QJsonObject json;
-    QJsonArray tileSize{ 1420.0, 914.0 };
-    QJsonArray windowSize{ 1420, 914 };
-    QJsonArray offset{ 0.0, 0.0 };
+    QJsonArray tileSize{1420.0, 914.0};
+    QJsonArray windowSize{1420, 914};
+    QJsonArray offset{0.0, 0.0};
     json["tile_size"] = tileSize;
     json["window_size"] = windowSize;
     json["window_offset_in_tile"] = offset;
 
     NiriWindowLayout layout = fromNiriJson<NiriWindowLayout>(json);
 
-    QList<double> expectedTile{ 1420.0, 914.0 };
+    QList<double> expectedTile{1420.0, 914.0};
     QCOMPARE(layout.tileSize, expectedTile);
-    QList<int> expectedWSize{ 1420, 914 };
+    QList<int> expectedWSize{1420, 914};
     QCOMPARE(layout.windowSize, expectedWSize);
-    QList<double> expectedOff{ 0.0, 0.0 };
+    QList<double> expectedOff{0.0, 0.0};
     QCOMPARE(layout.windowOffsetInTile, expectedOff);
 }
 
@@ -158,7 +158,7 @@ void TestConverter::missingFieldKeepsDefault()
     QCOMPARE(ws.id, 1ull);
     QCOMPARE(ws.isUrgent, false);
     QCOMPARE(ws.isActive, false);
-    QCOMPARE(ws.name, QString{ });
+    QCOMPARE(ws.name, QString{});
 }
 
 void TestConverter::extraFieldIgnored()
@@ -188,7 +188,7 @@ void TestConverter::u64IdsPreserved()
 
 void TestConverter::keyboardLayoutsFromJson()
 {
-    QJsonArray names{ QStringLiteral("English (US)"), QStringLiteral("Russian (Macintosh)") };
+    QJsonArray names{QStringLiteral("English (US)"), QStringLiteral("Russian (Macintosh)")};
     QJsonObject json;
     json["names"] = names;
     json["current_idx"] = 0;
@@ -204,9 +204,9 @@ void TestConverter::keyboardLayoutsFromJson()
 void TestConverter::nestedLayoutRecursion()
 {
     QJsonObject layout;
-    QJsonArray tileSize{ 800.0, 600.0 };
-    QJsonArray windowSize{ 800, 600 };
-    QJsonArray offset{ 0.0, 0.0 };
+    QJsonArray tileSize{800.0, 600.0};
+    QJsonArray windowSize{800, 600};
+    QJsonArray offset{0.0, 0.0};
     layout["tile_size"] = tileSize;
     layout["window_size"] = windowSize;
     layout["window_offset_in_tile"] = offset;
@@ -223,9 +223,9 @@ void TestConverter::nestedLayoutRecursion()
     NiriWindow w = fromNiriJson<NiriWindow>(json);
 
     QCOMPARE(w.id, 99ull);
-    QList<double> expectedTile{ 800.0, 600.0 };
+    QList<double> expectedTile{800.0, 600.0};
     QCOMPARE(w.layout.tileSize, expectedTile);
-    QList<int> expectedWSize{ 800, 600 };
+    QList<int> expectedWSize{800, 600};
     QCOMPARE(w.layout.windowSize, expectedWSize);
     QCOMPARE(w.focusTimestamp.secs, 5000ull);
     QCOMPARE(w.focusTimestamp.nanos, 0u);
@@ -235,16 +235,16 @@ void TestConverter::outputWithModesFromJson()
 {
     QJsonArray modes;
     modes.append(QJsonObject{
-            { "width", 2880 },
-            { "height", 1920 },
-            { "refresh_rate", 120000 },
-            { "is_preferred", true },
+            {"width", 2880},
+            {"height", 1920},
+            {"refresh_rate", 120000},
+            {"is_preferred", true},
     });
     modes.append(QJsonObject{
-            { "width", 2880 },
-            { "height", 1920 },
-            { "refresh_rate", 60001 },
-            { "is_preferred", true },
+            {"width", 2880},
+            {"height", 1920},
+            {"refresh_rate", 60001},
+            {"is_preferred", true},
     });
 
     QJsonObject json;

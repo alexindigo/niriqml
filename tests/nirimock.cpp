@@ -129,11 +129,10 @@ void NiriMock::onReadyRead()
         QJsonObject action = obj["Action"].toObject();
         if (!action.isEmpty()) {
             if (!m_nextActionError.isEmpty()) {
-                sendLine(socket, QJsonObject{ { "Err", m_nextActionError } });
+                sendLine(socket, QJsonObject{{"Err", m_nextActionError}});
                 m_nextActionError.clear();
             } else {
-                sendLine(socket,
-                         QJsonObject{ { "Ok", QJsonObject{ { "Handled", QJsonValue::Null } } } });
+                sendLine(socket, QJsonObject{{"Ok", QJsonObject{{"Handled", QJsonValue::Null}}}});
             }
             socket->disconnectFromServer();
             continue;
@@ -146,22 +145,22 @@ void NiriMock::handleEventStreamSubscribe(QLocalSocket *socket)
     m_eventSocket = socket;
 
     // First reply: {"Ok":"Handled"}
-    sendLine(socket, QJsonObject{ { "Ok", QStringLiteral("Handled") } });
+    sendLine(socket, QJsonObject{{"Ok", QStringLiteral("Handled")}});
 
     // Then send initial state as bare events {"EventName":{...}}
     for (const auto &w : m_windows) {
         QJsonObject event;
-        event["WindowOpenedOrChanged"] = QJsonObject{ { "window", w.toObject() } };
+        event["WindowOpenedOrChanged"] = QJsonObject{{"window", w.toObject()}};
         sendLine(socket, event);
     }
     if (!m_windows.isEmpty()) {
         QJsonObject event;
-        event["WindowsChanged"] = QJsonObject{ { "windows", m_windows } };
+        event["WindowsChanged"] = QJsonObject{{"windows", m_windows}};
         sendLine(socket, event);
     }
     if (!m_workspaces.isEmpty()) {
         QJsonObject event;
-        event["WorkspacesChanged"] = QJsonObject{ { "workspaces", m_workspaces } };
+        event["WorkspacesChanged"] = QJsonObject{{"workspaces", m_workspaces}};
         sendLine(socket, event);
     }
 
@@ -172,7 +171,7 @@ void NiriMock::handleRequest(QLocalSocket *socket, const QJsonObject &request)
 {
     Q_UNUSED(request)
     // One-shot request: send canned reply, close
-    sendLine(socket, QJsonObject{ { "Ok", QJsonObject{ { "Handled", QJsonValue::Null } } } });
+    sendLine(socket, QJsonObject{{"Ok", QJsonObject{{"Handled", QJsonValue::Null}}}});
     socket->disconnectFromServer();
 }
 
