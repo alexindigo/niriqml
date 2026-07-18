@@ -62,3 +62,4 @@ late subscribers. Tested against niri 26.04.
 - QML registration smoke test: verifies all 5 singletons + 5 QML_NAMED_ELEMENT
   types are creatable and key Q_PROPERTYs exist. Runs headless (no
   NIRI_SOCKET), compatible with CI (`8cedfd1`)
+- CHANGELOG.md with commit-date-grouped severity blocks (`f8b17eb`)
