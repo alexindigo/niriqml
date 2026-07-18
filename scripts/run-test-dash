@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+BUILD_DIR="${PROJECT_DIR}/build-release"
+if [ ! -f "${BUILD_DIR}/Niri/libniriqmlplugin.so" ]; then
+    "${SCRIPT_DIR}/build"
+fi
+
+# Resolve and export NIRI_SOCKET
+if [ -z "${NIRI_SOCKET:-}" ]; then
+    NIRI_SOCKET=$(ls /run/user/$(id -u)/niri.wayland-*.sock 2>/dev/null | head -1 || true)
+fi
+
+if [ -z "$NIRI_SOCKET" ]; then
+    echo "error: no niri socket found. Is niri running?"
+    echo "  looked in \$NIRI_SOCKET and /run/user/$(id -u)/niri.wayland-*.sock"
+    exit 1
+fi
+
+export NIRI_SOCKET
+
+echo "Starting niriqml dashboard..."
+echo "  Import path: ${BUILD_DIR}"
+echo "  Socket: $NIRI_SOCKET"
+echo ""
+
+QML_IMPORT_PATH="${BUILD_DIR}" qml6 "${PROJECT_DIR}/examples/DashboardVisualizer.qml" "$@"
