@@ -1,11 +1,23 @@
 #include "nirirequests.h"
 
+#include <QJSEngine>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonParseError>
 #include <QDebug>
 
 #include "niriconnection.h"
+#include "nirierror.h"
+#include "niritypes.h"
+#include "niriutils.h"
+
+NiriRequests *NiriRequests::create(QQmlEngine *, QJSEngine *jsEngine)
+{
+    NiriRequests *self = instance();
+    if (jsEngine)
+        QJSEngine::setObjectOwnership(self, QJSEngine::CppOwnership);
+    return self;
+}
 
 NiriRequests *NiriRequests::instance()
 {
@@ -20,7 +32,7 @@ NiriRequests::NiriRequests(QObject *parent)
 
 QString NiriRequests::socketPath() const
 {
-    // Prefer NiriConnection's active path (so tests using a mock socket also work)
+    // Use NiriConnection's path if connected (works both with mock and real niri)
     if (NiriConnection::instance()->isConnected())
         return NiriConnection::instance()->socketPath();
     return QString::fromUtf8(qgetenv("NIRI_SOCKET"));
@@ -55,8 +67,8 @@ void NiriRequests::sendJson(const QJsonValue &request, Callback callback)
     pr->socket = new QLocalSocket(this);
     pr->callback = callback;
 
-    // QJsonDocument only supports arrays/objects as roots; for bare strings we
-    // serialize manually (Qt's JSON parser accepts them on decode).
+    // QJsonDocument only supports arrays/objects as roots; for bare strings
+    // we serialize manually (Qt's JSON parser accepts them on decode).
     if (request.isString()) {
         pr->sendBuffer = QByteArray("\"") + request.toString().toUtf8() + "\"\n";
     } else if (request.isArray()) {
@@ -64,6 +76,7 @@ void NiriRequests::sendJson(const QJsonValue &request, Callback callback)
     } else if (request.isObject()) {
         pr->sendBuffer = QJsonDocument(request.toObject()).toJson(QJsonDocument::Compact) + "\n";
     } else {
+        // null/bool/number — rare
         pr->sendBuffer = QJsonDocument::fromVariant(request.toVariant()).toJson(QJsonDocument::Compact) + "\n";
     }
 
@@ -100,4 +113,178 @@ void NiriRequests::sendJson(const QJsonValue &request, Callback callback)
     });
 
     pr->socket->connectToServer(socketPath());
+}
+
+// ── Generic raw send (escape hatch) ──
+
+static void wireRawReply(NiriPendingReply *reply, bool ok, const QJsonObject &result)
+{
+    if (!ok) {
+        NiriError err;
+        err.code = -1;
+        err.message = result.value("error").toString();
+        reply->setError(err);
+    } else {
+        reply->setFinished(QVariant::fromValue(result.toVariantMap()));
+    }
+}
+
+NiriPendingReply *NiriRequests::sendRaw(const QString &query)
+{
+    auto *reply = new NiriPendingReply(this);
+    sendJson(QJsonValue(query), [reply](bool ok, const QJsonObject &result) {
+        wireRawReply(reply, ok, result);
+    });
+    return reply;
+}
+
+NiriPendingReply *NiriRequests::sendRaw(const QJsonObject &request)
+{
+    auto *reply = new NiriPendingReply(this);
+    sendJson(QJsonValue(request), [reply](bool ok, const QJsonObject &result) {
+        wireRawReply(reply, ok, result);
+    });
+    return reply;
+}
+
+// ── Typed query wrappers ──
+
+NiriPendingReply *NiriRequests::windows()
+{
+    auto *reply = new NiriPendingReply(this);
+    sendJson(QJsonValue(QStringLiteral("Windows")), [reply](bool ok, const QJsonObject &result) {
+        if (!ok) {
+            NiriError err;
+            err.code = -1;
+            err.message = result.value("error").toString();
+            reply->setError(err);
+            return;
+        }
+        QJsonArray arr = result.value("Windows").toArray();
+        QVariantList windows;
+        windows.reserve(arr.size());
+        for (const QJsonValue &v : arr)
+            windows.append(jsonToGadget(v.toObject(), QMetaType::fromType<NiriWindow>()));
+        reply->setFinished(windows);
+    });
+    return reply;
+}
+
+NiriPendingReply *NiriRequests::workspaces()
+{
+    auto *reply = new NiriPendingReply(this);
+    sendJson(QJsonValue(QStringLiteral("Workspaces")), [reply](bool ok, const QJsonObject &result) {
+        if (!ok) {
+            NiriError err;
+            err.code = -1;
+            err.message = result.value("error").toString();
+            reply->setError(err);
+            return;
+        }
+        QJsonArray arr = result.value("Workspaces").toArray();
+        QVariantList workspaces;
+        workspaces.reserve(arr.size());
+        for (const QJsonValue &v : arr)
+            workspaces.append(jsonToGadget(v.toObject(), QMetaType::fromType<NiriWorkspace>()));
+        reply->setFinished(workspaces);
+    });
+    return reply;
+}
+
+NiriPendingReply *NiriRequests::outputs()
+{
+    auto *reply = new NiriPendingReply(this);
+    sendJson(QJsonValue(QStringLiteral("Outputs")), [reply](bool ok, const QJsonObject &result) {
+        if (!ok) {
+            NiriError err;
+            err.code = -1;
+            err.message = result.value("error").toString();
+            reply->setError(err);
+            return;
+        }
+        // Outputs is a map: {"eDP-1": {...}, "DP-2": {...}}
+        QJsonObject obj = result.value("Outputs").toObject();
+        QVariantMap outputs;
+        for (auto it = obj.begin(); it != obj.end(); ++it) {
+            outputs.insert(it.key(),
+                           jsonToGadget(it.value().toObject(), QMetaType::fromType<NiriOutput>()));
+        }
+        reply->setFinished(outputs);
+    });
+    return reply;
+}
+
+NiriPendingReply *NiriRequests::focusedWindow()
+{
+    auto *reply = new NiriPendingReply(this);
+    sendJson(QJsonValue(QStringLiteral("FocusedWindow")), [reply](bool ok, const QJsonObject &result) {
+        if (!ok) {
+            NiriError err;
+            err.code = -1;
+            err.message = result.value("error").toString();
+            reply->setError(err);
+            return;
+        }
+        QJsonValue val = result.value("FocusedWindow");
+        if (val.isNull() || !val.isObject()) {
+            reply->setFinished(QVariant());
+            return;
+        }
+        reply->setFinished(jsonToGadget(val.toObject(), QMetaType::fromType<NiriWindow>()));
+    });
+    return reply;
+}
+
+NiriPendingReply *NiriRequests::focusedOutput()
+{
+    auto *reply = new NiriPendingReply(this);
+    sendJson(QJsonValue(QStringLiteral("FocusedOutput")), [reply](bool ok, const QJsonObject &result) {
+        if (!ok) {
+            NiriError err;
+            err.code = -1;
+            err.message = result.value("error").toString();
+            reply->setError(err);
+            return;
+        }
+        QJsonValue val = result.value("FocusedOutput");
+        if (val.isNull() || !val.isObject()) {
+            reply->setFinished(QVariant());
+            return;
+        }
+        reply->setFinished(jsonToGadget(val.toObject(), QMetaType::fromType<NiriOutput>()));
+    });
+    return reply;
+}
+
+NiriPendingReply *NiriRequests::keyboardLayouts()
+{
+    auto *reply = new NiriPendingReply(this);
+    sendJson(QJsonValue(QStringLiteral("KeyboardLayouts")), [reply](bool ok, const QJsonObject &result) {
+        if (!ok) {
+            NiriError err;
+            err.code = -1;
+            err.message = result.value("error").toString();
+            reply->setError(err);
+            return;
+        }
+        QJsonObject obj = result.value("KeyboardLayouts").toObject();
+        reply->setFinished(jsonToGadget(obj, QMetaType::fromType<NiriKeyboardLayouts>()));
+    });
+    return reply;
+}
+
+NiriPendingReply *NiriRequests::version()
+{
+    auto *reply = new NiriPendingReply(this);
+    sendJson(QJsonValue(QStringLiteral("Version")), [reply](bool ok, const QJsonObject &result) {
+        if (!ok) {
+            NiriError err;
+            err.code = -1;
+            err.message = result.value("error").toString();
+            reply->setError(err);
+            return;
+        }
+        reply->setFinished(result.value("Version").toString());
+    });
+    return reply;
 }
