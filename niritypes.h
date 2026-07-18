@@ -20,6 +20,7 @@ public:
     quint32 nanos = 0;
 
     bool operator==(const NiriTimestamp &o) const { return secs == o.secs && nanos == o.nanos; }
+    bool operator!=(const NiriTimestamp &o) const { return !(*this == o); }
 };
 
 struct NiriWindowLayout
@@ -47,6 +48,7 @@ public:
                 && windowSize == o.windowSize && tilePosInWorkspaceView == o.tilePosInWorkspaceView
                 && windowOffsetInTile == o.windowOffsetInTile;
     }
+    bool operator!=(const NiriWindowLayout &o) const { return !(*this == o); }
 };
 
 struct NiriWindow
@@ -85,6 +87,7 @@ public:
                 && isFloating == o.isFloating && isUrgent == o.isUrgent && layout == o.layout
                 && focusTimestamp == o.focusTimestamp;
     }
+    bool operator!=(const NiriWindow &o) const { return !(*this == o); }
 };
 
 struct NiriWorkspace
@@ -118,6 +121,7 @@ public:
                 && isUrgent == o.isUrgent && isActive == o.isActive && isFocused == o.isFocused
                 && activeWindowId == o.activeWindowId;
     }
+    bool operator!=(const NiriWorkspace &o) const { return !(*this == o); }
 };
 
 struct NiriMode
@@ -142,6 +146,7 @@ public:
         return width == o.width && height == o.height && refreshRate == o.refreshRate
                 && isPreferred == o.isPreferred;
     }
+    bool operator!=(const NiriMode &o) const { return !(*this == o); }
 };
 
 struct NiriLogicalOutput
@@ -170,6 +175,7 @@ public:
         return x == o.x && y == o.y && width == o.width && height == o.height && scale == o.scale
                 && transform == o.transform;
     }
+    bool operator!=(const NiriLogicalOutput &o) const { return !(*this == o); }
 };
 
 struct NiriOutput
@@ -210,6 +216,7 @@ public:
                 && vrrSupported == o.vrrSupported && vrrEnabled == o.vrrEnabled
                 && logical == o.logical;
     }
+    bool operator!=(const NiriOutput &o) const { return !(*this == o); }
 };
 
 struct NiriKeyboardLayouts
@@ -229,4 +236,5 @@ public:
     {
         return names == o.names && currentIdx == o.currentIdx;
     }
+    bool operator!=(const NiriKeyboardLayouts &o) const { return !(*this == o); }
 };
