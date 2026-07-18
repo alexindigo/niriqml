@@ -2,14 +2,15 @@
 
 #include "nirievents.h"
 
-NiriEventLog::NiriEventLog(QObject *parent)
-    : QAbstractListModel(parent)
+NiriEventLog::NiriEventLog(QObject *parent) : QAbstractListModel(parent)
 {
-    connect(NiriEvents::instance(), &NiriEvents::rawEvent,
-            this, &NiriEventLog::appendEvent);
+    connect(NiriEvents::instance(), &NiriEvents::rawEvent, this, &NiriEventLog::appendEvent);
 }
 
-int NiriEventLog::capacity() const { return m_capacity; }
+int NiriEventLog::capacity() const
+{
+    return m_capacity;
+}
 
 void NiriEventLog::setCapacity(int capacity)
 {
@@ -31,7 +32,7 @@ int NiriEventLog::rowCount(const QModelIndex &parent) const
 QVariant NiriEventLog::data(const QModelIndex &index, int role) const
 {
     if (!index.isValid() || index.row() < 0 || index.row() >= m_events.size())
-        return {};
+        return { };
 
     const auto &event = m_events.at(index.row());
     switch (role) {
@@ -40,7 +41,7 @@ QVariant NiriEventLog::data(const QModelIndex &index, int role) const
     case PayloadRole:
         return QVariant(event.payload);
     default:
-        return {};
+        return { };
     }
 }
 
@@ -58,6 +59,6 @@ void NiriEventLog::appendEvent(const QString &name, const QVariantMap &payload)
         m_events.removeFirst();
 
     beginInsertRows(QModelIndex(), m_events.size(), m_events.size());
-    m_events.append({name, payload});
+    m_events.append({ name, payload });
     endInsertRows();
 }

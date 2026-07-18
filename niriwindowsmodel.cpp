@@ -2,12 +2,12 @@
 
 #include "nirievents.h"
 
-NiriWindowsModel::NiriWindowsModel(QObject *parent)
-    : QAbstractListModel(parent)
+NiriWindowsModel::NiriWindowsModel(QObject *parent) : QAbstractListModel(parent)
 {
     NiriEvents *events = NiriEvents::instance();
     connect(events, &NiriEvents::windowsChanged, this, &NiriWindowsModel::onWindowsChanged);
-    connect(events, &NiriEvents::windowOpenedOrChanged, this, &NiriWindowsModel::onWindowOpenedOrChanged);
+    connect(events, &NiriEvents::windowOpenedOrChanged, this,
+            &NiriWindowsModel::onWindowOpenedOrChanged);
     connect(events, &NiriEvents::windowClosed, this, &NiriWindowsModel::onWindowClosed);
     connect(events, &NiriEvents::windowFocusChanged, this, &NiriWindowsModel::onWindowFocusChanged);
 
@@ -27,35 +27,45 @@ int NiriWindowsModel::rowCount(const QModelIndex &parent) const
 QVariant NiriWindowsModel::data(const QModelIndex &index, int role) const
 {
     if (!index.isValid() || index.row() < 0 || index.row() >= m_windows.size())
-        return {};
+        return { };
 
     const NiriWindow &w = m_windows.at(index.row());
     switch (role) {
-    case WindowRole:      return QVariant::fromValue(w);
-    case IdRole:          return QVariant::fromValue(w.id);
-    case TitleRole:       return w.title;
-    case AppIdRole:       return w.appId;
-    case PidRole:         return w.pid;
-    case WorkspaceIdRole: return QVariant::fromValue(w.workspaceId);
-    case IsFocusedRole:   return w.isFocused;
-    case IsFloatingRole:  return w.isFloating;
-    case IsUrgentRole:    return w.isUrgent;
-    default:              return {};
+    case WindowRole:
+        return QVariant::fromValue(w);
+    case IdRole:
+        return QVariant::fromValue(w.id);
+    case TitleRole:
+        return w.title;
+    case AppIdRole:
+        return w.appId;
+    case PidRole:
+        return w.pid;
+    case WorkspaceIdRole:
+        return QVariant::fromValue(w.workspaceId);
+    case IsFocusedRole:
+        return w.isFocused;
+    case IsFloatingRole:
+        return w.isFloating;
+    case IsUrgentRole:
+        return w.isUrgent;
+    default:
+        return { };
     }
 }
 
 QHash<int, QByteArray> NiriWindowsModel::roleNames() const
 {
     return {
-        { WindowRole,      "window" },
-        { IdRole,          "id" },
-        { TitleRole,       "title" },
-        { AppIdRole,       "appId" },
-        { PidRole,         "pid" },
+        { WindowRole, "window" },
+        { IdRole, "id" },
+        { TitleRole, "title" },
+        { AppIdRole, "appId" },
+        { PidRole, "pid" },
         { WorkspaceIdRole, "workspaceId" },
-        { IsFocusedRole,   "isFocused" },
-        { IsFloatingRole,  "isFloating" },
-        { IsUrgentRole,    "isUrgent" },
+        { IsFocusedRole, "isFocused" },
+        { IsFloatingRole, "isFloating" },
+        { IsUrgentRole, "isUrgent" },
     };
 }
 
@@ -118,7 +128,7 @@ void NiriWindowsModel::onWindowFocusChanged(quint64 id)
         if (wasFocused != nowFocused) {
             m_windows[i].isFocused = nowFocused;
             QModelIndex idx = index(i);
-            emit dataChanged(idx, idx, {IsFocusedRole, WindowRole});
+            emit dataChanged(idx, idx, { IsFocusedRole, WindowRole });
         }
     }
 }

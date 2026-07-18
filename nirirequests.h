@@ -37,18 +37,19 @@ public:
 
     // Typed query wrappers. Each returns a NiriPendingReply.
     // On success, .value is a QVariantMap or gadget as documented per method.
-    Q_INVOKABLE NiriPendingReply *windows();          // value: QVariantList of NiriWindow
-    Q_INVOKABLE NiriPendingReply *workspaces();       // value: QVariantList of NiriWorkspace
-    Q_INVOKABLE NiriPendingReply *outputs();          // value: QVariantMap<name, NiriOutput>
-    Q_INVOKABLE NiriPendingReply *focusedWindow();    // value: NiriWindow (wrapped in QVariant)
-    Q_INVOKABLE NiriPendingReply *focusedOutput();    // value: NiriOutput (wrapped in QVariant)
-    Q_INVOKABLE NiriPendingReply *keyboardLayouts();  // value: NiriKeyboardLayouts (wrapped)
-    Q_INVOKABLE NiriPendingReply *version();          // value: QString
+    Q_INVOKABLE NiriPendingReply *windows(); // value: QVariantList of NiriWindow
+    Q_INVOKABLE NiriPendingReply *workspaces(); // value: QVariantList of NiriWorkspace
+    Q_INVOKABLE NiriPendingReply *outputs(); // value: QVariantMap<name, NiriOutput>
+    Q_INVOKABLE NiriPendingReply *focusedWindow(); // value: NiriWindow (wrapped in QVariant)
+    Q_INVOKABLE NiriPendingReply *focusedOutput(); // value: NiriOutput (wrapped in QVariant)
+    Q_INVOKABLE NiriPendingReply *keyboardLayouts(); // value: NiriKeyboardLayouts (wrapped)
+    Q_INVOKABLE NiriPendingReply *version(); // value: QString
 
 private:
     explicit NiriRequests(QObject *parent = nullptr);
 
-    struct PendingRequest {
+    struct PendingRequest
+    {
         QLocalSocket *socket = nullptr;
         QByteArray sendBuffer;
         QByteArray recvBuffer;

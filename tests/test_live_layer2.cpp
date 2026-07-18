@@ -57,8 +57,8 @@ private:
 void TestLiveLayer2::niriEventLogCollects()
 {
     NiriEventLog log;
-    QProcess::execute("niri", {"msg", "action", "toggle-overview"});
-    QProcess::execute("niri", {"msg", "action", "toggle-overview"});
+    QProcess::execute("niri", { "msg", "action", "toggle-overview" });
+    QProcess::execute("niri", { "msg", "action", "toggle-overview" });
     QVERIFY(waitFor([&]() { return log.rowCount() > 0; }, 5000));
 }
 

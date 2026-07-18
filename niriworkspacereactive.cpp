@@ -2,16 +2,21 @@
 
 #include "nirievents.h"
 
-NiriWorkspaceReactive::NiriWorkspaceReactive(QObject *parent)
-    : QObject(parent)
+NiriWorkspaceReactive::NiriWorkspaceReactive(QObject *parent) : QObject(parent)
 {
     NiriEvents *events = NiriEvents::instance();
-    connect(events, &NiriEvents::workspacesChanged, this, &NiriWorkspaceReactive::onWorkspacesChanged);
-    connect(events, &NiriEvents::workspaceActivated, this, &NiriWorkspaceReactive::onWorkspaceActivated);
-    connect(events, &NiriEvents::workspaceActiveWindowChanged, this, &NiriWorkspaceReactive::onWorkspaceActiveWindowChanged);
+    connect(events, &NiriEvents::workspacesChanged, this,
+            &NiriWorkspaceReactive::onWorkspacesChanged);
+    connect(events, &NiriEvents::workspaceActivated, this,
+            &NiriWorkspaceReactive::onWorkspaceActivated);
+    connect(events, &NiriEvents::workspaceActiveWindowChanged, this,
+            &NiriWorkspaceReactive::onWorkspaceActiveWindowChanged);
 }
 
-QString NiriWorkspaceReactive::workspaceName() const { return m_selectorName; }
+QString NiriWorkspaceReactive::workspaceName() const
+{
+    return m_selectorName;
+}
 void NiriWorkspaceReactive::setWorkspaceName(const QString &name)
 {
     if (m_selectorName == name)
@@ -33,7 +38,10 @@ void NiriWorkspaceReactive::setWorkspaceName(const QString &name)
     }
 }
 
-quint64 NiriWorkspaceReactive::workspaceId() const { return m_selectorId; }
+quint64 NiriWorkspaceReactive::workspaceId() const
+{
+    return m_selectorId;
+}
 void NiriWorkspaceReactive::setWorkspaceId(quint64 id)
 {
     if (m_selectorId == id)
@@ -55,15 +63,42 @@ void NiriWorkspaceReactive::setWorkspaceId(quint64 id)
     }
 }
 
-bool NiriWorkspaceReactive::valid() const { return m_valid; }
-quint64 NiriWorkspaceReactive::id() const { return m_data.id; }
-int NiriWorkspaceReactive::idx() const { return m_data.idx; }
-QString NiriWorkspaceReactive::name() const { return m_data.name; }
-QString NiriWorkspaceReactive::output() const { return m_data.output; }
-bool NiriWorkspaceReactive::isUrgent() const { return m_data.isUrgent; }
-bool NiriWorkspaceReactive::isActive() const { return m_data.isActive; }
-bool NiriWorkspaceReactive::isFocused() const { return m_data.isFocused; }
-quint64 NiriWorkspaceReactive::activeWindowId() const { return m_data.activeWindowId; }
+bool NiriWorkspaceReactive::valid() const
+{
+    return m_valid;
+}
+quint64 NiriWorkspaceReactive::id() const
+{
+    return m_data.id;
+}
+int NiriWorkspaceReactive::idx() const
+{
+    return m_data.idx;
+}
+QString NiriWorkspaceReactive::name() const
+{
+    return m_data.name;
+}
+QString NiriWorkspaceReactive::output() const
+{
+    return m_data.output;
+}
+bool NiriWorkspaceReactive::isUrgent() const
+{
+    return m_data.isUrgent;
+}
+bool NiriWorkspaceReactive::isActive() const
+{
+    return m_data.isActive;
+}
+bool NiriWorkspaceReactive::isFocused() const
+{
+    return m_data.isFocused;
+}
+quint64 NiriWorkspaceReactive::activeWindowId() const
+{
+    return m_data.activeWindowId;
+}
 
 bool NiriWorkspaceReactive::matches(const NiriWorkspace &w) const
 {
@@ -83,7 +118,7 @@ void NiriWorkspaceReactive::updateFrom(const NiriWorkspace &w)
 
 void NiriWorkspaceReactive::clear()
 {
-    m_data = NiriWorkspace{};
+    m_data = NiriWorkspace{ };
     m_valid = false;
 }
 

@@ -28,7 +28,7 @@ static QVariant jsonValueToVariant(const QJsonValue &val, QMetaType targetType);
 
 // Dispatch table for list-of-gadget types. Add a branch when introducing
 // a new QList<Gadget> property.
-template<typename T>
+template <typename T>
 static QVariant typedListFromJson(const QJsonArray &arr)
 {
     QList<T> list;
@@ -44,7 +44,11 @@ using ListConverter = QVariant (*)(const QJsonArray &);
 static ListConverter findListConverter(QMetaType containerType)
 {
 #define BRIDGE(T) +[](const QJsonArray &a) { return typedListFromJson<T>(a); }
-    static const struct { int containerTypeId; ListConverter fn; } table[] = {
+    static const struct
+    {
+        int containerTypeId;
+        ListConverter fn;
+    } table[] = {
         { QMetaType::fromType<QList<NiriMode>>().id(), BRIDGE(NiriMode) },
     };
 #undef BRIDGE
@@ -91,7 +95,7 @@ static QVariant jsonArrayToTypedList(const QJsonArray &arr, QMetaType containerT
 static QVariant jsonValueToVariant(const QJsonValue &val, QMetaType targetType)
 {
     if (val.isNull())
-        return {};
+        return { };
 
     if (val.isObject()) {
         const QMetaObject *mo = targetType.metaObject();
@@ -113,7 +117,7 @@ QVariant jsonToGadget(const QJsonObject &json, QMetaType targetType)
     const QMetaObject *meta = targetType.metaObject();
     if (!meta) {
         qWarning() << "niriqml: jsonToGadget called on non-gadget type" << targetType.name();
-        return {};
+        return { };
     }
 
     QVariant result(targetType);
@@ -152,4 +156,3 @@ QVariantList jsonArrayToGadgets(const QJsonArray &arr, QMetaType elementType)
         result.append(jsonToGadget(v.toObject(), elementType));
     return result;
 }
-

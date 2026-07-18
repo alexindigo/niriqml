@@ -21,8 +21,7 @@ NiriConnection *NiriConnection::instance()
     return &s;
 }
 
-NiriConnection::NiriConnection(QObject *parent)
-    : QObject(parent)
+NiriConnection::NiriConnection(QObject *parent) : QObject(parent)
 {
     connect(&m_socket, &QLocalSocket::connected, this, &NiriConnection::onConnected);
     connect(&m_socket, &QLocalSocket::disconnected, this, &NiriConnection::onDisconnected);
@@ -38,9 +37,18 @@ NiriConnection::NiriConnection(QObject *parent)
     });
 }
 
-bool NiriConnection::isConnected() const { return m_connected; }
-QString NiriConnection::socketPath() const { return m_socketPath; }
-QString NiriConnection::errorString() const { return m_socket.errorString(); }
+bool NiriConnection::isConnected() const
+{
+    return m_connected;
+}
+QString NiriConnection::socketPath() const
+{
+    return m_socketPath;
+}
+QString NiriConnection::errorString() const
+{
+    return m_socket.errorString();
+}
 
 void NiriConnection::connectToSocket(const QString &path)
 {
@@ -54,7 +62,8 @@ void NiriConnection::connectToSocket(const QString &path)
     m_readBuffer.clear();
 
     m_socketPath = path.isEmpty() ? QString::fromUtf8(qgetenv("NIRI_SOCKET")) : path;
-    qInfo() << "NiriConnection: connecting to" << (m_socketPath.isEmpty() ? "(empty!)" : m_socketPath);
+    qInfo() << "NiriConnection: connecting to"
+            << (m_socketPath.isEmpty() ? "(empty!)" : m_socketPath);
     m_socket.connectToServer(m_socketPath);
 }
 
@@ -85,7 +94,8 @@ void NiriConnection::scheduleReconnect()
     // Exponential backoff: 500ms, 1s, 2s, 4s, ... capped at 30s
     int delayMs = qMin(30000, 500 << qMin(m_reconnectAttempt, 6));
     m_reconnectAttempt++;
-    qInfo() << "NiriConnection: reconnect scheduled in" << delayMs << "ms (attempt" << m_reconnectAttempt << ")";
+    qInfo() << "NiriConnection: reconnect scheduled in" << delayMs << "ms (attempt"
+            << m_reconnectAttempt << ")";
     emit reconnectScheduled(delayMs, m_reconnectAttempt);
     m_reconnectTimer.start(delayMs);
 }

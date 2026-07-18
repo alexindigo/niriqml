@@ -116,11 +116,11 @@ void TestConnection::mockSendsStreamEvent()
     // Mock sends a stream event
     QJsonObject payload;
     payload["window"] = QJsonObject{
-        {"id", 2},
-        {"title", "New Window"},
-        {"app_id", "test2"},
+        { "id", 2 },
+        { "title", "New Window" },
+        { "app_id", "test2" },
     };
-    m_mock->sendEvent(QJsonObject{{"WindowOpenedOrChanged", payload}});
+    m_mock->sendEvent(QJsonObject{ { "WindowOpenedOrChanged", payload } });
 
     QVERIFY(eventSpy.wait(1000));
     QCOMPARE(eventSpy.count(), 1);
@@ -132,7 +132,7 @@ void TestConnection::mockSendsStreamEvent()
 void TestConnection::actionRequestReturnsOk()
 {
     QJsonObject action;
-    action["Action"] = QJsonObject{{"FocusWindow", QJsonObject{{"id", 1}}}};
+    action["Action"] = QJsonObject{ { "FocusWindow", QJsonObject{ { "id", 1 } } } };
 
     bool called = false;
     bool okResult = false;
@@ -152,7 +152,7 @@ void TestConnection::actionRequestReturnsError()
     m_mock->setNextActionError(QStringLiteral("Window 999 not found"));
 
     QJsonObject action;
-    action["Action"] = QJsonObject{{"FocusWindow", QJsonObject{{"id", 999}}}};
+    action["Action"] = QJsonObject{ { "FocusWindow", QJsonObject{ { "id", 999 } } } };
 
     bool called = false;
     bool okResult = true;

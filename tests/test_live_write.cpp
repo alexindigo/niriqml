@@ -45,7 +45,7 @@ private slots:
 
 void TestLiveWrite::actionSpawn_reachable()
 {
-    NiriPendingReply *reply = NiriActions::instance()->spawn({"true"});
+    NiriPendingReply *reply = NiriActions::instance()->spawn({ "true" });
     QSignalSpy spy(reply, &NiriPendingReply::finished);
     QVERIFY(spy.wait(3000));
     QVERIFY(!reply->isError());
@@ -157,9 +157,7 @@ void TestLiveWrite::sendRawObjectRequest()
     quint64 id = fw->value().value<NiriWindow>().id;
 
     QJsonObject request;
-    request["Action"] = QJsonObject{
-        {"FocusWindow", QJsonObject{{"id", qint64(id)}}}
-    };
+    request["Action"] = QJsonObject{ { "FocusWindow", QJsonObject{ { "id", qint64(id) } } } };
     NiriPendingReply *reply = NiriRequests::instance()->sendRaw(request);
     QSignalSpy spy(reply, &NiriPendingReply::finished);
     QVERIFY(spy.wait(3000));

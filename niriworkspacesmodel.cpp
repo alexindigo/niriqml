@@ -2,13 +2,15 @@
 
 #include "nirievents.h"
 
-NiriWorkspacesModel::NiriWorkspacesModel(QObject *parent)
-    : QAbstractListModel(parent)
+NiriWorkspacesModel::NiriWorkspacesModel(QObject *parent) : QAbstractListModel(parent)
 {
     NiriEvents *events = NiriEvents::instance();
-    connect(events, &NiriEvents::workspacesChanged, this, &NiriWorkspacesModel::onWorkspacesChanged);
-    connect(events, &NiriEvents::workspaceActivated, this, &NiriWorkspacesModel::onWorkspaceActivated);
-    connect(events, &NiriEvents::workspaceActiveWindowChanged, this, &NiriWorkspacesModel::onWorkspaceActiveWindowChanged);
+    connect(events, &NiriEvents::workspacesChanged, this,
+            &NiriWorkspacesModel::onWorkspacesChanged);
+    connect(events, &NiriEvents::workspaceActivated, this,
+            &NiriWorkspacesModel::onWorkspaceActivated);
+    connect(events, &NiriEvents::workspaceActiveWindowChanged, this,
+            &NiriWorkspacesModel::onWorkspaceActiveWindowChanged);
 
     // Bootstrap from cached snapshot for late subscribers
     QVariantList snapshot = events->lastWorkspacesSnapshot();
@@ -26,34 +28,44 @@ int NiriWorkspacesModel::rowCount(const QModelIndex &parent) const
 QVariant NiriWorkspacesModel::data(const QModelIndex &index, int role) const
 {
     if (!index.isValid() || index.row() < 0 || index.row() >= m_workspaces.size())
-        return {};
+        return { };
 
     const NiriWorkspace &w = m_workspaces.at(index.row());
     switch (role) {
-    case WorkspaceRole:      return QVariant::fromValue(w);
-    case IdRole:             return QVariant::fromValue(w.id);
-    case IdxRole:            return w.idx;
-    case NameRole:           return w.name;
-    case OutputRole:         return w.output;
-    case IsUrgentRole:       return w.isUrgent;
-    case IsActiveRole:       return w.isActive;
-    case IsFocusedRole:      return w.isFocused;
-    case ActiveWindowIdRole: return QVariant::fromValue(w.activeWindowId);
-    default:                 return {};
+    case WorkspaceRole:
+        return QVariant::fromValue(w);
+    case IdRole:
+        return QVariant::fromValue(w.id);
+    case IdxRole:
+        return w.idx;
+    case NameRole:
+        return w.name;
+    case OutputRole:
+        return w.output;
+    case IsUrgentRole:
+        return w.isUrgent;
+    case IsActiveRole:
+        return w.isActive;
+    case IsFocusedRole:
+        return w.isFocused;
+    case ActiveWindowIdRole:
+        return QVariant::fromValue(w.activeWindowId);
+    default:
+        return { };
     }
 }
 
 QHash<int, QByteArray> NiriWorkspacesModel::roleNames() const
 {
     return {
-        { WorkspaceRole,      "workspace" },
-        { IdRole,             "id" },
-        { IdxRole,            "idx" },
-        { NameRole,           "name" },
-        { OutputRole,         "output" },
-        { IsUrgentRole,       "isUrgent" },
-        { IsActiveRole,       "isActive" },
-        { IsFocusedRole,      "isFocused" },
+        { WorkspaceRole, "workspace" },
+        { IdRole, "id" },
+        { IdxRole, "idx" },
+        { NameRole, "name" },
+        { OutputRole, "output" },
+        { IsUrgentRole, "isUrgent" },
+        { IsActiveRole, "isActive" },
+        { IsFocusedRole, "isFocused" },
         { ActiveWindowIdRole, "activeWindowId" },
     };
 }
@@ -121,5 +133,5 @@ void NiriWorkspacesModel::onWorkspaceActiveWindowChanged(quint64 workspaceId, qu
     int row = *it;
     m_workspaces[row].activeWindowId = windowId;
     QModelIndex idx = index(row);
-    emit dataChanged(idx, idx, {ActiveWindowIdRole, WorkspaceRole});
+    emit dataChanged(idx, idx, { ActiveWindowIdRole, WorkspaceRole });
 }

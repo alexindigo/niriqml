@@ -2,17 +2,21 @@
 
 #include "nirievents.h"
 
-NiriWindowReactive::NiriWindowReactive(QObject *parent)
-    : QObject(parent)
+NiriWindowReactive::NiriWindowReactive(QObject *parent) : QObject(parent)
 {
     NiriEvents *events = NiriEvents::instance();
-    connect(events, &NiriEvents::windowOpenedOrChanged, this, &NiriWindowReactive::onWindowOpenedOrChanged);
+    connect(events, &NiriEvents::windowOpenedOrChanged, this,
+            &NiriWindowReactive::onWindowOpenedOrChanged);
     connect(events, &NiriEvents::windowClosed, this, &NiriWindowReactive::onWindowClosed);
     connect(events, &NiriEvents::windowsChanged, this, &NiriWindowReactive::onWindowsChanged);
-    connect(events, &NiriEvents::windowFocusChanged, this, &NiriWindowReactive::onWindowFocusChanged);
+    connect(events, &NiriEvents::windowFocusChanged, this,
+            &NiriWindowReactive::onWindowFocusChanged);
 }
 
-quint64 NiriWindowReactive::windowId() const { return m_windowId; }
+quint64 NiriWindowReactive::windowId() const
+{
+    return m_windowId;
+}
 
 void NiriWindowReactive::setWindowId(quint64 id)
 {
@@ -36,17 +40,50 @@ void NiriWindowReactive::setWindowId(quint64 id)
     }
 }
 
-bool NiriWindowReactive::valid() const { return m_valid; }
-quint64 NiriWindowReactive::id() const { return m_data.id; }
-QString NiriWindowReactive::title() const { return m_data.title; }
-QString NiriWindowReactive::appId() const { return m_data.appId; }
-quint32 NiriWindowReactive::pid() const { return m_data.pid; }
-quint64 NiriWindowReactive::workspaceId() const { return m_data.workspaceId; }
-bool NiriWindowReactive::isFocused() const { return m_data.isFocused; }
-bool NiriWindowReactive::isFloating() const { return m_data.isFloating; }
-bool NiriWindowReactive::isUrgent() const { return m_data.isUrgent; }
-NiriWindowLayout NiriWindowReactive::layout() const { return m_data.layout; }
-NiriTimestamp NiriWindowReactive::focusTimestamp() const { return m_data.focusTimestamp; }
+bool NiriWindowReactive::valid() const
+{
+    return m_valid;
+}
+quint64 NiriWindowReactive::id() const
+{
+    return m_data.id;
+}
+QString NiriWindowReactive::title() const
+{
+    return m_data.title;
+}
+QString NiriWindowReactive::appId() const
+{
+    return m_data.appId;
+}
+quint32 NiriWindowReactive::pid() const
+{
+    return m_data.pid;
+}
+quint64 NiriWindowReactive::workspaceId() const
+{
+    return m_data.workspaceId;
+}
+bool NiriWindowReactive::isFocused() const
+{
+    return m_data.isFocused;
+}
+bool NiriWindowReactive::isFloating() const
+{
+    return m_data.isFloating;
+}
+bool NiriWindowReactive::isUrgent() const
+{
+    return m_data.isUrgent;
+}
+NiriWindowLayout NiriWindowReactive::layout() const
+{
+    return m_data.layout;
+}
+NiriTimestamp NiriWindowReactive::focusTimestamp() const
+{
+    return m_data.focusTimestamp;
+}
 
 void NiriWindowReactive::updateFrom(const NiriWindow &w)
 {
@@ -57,7 +94,7 @@ void NiriWindowReactive::updateFrom(const NiriWindow &w)
 
 void NiriWindowReactive::clear()
 {
-    m_data = NiriWindow{};
+    m_data = NiriWindow{ };
     m_valid = false;
 }
 

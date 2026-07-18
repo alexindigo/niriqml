@@ -11,7 +11,7 @@ QByteArray toSnakeCase(QByteArrayView camel);
 
 QVariant jsonToGadget(const QJsonObject &json, QMetaType targetType);
 
-template<typename T>
+template <typename T>
 T fromNiriJson(const QJsonObject &json)
 {
     return jsonToGadget(json, QMetaType::fromType<T>()).template value<T>();

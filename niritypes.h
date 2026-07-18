@@ -41,12 +41,11 @@ public:
     QList<double> tilePosInWorkspaceView;
     QList<double> windowOffsetInTile;
 
-    bool operator==(const NiriWindowLayout &o) const {
-        return posInScrollingLayout == o.posInScrollingLayout
-            && tileSize == o.tileSize
-            && windowSize == o.windowSize
-            && tilePosInWorkspaceView == o.tilePosInWorkspaceView
-            && windowOffsetInTile == o.windowOffsetInTile;
+    bool operator==(const NiriWindowLayout &o) const
+    {
+        return posInScrollingLayout == o.posInScrollingLayout && tileSize == o.tileSize
+                && windowSize == o.windowSize && tilePosInWorkspaceView == o.tilePosInWorkspaceView
+                && windowOffsetInTile == o.windowOffsetInTile;
     }
 };
 
@@ -79,12 +78,12 @@ public:
     NiriWindowLayout layout;
     NiriTimestamp focusTimestamp;
 
-    bool operator==(const NiriWindow &o) const {
-        return id == o.id && title == o.title && appId == o.appId
-            && pid == o.pid && workspaceId == o.workspaceId
-            && isFocused == o.isFocused && isFloating == o.isFloating
-            && isUrgent == o.isUrgent && layout == o.layout
-            && focusTimestamp == o.focusTimestamp;
+    bool operator==(const NiriWindow &o) const
+    {
+        return id == o.id && title == o.title && appId == o.appId && pid == o.pid
+                && workspaceId == o.workspaceId && isFocused == o.isFocused
+                && isFloating == o.isFloating && isUrgent == o.isUrgent && layout == o.layout
+                && focusTimestamp == o.focusTimestamp;
     }
 };
 
@@ -113,11 +112,11 @@ public:
     bool isFocused = false;
     quint64 activeWindowId = 0;
 
-    bool operator==(const NiriWorkspace &o) const {
-        return id == o.id && idx == o.idx && name == o.name
-            && output == o.output && isUrgent == o.isUrgent
-            && isActive == o.isActive && isFocused == o.isFocused
-            && activeWindowId == o.activeWindowId;
+    bool operator==(const NiriWorkspace &o) const
+    {
+        return id == o.id && idx == o.idx && name == o.name && output == o.output
+                && isUrgent == o.isUrgent && isActive == o.isActive && isFocused == o.isFocused
+                && activeWindowId == o.activeWindowId;
     }
 };
 
@@ -138,9 +137,10 @@ public:
     quint32 refreshRate = 0;
     bool isPreferred = false;
 
-    bool operator==(const NiriMode &o) const {
-        return width == o.width && height == o.height
-            && refreshRate == o.refreshRate && isPreferred == o.isPreferred;
+    bool operator==(const NiriMode &o) const
+    {
+        return width == o.width && height == o.height && refreshRate == o.refreshRate
+                && isPreferred == o.isPreferred;
     }
 };
 
@@ -165,10 +165,10 @@ public:
     double scale = 1.0;
     QString transform;
 
-    bool operator==(const NiriLogicalOutput &o) const {
-        return x == o.x && y == o.y && width == o.width
-            && height == o.height && scale == o.scale
-            && transform == o.transform;
+    bool operator==(const NiriLogicalOutput &o) const
+    {
+        return x == o.x && y == o.y && width == o.width && height == o.height && scale == o.scale
+                && transform == o.transform;
     }
 };
 
@@ -203,11 +203,12 @@ public:
     bool vrrEnabled = false;
     NiriLogicalOutput logical;
 
-    bool operator==(const NiriOutput &o) const {
-        return name == o.name && physicalSize == o.physicalSize
-            && modes == o.modes && currentMode == o.currentMode
-            && isCustomMode == o.isCustomMode && vrrSupported == o.vrrSupported
-            && vrrEnabled == o.vrrEnabled && logical == o.logical;
+    bool operator==(const NiriOutput &o) const
+    {
+        return name == o.name && physicalSize == o.physicalSize && modes == o.modes
+                && currentMode == o.currentMode && isCustomMode == o.isCustomMode
+                && vrrSupported == o.vrrSupported && vrrEnabled == o.vrrEnabled
+                && logical == o.logical;
     }
 };
 
@@ -224,7 +225,8 @@ public:
     QStringList names;
     int currentIdx = 0;
 
-    bool operator==(const NiriKeyboardLayouts &o) const {
+    bool operator==(const NiriKeyboardLayouts &o) const
+    {
         return names == o.names && currentIdx == o.currentIdx;
     }
 };

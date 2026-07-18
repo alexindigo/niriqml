@@ -25,18 +25,32 @@ NiriEvents *NiriEvents::instance()
     return &s;
 }
 
-NiriEvents::NiriEvents(QObject *parent)
-    : QObject(parent)
+NiriEvents::NiriEvents(QObject *parent) : QObject(parent)
 {
-    connect(NiriConnection::instance(), &NiriConnection::eventReceived,
-            this, &NiriEvents::dispatchEvent);
+    connect(NiriConnection::instance(), &NiriConnection::eventReceived, this,
+            &NiriEvents::dispatchEvent);
 }
 
-QVariantList NiriEvents::lastWindowsSnapshot() const { return m_lastWindows; }
-QVariantList NiriEvents::lastWorkspacesSnapshot() const { return m_lastWorkspaces; }
-NiriKeyboardLayouts NiriEvents::lastKeyboardLayouts() const { return m_lastKeyboardLayouts; }
-bool NiriEvents::lastOverviewOpen() const { return m_lastOverviewOpen; }
-quint64 NiriEvents::lastFocusedWindowId() const { return m_lastFocusedWindowId; }
+QVariantList NiriEvents::lastWindowsSnapshot() const
+{
+    return m_lastWindows;
+}
+QVariantList NiriEvents::lastWorkspacesSnapshot() const
+{
+    return m_lastWorkspaces;
+}
+NiriKeyboardLayouts NiriEvents::lastKeyboardLayouts() const
+{
+    return m_lastKeyboardLayouts;
+}
+bool NiriEvents::lastOverviewOpen() const
+{
+    return m_lastOverviewOpen;
+}
+quint64 NiriEvents::lastFocusedWindowId() const
+{
+    return m_lastFocusedWindowId;
+}
 
 void NiriEvents::dispatchEvent(const QString &name, const QVariantMap &payload)
 {
@@ -47,7 +61,8 @@ void NiriEvents::dispatchEvent(const QString &name, const QVariantMap &payload)
 #define NIRI_INT(K) obj.value(QStringLiteral(K)).toInteger()
 #define NIRI_BOOL(K) obj.value(QStringLiteral(K)).toBool()
 #define NIRI_GADGET(K, T) fromNiriJson<T>(obj.value(QStringLiteral(K)).toObject())
-#define NIRI_LIST(K, T) jsonArrayToGadgets(obj.value(QStringLiteral(K)).toArray(), QMetaType::fromType<T>())
+#define NIRI_LIST(K, T) \
+    jsonArrayToGadgets(obj.value(QStringLiteral(K)).toArray(), QMetaType::fromType<T>())
 
     if (name == QStringLiteral("WorkspacesChanged")) {
         m_lastWorkspaces = NIRI_LIST("workspaces", NiriWorkspace);
@@ -126,8 +141,7 @@ void NiriEvents::dispatchEvent(const QString &name, const QVariantMap &payload)
     } else if (name == QStringLiteral("WorkspaceActivated")) {
         emit workspaceActivated(NIRI_INT("id"), NIRI_BOOL("focused"));
     } else if (name == QStringLiteral("WorkspaceActiveWindowChanged")) {
-        emit workspaceActiveWindowChanged(NIRI_INT("workspace_id"),
-                                          NIRI_INT("active_window_id"));
+        emit workspaceActiveWindowChanged(NIRI_INT("workspace_id"), NIRI_INT("active_window_id"));
     } else if (name == QStringLiteral("WindowLayoutsChanged")) {
         emit windowLayoutsChanged(NIRI_ARR("changes").toVariantList());
     }

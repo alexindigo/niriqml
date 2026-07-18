@@ -36,7 +36,8 @@ protected:
 
 private:
     int m_capacity = 500;
-    struct Event {
+    struct Event
+    {
         QString name;
         QVariantMap payload;
     };

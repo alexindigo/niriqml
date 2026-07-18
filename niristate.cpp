@@ -18,8 +18,7 @@ NiriState *NiriState::instance()
     return &s;
 }
 
-NiriState::NiriState(QObject *parent)
-    : QObject(parent)
+NiriState::NiriState(QObject *parent) : QObject(parent)
 {
     NiriEvents *events = NiriEvents::instance();
     connect(events, &NiriEvents::windowsChanged, this, &NiriState::onWindowsChanged);
@@ -38,13 +37,34 @@ NiriState::NiriState(QObject *parent)
         onWorkspacesChanged(workspaces);
 }
 
-quint64 NiriState::focusedWindowId() const { return m_focusedWindowId; }
-QString NiriState::focusedWindowAppId() const { return m_focusedWindowAppId; }
-QString NiriState::focusedWindowTitle() const { return m_focusedWindowTitle; }
-quint64 NiriState::focusedWorkspaceId() const { return m_focusedWorkspaceId; }
-QString NiriState::activeOutput() const { return m_activeOutput; }
-int NiriState::windowCount() const { return m_windowCount; }
-int NiriState::workspaceCount() const { return m_workspaceCount; }
+quint64 NiriState::focusedWindowId() const
+{
+    return m_focusedWindowId;
+}
+QString NiriState::focusedWindowAppId() const
+{
+    return m_focusedWindowAppId;
+}
+QString NiriState::focusedWindowTitle() const
+{
+    return m_focusedWindowTitle;
+}
+quint64 NiriState::focusedWorkspaceId() const
+{
+    return m_focusedWorkspaceId;
+}
+QString NiriState::activeOutput() const
+{
+    return m_activeOutput;
+}
+int NiriState::windowCount() const
+{
+    return m_windowCount;
+}
+int NiriState::workspaceCount() const
+{
+    return m_workspaceCount;
+}
 
 void NiriState::syncFocusedWindowInfo()
 {

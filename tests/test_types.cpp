@@ -11,7 +11,7 @@ private slots:
     void niriWindowDefaults();
 };
 
-void TestTypes::initTestCase() {}
+void TestTypes::initTestCase() { }
 
 void TestTypes::niriWindowDefaults()
 {

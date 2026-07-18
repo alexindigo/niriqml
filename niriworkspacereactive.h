@@ -12,7 +12,8 @@ class NiriWorkspaceReactive : public QObject
     QML_NAMED_ELEMENT(NiriWorkspace)
 
     // Selector: match by name (preferred) or id
-    Q_PROPERTY(QString workspaceName READ workspaceName WRITE setWorkspaceName NOTIFY workspaceNameChanged)
+    Q_PROPERTY(QString workspaceName READ workspaceName WRITE setWorkspaceName NOTIFY
+                       workspaceNameChanged)
     Q_PROPERTY(quint64 workspaceId READ workspaceId WRITE setWorkspaceId NOTIFY workspaceIdChanged)
 
     Q_PROPERTY(bool valid READ valid NOTIFY workspaceChanged)

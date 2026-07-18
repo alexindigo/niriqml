@@ -35,8 +35,8 @@ void TestLiveEvents::rawEventCatchall()
 {
     QSignalSpy spy(NiriEvents::instance(), &NiriEvents::rawEvent);
     // Reliably fire OverviewOpenedOrClosed by toggling overview twice
-    QProcess::execute("niri", {"msg", "action", "toggle-overview"});
-    QProcess::execute("niri", {"msg", "action", "toggle-overview"});
+    QProcess::execute("niri", { "msg", "action", "toggle-overview" });
+    QProcess::execute("niri", { "msg", "action", "toggle-overview" });
     QVERIFY(spy.wait(5000));
 }
 
