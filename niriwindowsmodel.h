@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QAbstractListModel>
+#include <QHash>
 #include <QList>
 #include <QtQml/qqmlregistration.h>
 
@@ -14,6 +15,14 @@ class NiriWindowsModel : public QAbstractListModel
 public:
     enum Roles {
         WindowRole = Qt::UserRole + 1,
+        IdRole,
+        TitleRole,
+        AppIdRole,
+        PidRole,
+        WorkspaceIdRole,
+        IsFocusedRole,
+        IsFloatingRole,
+        IsUrgentRole,
     };
 
     explicit NiriWindowsModel(QObject *parent = nullptr);
@@ -24,6 +33,15 @@ public:
 protected:
     QHash<int, QByteArray> roleNames() const override;
 
+private slots:
+    void onWindowsChanged(const QVariantList &windows);
+    void onWindowOpenedOrChanged(const NiriWindow &window);
+    void onWindowClosed(quint64 id);
+    void onWindowFocusChanged(quint64 id);
+
 private:
     QList<NiriWindow> m_windows;
+    QHash<quint64, int> m_idToRow;
+
+    void rebuildIndex();
 };

@@ -121,6 +121,7 @@ if(BUILD_TEST_MODE)
     add_niriqml_test(test_converter)
     add_niriqml_test(test_live_wire)
     add_niriqml_test(test_live_events)
+    add_niriqml_test(test_live_layer2)
 
     add_executable(test_connection
         tests/test_connection.cpp
