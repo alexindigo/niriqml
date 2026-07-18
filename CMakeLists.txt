@@ -97,7 +97,7 @@ install(FILES
 option(BUILD_TEST_MODE "Build C++ test executables" ON)
 
 if(BUILD_TEST_MODE)
-    find_package(Qt6 REQUIRED COMPONENTS Test)
+    find_package(Qt6 REQUIRED COMPONENTS QuickTest Test)
 
     macro(add_niriqml_test NAME)
         add_executable(${NAME} tests/${NAME}.cpp)
@@ -123,6 +123,26 @@ if(BUILD_TEST_MODE)
     add_niriqml_test(test_live_events)
     add_niriqml_test(test_live_layer2)
     add_niriqml_test(test_live_write)
+
+    add_executable(test_api
+        tests/test_api.cpp
+    )
+    target_include_directories(test_api PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(test_api PRIVATE
+        Qt6::Core Qt6::Quick Qt6::QuickTest Qt6::Network niriqml
+    )
+    enable_testing()
+    add_test(NAME test_api
+        COMMAND test_api
+            -input ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_api.qml
+    )
+    set_tests_properties(test_api PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QML_IMPORT_PATH=${CMAKE_CURRENT_BINARY_DIR}"
+    )
+    if(ENABLE_COVERAGE)
+        target_compile_options(test_api PRIVATE --coverage -fprofile-abs-path)
+        target_link_options(test_api PRIVATE --coverage -fprofile-abs-path)
+    endif()
 
     add_executable(test_connection
         tests/test_connection.cpp
