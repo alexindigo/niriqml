@@ -42,6 +42,8 @@ set(NIRIQML_SOURCES
     nirierror.h
     nirieventlog.cpp
     nirieventlog.h
+    nirilinebuffer.cpp
+    nirilinebuffer.h
 )
 
 qt_add_qml_module(niriqml
@@ -83,6 +85,7 @@ install(FILES
     niripendingreply.h
     nirierror.h
     nirieventlog.h
+    nirilinebuffer.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/niriqml
 )
 
@@ -112,6 +115,26 @@ if(BUILD_TEST_MODE)
 
     add_niriqml_test(test_framing)
     add_niriqml_test(test_types)
+    add_niriqml_test(test_live_wire)
+
+    add_executable(test_connection
+        tests/test_connection.cpp
+        tests/nirimock.h
+        tests/nirimock.cpp
+    )
+    target_include_directories(test_connection PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(test_connection PRIVATE
+        Qt6::Core Qt6::Quick Qt6::Test Qt6::Network niriqml
+    )
+    enable_testing()
+    add_test(NAME test_connection COMMAND test_connection)
+    set_tests_properties(test_connection PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    )
+    if(ENABLE_COVERAGE)
+        target_compile_options(test_connection PRIVATE --coverage -fprofile-abs-path)
+        target_link_options(test_connection PRIVATE --coverage -fprofile-abs-path)
+    endif()
 endif()
 
 # ==================== COVERAGE ====================
