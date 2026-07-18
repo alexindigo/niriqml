@@ -1,8 +1,12 @@
 #include "nirieventlog.h"
 
+#include "nirievents.h"
+
 NiriEventLog::NiriEventLog(QObject *parent)
     : QAbstractListModel(parent)
 {
+    connect(NiriEvents::instance(), &NiriEvents::rawEvent,
+            this, &NiriEventLog::appendEvent);
 }
 
 int NiriEventLog::capacity() const { return m_capacity; }
