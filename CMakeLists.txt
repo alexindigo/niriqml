@@ -44,6 +44,8 @@ set(NIRIQML_SOURCES
     nirieventlog.h
     nirilinebuffer.cpp
     nirilinebuffer.h
+    niriutils.cpp
+    niriutils.h
 )
 
 qt_add_qml_module(niriqml
@@ -86,6 +88,7 @@ install(FILES
     nirierror.h
     nirieventlog.h
     nirilinebuffer.h
+    niriutils.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/niriqml
 )
 
@@ -115,6 +118,7 @@ if(BUILD_TEST_MODE)
 
     add_niriqml_test(test_framing)
     add_niriqml_test(test_types)
+    add_niriqml_test(test_converter)
     add_niriqml_test(test_live_wire)
 
     add_executable(test_connection
