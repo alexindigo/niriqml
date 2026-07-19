@@ -35,6 +35,19 @@ README-snippet test.
 
 ## Tooling
 
-- **`clang-format` enforcement** — the `.clang-format` is Qt canonical, but
-  format-on-save is not yet enabled in the Zed project settings. Add
-  `.zed/settings.json` with `format_on_save: "on"` for C++.
+- **`clang-format` enforcement in CI** — the lint job in `.github/workflows/ci.yml`
+  runs `clang-format --dry-run --Werror` on every push and PR. Non-conformant
+  code cannot merge.
+- **Zed format-on-save** — not yet enabled in the project. Add `.zed/settings.json`
+  with `format_on_save: "on"` for C++ to catch drift before commit.
+- **Pre-commit hook** — the `add-clang-format` skill can install one locally;
+  not committed since `.git/hooks/` is per-checkout.
+
+## Documentation
+
+- **Autogen API.md from headers** — currently API.md is manually written from a
+  grep of the headers. A script could walk Q_PROPERTY/Q_INVOKABLE/signal
+  declarations and emit the markdown automatically. Bonus: catch drift as a
+  lint check.
+- **API.md sync discipline** — when adding a new gadget field, Q_PROPERTY,
+  signal, role, or Q_INVOKABLE, update API.md in the same commit.

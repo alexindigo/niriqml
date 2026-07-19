@@ -33,15 +33,18 @@ late subscribers. Tested against niri 26.04.
 
 - Add `operator!=` to all 8 Q_GADGETs in niritypes.h. Qt 6.5 MOC generates
   `operator!=` for Q_PROPERTY change detection but C++17 does not
-  auto-synthesize `!=` from `==` (that's C++20). Qt ≥ 6.11 does not trigger
-  this; aqtinstall Qt 6.5 does. (`3698eef`)
+  auto-synthesize `!=` from `==` (that's C++20). Qt >=6.11 does not trigger
+  this; aqtinstall Qt 6.5 does. (`b3e4f10`)
 - Pin `Cpp11BracedListStyle: true` in `.clang-format`. The WebKit base style
   default for this key differs between clang-format 20 (Ubuntu 24.04) and 22
-  (Arch). Adds 8 mock-based headless tests for NiriEvents typed dispatch
-  (`1f13dd4`)
-- Iterate CI configuration: Qt 6.10 (ICU 74 compatibility), clang-format-20,
-  system deps (libgl, libdbus, libxkbcommon), coverage on/off (`f792fe7`
-  through `b28a8d1`)
+  (Arch). Without the pin, both versions emit conflicting formatting. (`39ece54`)
+
+### CI
+
+- GitHub Actions workflow on ubuntu-24.04: Qt 6.10 via install-qt-action
+  (ICU 74 compatible), cmake+ninja debug build with coverage, ctest excluding
+  live_* and test_api targets, lcov capture and HTML artifact upload. Lint
+  job runs clang-format-20 dry-run --Werror on all C++ sources. (`4f9a89e`)
 
 ### Refactor
 
@@ -53,6 +56,8 @@ late subscribers. Tested against niri 26.04.
 - Comprehensive README.md with verified-by-inspection QML snippets covering
   every API surface (models, state, events, reactives, actions, queries,
   sendRaw) (`4e330e2`)
+- API.md: full reference covering 5 singletons, 5 elements, 8 value types,
+  NiriPendingReply, NiriError. Every Q_PROPERTY/signal/Q_INVOKABLE spelled out
 - Committed niri 26.04 IPC schema snapshot (`docs/SCHEMA.md`)
 - FutureDevelopment.md with executable-README-snippets idea, remaining IPC
   surface, packaging, and performance backlog items
@@ -62,4 +67,6 @@ late subscribers. Tested against niri 26.04.
 - QML registration smoke test: verifies all 5 singletons + 5 QML_NAMED_ELEMENT
   types are creatable and key Q_PROPERTYs exist. Runs headless (no
   NIRI_SOCKET), compatible with CI (`8cedfd1`)
-- CHANGELOG.md with commit-date-grouped severity blocks (`f8b17eb`)
+- 8 mock-based headless tests for NiriEvents typed dispatch (test_events).
+  Injects synthetic events via QMetaObject::invokeMethod and asserts typed
+  signals and cached snapshots (`39ece54`)
