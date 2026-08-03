@@ -1,5 +1,7 @@
 #include "niriworkspacereactive.h"
 
+#include <optional>
+
 #include "nirievents.h"
 
 NiriWorkspaceReactive::NiriWorkspaceReactive(QObject *parent) : QObject(parent)
@@ -143,16 +145,16 @@ void NiriWorkspaceReactive::onWorkspaceActivated(quint64 workspaceId, bool focus
         return;
     // Look up the activated workspace to find its output. If it matches our
     // workspace's output, our isActive flag needs updating.
-    const NiriWorkspace *target = nullptr;
+    std::optional<NiriWorkspace> target;
     QVariantList snapshot = NiriEvents::instance()->lastWorkspacesSnapshot();
     for (const QVariant &v : snapshot) {
         NiriWorkspace w = v.value<NiriWorkspace>();
         if (w.id == workspaceId) {
-            target = &w;
+            target = w;
             break;
         }
     }
-    if (!target)
+    if (!target.has_value())
         return;
 
     if (m_data.output != target->output && m_data.id != workspaceId)
