@@ -6,6 +6,7 @@
 #include <QLocalSocket>
 #include <QObject>
 #include <QQmlEngine>
+#include <QTimer>
 #include <QtQml/qqmlregistration.h>
 #include <functional>
 
@@ -45,6 +46,9 @@ public:
     Q_INVOKABLE NiriPendingReply *keyboardLayouts(); // value: NiriKeyboardLayouts (wrapped)
     Q_INVOKABLE NiriPendingReply *version(); // value: QString
 
+    void setRequestTimeoutMs(int ms) { m_requestTimeoutMs = ms; }
+    int requestTimeoutMs() const { return m_requestTimeoutMs; }
+
 private:
     explicit NiriRequests(QObject *parent = nullptr);
 
@@ -55,8 +59,11 @@ private:
         QByteArray recvBuffer;
         Callback callback;
         bool finished = false;
+        int requestTimerId = -1;
     };
 
     QString socketPath() const;
     void completeRequest(PendingRequest *pr, bool ok, const QJsonObject &result);
+
+    int m_requestTimeoutMs = 5000;
 };

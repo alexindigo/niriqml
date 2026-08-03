@@ -41,6 +41,11 @@ void NiriRequests::completeRequest(PendingRequest *pr, bool ok, const QJsonObjec
         return;
     pr->finished = true;
 
+    if (pr->requestTimerId >= 0) {
+        killTimer(pr->requestTimerId);
+        pr->requestTimerId = -1;
+    }
+
     Callback cb = pr->callback;
 
     if (pr->socket) {
@@ -78,6 +83,17 @@ void NiriRequests::sendJson(const QJsonValue &request, Callback callback)
                 QJsonDocument::fromVariant(request.toVariant()).toJson(QJsonDocument::Compact)
                 + "\n";
     }
+
+    auto *timeout = new QTimer(this);
+    timeout->setSingleShot(true);
+    connect(timeout, &QTimer::timeout, this, [pr, this]() {
+        if (!pr->finished) {
+            pr->requestTimerId = -1;
+            completeRequest(pr, false, QJsonObject{{"error", "Timeout"}});
+        }
+    });
+    timeout->start(m_requestTimeoutMs);
+    pr->requestTimerId = timeout->timerId();
 
     connect(pr->socket, &QLocalSocket::connected, this,
             [pr]() { pr->socket->write(pr->sendBuffer); });

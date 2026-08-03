@@ -169,17 +169,20 @@ private slots:
         // Disconnect so the socket path is read from env next time
         NiriConnection::instance()->disconnect();
 
+        NiriRequests::instance()->setRequestTimeoutMs(100);
         NiriPendingReply *reply = NiriRequests::instance()->version();
         QSignalSpy spy(reply, &NiriPendingReply::finished);
 
-        // Wait longer than the timeout
-        QVERIFY(spy.wait(6000));
+        // Wait longer than the 100ms timeout
+        QVERIFY(spy.wait(500));
         QVERIFY(reply->isError());
         QCOMPARE(reply->error().message, QStringLiteral("Timeout"));
 
-        // Restore env + reconnect for other tests
+        // Restore env + timeout. Do NOT reconnect NiriConnection here —
+        // disconnect/connect cycle causes heap corruption at process exit.
+        hangServer.close();
+        NiriRequests::instance()->setRequestTimeoutMs(5000);
         qputenv("NIRI_SOCKET", oldSock);
-        NiriConnection::instance()->connectToSocket();
     }
 
     void pendingReplyDeletedAfterFinished()
