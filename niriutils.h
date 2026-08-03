@@ -18,3 +18,5 @@ T fromNiriJson(const QJsonObject &json)
 }
 
 QVariantList jsonArrayToGadgets(const QJsonArray &arr, QMetaType elementType);
+
+int snakeCaseCacheSizeForTesting();

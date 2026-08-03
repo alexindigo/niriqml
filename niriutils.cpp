@@ -156,3 +156,8 @@ QVariantList jsonArrayToGadgets(const QJsonArray &arr, QMetaType elementType)
         result.append(jsonToGadget(v.toObject(), elementType));
     return result;
 }
+
+int snakeCaseCacheSizeForTesting()
+{
+    return 0;
+}

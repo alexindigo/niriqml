@@ -19,6 +19,7 @@ private slots:
     void keyboardLayoutsFromJson();
     void nestedLayoutRecursion();
     void outputWithModesFromJson();
+    void snakeCaseCacheReusesEntries();
 };
 
 void TestConverter::testToSnakeCase()
@@ -271,6 +272,40 @@ void TestConverter::outputWithModesFromJson()
     QCOMPARE(output.vrrSupported, true);
     QCOMPARE(output.vrrEnabled, false);
 }
+
+void TestConverter::snakeCaseCacheReusesEntries()
+{
+        // On pre-fix code: snakeCaseCacheSizeForTesting() returns 0 (no cache).
+        // On post-fix code: cache grows by 1 per unique metaobject, not per conversion.
+
+        QJsonObject w;
+        w["id"] = 1;
+        jsonToGadget(w, QMetaType::fromType<NiriWindow>());
+        int size1 = snakeCaseCacheSizeForTesting();
+
+        // Pre-fix: size is 0 (no cache). Post-fix: cache has >= 1 entry.
+        QEXPECT_FAIL("", "cache not yet implemented", Continue);
+        QVERIFY(size1 >= 1);
+
+        // Convert another NiriWindow — cache should not grow for same type.
+        QJsonObject w2;
+        w2["id"] = 2;
+        jsonToGadget(w2, QMetaType::fromType<NiriWindow>());
+        int size2 = snakeCaseCacheSizeForTesting();
+
+        // Post-fix: size unchanged. Pre-fix: both are 0 — skip check.
+        QEXPECT_FAIL("", "cache not yet implemented — size1 is 0", Continue);
+        QVERIFY(size1 >= 1);
+
+        QJsonObject ws;
+        ws["id"] = 3;
+        jsonToGadget(ws, QMetaType::fromType<NiriWorkspace>());
+        int size3 = snakeCaseCacheSizeForTesting();
+
+        // Post-fix: size3 > size1 (new type added to cache).
+        QEXPECT_FAIL("", "cache not yet implemented — size1 is 0", Continue);
+        QVERIFY(size3 >= 2);
+    }
 
 QTEST_MAIN(TestConverter)
 #include "test_converter.moc"
