@@ -13,6 +13,7 @@
 #include "niriconnection.h"
 #include "nirievents.h"
 #include "niritypes.h"
+#include "niriworkspacereactive.h"
 
 class TestEvents : public QObject
 {
@@ -151,6 +152,37 @@ private slots:
         QVariantList snap = NiriEvents::instance()->lastWindowsSnapshot();
         QCOMPARE(snap.size(), 1);
         QCOMPARE(snap.at(0).value<NiriWindow>().id, quint64(2));
+    }
+
+    void workspaceReactiveHandlesActivation()
+    {
+        // Bootstrap: send WorkspacesChanged with two workspaces
+        QJsonArray wss;
+        QJsonObject ws1, ws2;
+        ws1["id"] = 1;
+        ws1["output"] = QStringLiteral("eDP-1");
+        ws1["is_active"] = true;
+        ws2["id"] = 2;
+        ws2["output"] = QStringLiteral("eDP-1");
+        ws2["is_active"] = false;
+        wss.append(ws1);
+        wss.append(ws2);
+        QJsonObject payload;
+        payload["workspaces"] = wss;
+        emitEvent(QStringLiteral("WorkspacesChanged"),
+                  {{QStringLiteral("workspaces"), wss.toVariantList()}});
+
+        NiriWorkspaceReactive reactive;
+        reactive.setWorkspaceId(2);
+        QVERIFY(reactive.valid());
+        QVERIFY(!reactive.isActive());
+
+        // Fire WorkspaceActivated — reads target->output after loop exit.
+        // On buggy code: dangling stack pointer under ASan, garbage otherwise.
+        emitEvent(QStringLiteral("WorkspaceActivated"),
+                  {{QStringLiteral("id"), 2}, {QStringLiteral("focused"), true}});
+
+        QVERIFY(reactive.isActive());
     }
 
 private:
