@@ -169,12 +169,9 @@ private slots:
         // guard still valid immediately after synchronous finished() emission
         QVERIFY(!guard.isNull());
 
-        // Pump event loop — deleteLater fires here
-        QCoreApplication::processEvents();
+        // Pump event loop — deleteLater fires via QTest::qWait
+        QTest::qWait(50);
 
-        // Post-fix: guard is null (deleteLater cleaned up).
-        // Pre-fix: guard remains non-null (reply retained by singleton parent).
-        QEXPECT_FAIL("", "reply retained by singleton parent — heap accumulation bug", Continue);
         QVERIFY(guard.isNull());
     }
 

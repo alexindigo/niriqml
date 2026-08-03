@@ -1,6 +1,9 @@
 #include "niripendingreply.h"
 
-NiriPendingReply::NiriPendingReply(QObject *parent) : QObject(parent) { }
+NiriPendingReply::NiriPendingReply(QObject *parent) : QObject(parent)
+{
+    connect(this, &NiriPendingReply::finished, this, &QObject::deleteLater);
+}
 
 bool NiriPendingReply::isError() const
 {
