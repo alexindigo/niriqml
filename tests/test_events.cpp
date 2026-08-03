@@ -10,6 +10,7 @@
 #include <QSignalSpy>
 #include <QTest>
 
+#include <QLocalServer>
 #include <QPointer>
 
 #include "niriconnection.h"
@@ -156,6 +157,29 @@ private slots:
         QVariantList snap = NiriEvents::instance()->lastWindowsSnapshot();
         QCOMPARE(snap.size(), 1);
         QCOMPARE(snap.at(0).value<NiriWindow>().id, quint64(2));
+    }
+
+    void socketTimeoutFailsAfterDelay()
+    {
+        QLocalServer hangServer;
+        QVERIFY(hangServer.listen(QStringLiteral("niriqml-test-hang")));
+        // Save old env and point at hanging server
+        QByteArray oldSock = qgetenv("NIRI_SOCKET");
+        qputenv("NIRI_SOCKET", "/tmp/niriqml-test-hang");
+        // Disconnect so the socket path is read from env next time
+        NiriConnection::instance()->disconnect();
+
+        NiriPendingReply *reply = NiriRequests::instance()->version();
+        QSignalSpy spy(reply, &NiriPendingReply::finished);
+
+        // Wait longer than the timeout
+        QVERIFY(spy.wait(6000));
+        QVERIFY(reply->isError());
+        QCOMPARE(reply->error().message, QStringLiteral("Timeout"));
+
+        // Restore env + reconnect for other tests
+        qputenv("NIRI_SOCKET", oldSock);
+        NiriConnection::instance()->connectToSocket();
     }
 
     void pendingReplyDeletedAfterFinished()
