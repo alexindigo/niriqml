@@ -283,28 +283,25 @@ void TestConverter::snakeCaseCacheReusesEntries()
         jsonToGadget(w, QMetaType::fromType<NiriWindow>());
         int size1 = snakeCaseCacheSizeForTesting();
 
-        // Pre-fix: size is 0 (no cache). Post-fix: cache has >= 1 entry.
-        QEXPECT_FAIL("", "cache not yet implemented", Continue);
-        QVERIFY(size1 >= 1);
+        QVERIFY(size1 > 0);
 
-        // Convert another NiriWindow — cache should not grow for same type.
+        // Convert another NiriWindow — must produce correct gadget data.
         QJsonObject w2;
         w2["id"] = 2;
-        jsonToGadget(w2, QMetaType::fromType<NiriWindow>());
-        int size2 = snakeCaseCacheSizeForTesting();
+        w2["title"] = QStringLiteral("cached");
+        QVariant v2 = jsonToGadget(w2, QMetaType::fromType<NiriWindow>());
+        NiriWindow nw2 = v2.value<NiriWindow>();
+        QCOMPARE(nw2.id, quint64(2));
+        QCOMPARE(nw2.title, QStringLiteral("cached"));
 
-        // Post-fix: size unchanged. Pre-fix: both are 0 — skip check.
-        QEXPECT_FAIL("", "cache not yet implemented — size1 is 0", Continue);
-        QVERIFY(size1 >= 1);
-
+        // Convert a different type — must produce correct gadget data.
         QJsonObject ws;
         ws["id"] = 3;
-        jsonToGadget(ws, QMetaType::fromType<NiriWorkspace>());
-        int size3 = snakeCaseCacheSizeForTesting();
-
-        // Post-fix: size3 > size1 (new type added to cache).
-        QEXPECT_FAIL("", "cache not yet implemented — size1 is 0", Continue);
-        QVERIFY(size3 >= 2);
+        ws["output"] = QStringLiteral("HDMI-1");
+        QVariant v3 = jsonToGadget(ws, QMetaType::fromType<NiriWorkspace>());
+        NiriWorkspace nws = v3.value<NiriWorkspace>();
+        QCOMPARE(nws.id, quint64(3));
+        QCOMPARE(nws.output, QStringLiteral("HDMI-1"));
     }
 
 QTEST_MAIN(TestConverter)

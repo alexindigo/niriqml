@@ -7,6 +7,8 @@
 
 #include "niritypes.h"
 
+static QHash<const QMetaObject *, QVector<QByteArray>> g_snakeCaseCache;
+
 QByteArray toSnakeCase(QByteArrayView camel)
 {
     QByteArray result;
@@ -124,12 +126,20 @@ QVariant jsonToGadget(const QJsonObject &json, QMetaType targetType)
     void *instance = result.data();
     QByteArray fullTypeName(targetType.name());
 
+    if (!g_snakeCaseCache.contains(meta)) {
+        QVector<QByteArray> keys(meta->propertyCount());
+        for (int i = 0; i < meta->propertyCount(); ++i)
+            keys[i] = toSnakeCase(meta->property(i).name());
+        g_snakeCaseCache.insert(meta, keys);
+    }
+    const QVector<QByteArray> &snakeKeys = g_snakeCaseCache[meta];
+
     for (int i = 0; i < meta->propertyCount(); ++i) {
         QMetaProperty prop = meta->property(i);
         if (!prop.isWritable())
             continue;
 
-        QByteArray snakeKey = toSnakeCase(prop.name());
+        const QByteArray &snakeKey = snakeKeys[i];
         QJsonValue val = json.value(QString::fromUtf8(snakeKey));
         if (val.isNull())
             continue;
@@ -159,5 +169,5 @@ QVariantList jsonArrayToGadgets(const QJsonArray &arr, QMetaType elementType)
 
 int snakeCaseCacheSizeForTesting()
 {
-    return 0;
+    return g_snakeCaseCache.size();
 }
