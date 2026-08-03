@@ -275,34 +275,34 @@ void TestConverter::outputWithModesFromJson()
 
 void TestConverter::snakeCaseCacheReusesEntries()
 {
-        // On pre-fix code: snakeCaseCacheSizeForTesting() returns 0 (no cache).
-        // On post-fix code: cache grows by 1 per unique metaobject, not per conversion.
+    // On pre-fix code: snakeCaseCacheSizeForTesting() returns 0 (no cache).
+    // On post-fix code: cache grows by 1 per unique metaobject, not per conversion.
 
-        QJsonObject w;
-        w["id"] = 1;
-        jsonToGadget(w, QMetaType::fromType<NiriWindow>());
-        int size1 = snakeCaseCacheSizeForTesting();
+    QJsonObject w;
+    w["id"] = 1;
+    jsonToGadget(w, QMetaType::fromType<NiriWindow>());
+    int size1 = snakeCaseCacheSizeForTesting();
 
-        QVERIFY(size1 > 0);
+    QVERIFY(size1 > 0);
 
-        // Convert another NiriWindow — must produce correct gadget data.
-        QJsonObject w2;
-        w2["id"] = 2;
-        w2["title"] = QStringLiteral("cached");
-        QVariant v2 = jsonToGadget(w2, QMetaType::fromType<NiriWindow>());
-        NiriWindow nw2 = v2.value<NiriWindow>();
-        QCOMPARE(nw2.id, quint64(2));
-        QCOMPARE(nw2.title, QStringLiteral("cached"));
+    // Convert another NiriWindow — must produce correct gadget data.
+    QJsonObject w2;
+    w2["id"] = 2;
+    w2["title"] = QStringLiteral("cached");
+    QVariant v2 = jsonToGadget(w2, QMetaType::fromType<NiriWindow>());
+    NiriWindow nw2 = v2.value<NiriWindow>();
+    QCOMPARE(nw2.id, quint64(2));
+    QCOMPARE(nw2.title, QStringLiteral("cached"));
 
-        // Convert a different type — must produce correct gadget data.
-        QJsonObject ws;
-        ws["id"] = 3;
-        ws["output"] = QStringLiteral("HDMI-1");
-        QVariant v3 = jsonToGadget(ws, QMetaType::fromType<NiriWorkspace>());
-        NiriWorkspace nws = v3.value<NiriWorkspace>();
-        QCOMPARE(nws.id, quint64(3));
-        QCOMPARE(nws.output, QStringLiteral("HDMI-1"));
-    }
+    // Convert a different type — must produce correct gadget data.
+    QJsonObject ws;
+    ws["id"] = 3;
+    ws["output"] = QStringLiteral("HDMI-1");
+    QVariant v3 = jsonToGadget(ws, QMetaType::fromType<NiriWorkspace>());
+    NiriWorkspace nws = v3.value<NiriWorkspace>();
+    QCOMPARE(nws.id, quint64(3));
+    QCOMPARE(nws.output, QStringLiteral("HDMI-1"));
+}
 
 QTEST_MAIN(TestConverter)
 #include "test_converter.moc"
