@@ -10,8 +10,12 @@
 #include <QSignalSpy>
 #include <QTest>
 
+#include <QPointer>
+
 #include "niriconnection.h"
 #include "nirievents.h"
+#include "niripendingreply.h"
+#include "nirirequests.h"
 #include "niritypes.h"
 #include "niriworkspacereactive.h"
 
@@ -152,6 +156,26 @@ private slots:
         QVariantList snap = NiriEvents::instance()->lastWindowsSnapshot();
         QCOMPARE(snap.size(), 1);
         QCOMPARE(snap.at(0).value<NiriWindow>().id, quint64(2));
+    }
+
+    void pendingReplyDeletedAfterFinished()
+    {
+        NiriPendingReply *reply = new NiriPendingReply(NiriRequests::instance());
+        QPointer<NiriPendingReply> guard(reply);
+        QVERIFY(!guard.isNull());
+
+        reply->setFinished(QVariant(42));
+
+        // guard still valid immediately after synchronous finished() emission
+        QVERIFY(!guard.isNull());
+
+        // Pump event loop — deleteLater fires here
+        QCoreApplication::processEvents();
+
+        // Post-fix: guard is null (deleteLater cleaned up).
+        // Pre-fix: guard remains non-null (reply retained by singleton parent).
+        QEXPECT_FAIL("", "reply retained by singleton parent — heap accumulation bug", Continue);
+        QVERIFY(guard.isNull());
     }
 
     void workspaceReactiveHandlesActivation()
