@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-08-02
+
+### Fix
+
+- Stack use-after-free in `NiriWorkspaceReactive::onWorkspaceActivated`:
+  the `target` pointer took the address of a stack-local `w` in the for-loop
+  body. After loop exit, `w` was destroyed and `target->output` dereferenced
+  dangling memory. Replaced with `std::optional<NiriWorkspace>` (`2a892eb`,
+  `97377f6`)
+- Heap accumulation of `NiriPendingReply` objects: replies were parented to
+  long-lived singletons (NiriActions, NiriRequests) and retained indefinitely.
+  Added `connect(finished, deleteLater)` in the constructor (`1067224`,
+  `5eee509`)
+- Missing timeout on query sockets: if niri hangs, `NiriRequests::sendJson()`
+  left the `PendingRequest` and `QLocalSocket` in memory indefinitely. Added
+  configurable timeout (default 5s) with `QTimer` per request (`9a0fc0a`,
+  `c363001`)
+- Repeated `QByteArray` allocations in `jsonToGadget()`:
+  `toSnakeCase(prop.name())` called on every property of every gadget
+  conversion. Cached per `QMetaObject` in a static hash (`2fa9605`,
+  `de5c0a6`)
+
+All four findings from Gemini code review of v0.1.0. Each fix includes a
+regression test verified to fail on pre-fix code.
+
 ## 2026-07-18
 
 ### Feature
