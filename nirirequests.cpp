@@ -94,9 +94,8 @@ void NiriRequests::sendJson(const QJsonValue &request, Callback callback)
     // the timer, this connection is severed, so the lambda can never fire
     // after pr has been deleted (previously the context was `this`, so a
     // late/spurious timeout dereferenced freed PendingRequest — UAF).
-    connect(timeout, &QTimer::timeout, timeout, [pr, this]() {
-        completeRequest(pr, false, QJsonObject{{"error", "Timeout"}});
-    });
+    connect(timeout, &QTimer::timeout, timeout,
+            [pr, this]() { completeRequest(pr, false, QJsonObject{{"error", "Timeout"}}); });
     timeout->start(m_requestTimeoutMs);
     pr->timeout = timeout;
 
