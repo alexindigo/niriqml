@@ -106,21 +106,23 @@ void NiriEvents::dispatchEvent(const QString &name, const QVariantMap &payload)
             m_lastFocusedWindowId = 0;
         emit windowClosed(id);
     } else if (name == QStringLiteral("WindowFocusChanged")) {
+        // id is Option<u64>: null becomes 0 here and means "nothing is
+        // focused anymore" (e.g. switched to an empty workspace). Don't
+        // drop it — consumers must clear their focused state, otherwise the
+        // last focused window looks focused forever.
         quint64 id = NIRI_INT("id");
-        if (id != 0) {
-            m_lastFocusedWindowId = id;
-            // Update isFocused flag in cached snapshot so late subscribers
-            // that bootstrap from lastWindowsSnapshot() see accurate focus state.
-            for (int i = 0; i < m_lastWindows.size(); ++i) {
-                NiriWindow w = m_lastWindows[i].value<NiriWindow>();
-                bool nowFocused = (w.id == id);
-                if (w.isFocused != nowFocused) {
-                    w.isFocused = nowFocused;
-                    m_lastWindows[i] = QVariant::fromValue(w);
-                }
+        m_lastFocusedWindowId = id;
+        // Update isFocused flag in cached snapshot so late subscribers
+        // that bootstrap from lastWindowsSnapshot() see accurate focus state.
+        for (int i = 0; i < m_lastWindows.size(); ++i) {
+            NiriWindow w = m_lastWindows[i].value<NiriWindow>();
+            bool nowFocused = (id != 0 && w.id == id);
+            if (w.isFocused != nowFocused) {
+                w.isFocused = nowFocused;
+                m_lastWindows[i] = QVariant::fromValue(w);
             }
-            emit windowFocusChanged(id);
         }
+        emit windowFocusChanged(id);
     } else if (name == QStringLiteral("KeyboardLayoutsChanged")) {
         m_lastKeyboardLayouts = NIRI_GADGET("keyboard_layouts", NiriKeyboardLayouts);
         emit keyboardLayoutsChanged(m_lastKeyboardLayouts);

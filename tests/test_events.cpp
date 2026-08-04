@@ -225,14 +225,8 @@ private slots:
         // when focus clears — e.g. switching to an empty workspace.
         emitEvent("WindowFocusChanged", {{"id", 0}});
 
-        // Pre-fix: id==0 silently dropped. Focused state stays stale forever.
-        QEXPECT_FAIL("", "id==0 silently dropped — focus state never clears", Continue);
         QCOMPARE(NiriEvents::instance()->lastFocusedWindowId(), quint64(0));
-        // Pre-fix: windowFocusChanged never emitted for id==0.
-        QEXPECT_FAIL("", "signal not emitted for null-id", Continue);
         QCOMPARE(spy.count(), 1);
-        // Pre-fix: cached snapshot still has is_focused==true for id=1.
-        QEXPECT_FAIL("", "snapshot isFocused flags not cleared", Continue);
         for (const QVariant &v : NiriEvents::instance()->lastWindowsSnapshot()) {
             NiriWindow w = v.value<NiriWindow>();
             QVERIFY(!w.isFocused);
