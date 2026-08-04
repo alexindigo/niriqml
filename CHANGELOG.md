@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-08-03
+
+### Fix
+
+- WindowFocusChanged with focal-window=null (id:0) now correctly clears
+  focused state. niri sends `{id: None}` when switching to an empty
+  workspace; the old code silently dropped `id==0`, keeping the last
+  focused window's state stale forever (`11ce8b0`, `b219c86`)
+- NiriConnection shutdown SIGSEGV: the implicit destructor called
+  `~QLocalSocket() → disconnectFromHost()` which started a QTimer while
+  Qt's event dispatcher was half-gone. Explicit destructor now calls
+  `abort()` (immediate close) and stops the reconnect timer first
+  (`4bc7b95`)
+- NiriRequests timeout timer upgraded from `killTimer()` to `QTimer*`
+  with context-bound connection. When a reply arrives before the
+  timeout fires, `deleteLater` on the timer severs the connection
+  automatically — prevents use-after-free from a late/spurious timeout
+  lambda dereferencing freed `PendingRequest` (`d41eb31`)
+
+All three found and validated in Atmosphera integration testing.
+
 ## 2026-08-02
 
 ### Fix
