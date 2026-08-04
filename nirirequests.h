@@ -55,11 +55,11 @@ private:
     struct PendingRequest
     {
         QLocalSocket *socket = nullptr;
+        QTimer *timeout = nullptr;
         QByteArray sendBuffer;
         QByteArray recvBuffer;
         Callback callback;
         bool finished = false;
-        int requestTimerId = -1;
     };
 
     QString socketPath() const;

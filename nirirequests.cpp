@@ -41,9 +41,13 @@ void NiriRequests::completeRequest(PendingRequest *pr, bool ok, const QJsonObjec
         return;
     pr->finished = true;
 
-    if (pr->requestTimerId >= 0) {
-        killTimer(pr->requestTimerId);
-        pr->requestTimerId = -1;
+    // Disarm the timeout and schedule its deletion. Deleting the timer also
+    // severs its (context-bound) timeout connection, so the lambda can never
+    // fire after pr is gone.
+    if (pr->timeout) {
+        pr->timeout->stop();
+        pr->timeout->deleteLater();
+        pr->timeout = nullptr;
     }
 
     Callback cb = pr->callback;
@@ -86,14 +90,15 @@ void NiriRequests::sendJson(const QJsonValue &request, Callback callback)
 
     auto *timeout = new QTimer(this);
     timeout->setSingleShot(true);
-    connect(timeout, &QTimer::timeout, this, [pr, this]() {
-        if (!pr->finished) {
-            pr->requestTimerId = -1;
-            completeRequest(pr, false, QJsonObject{{"error", "Timeout"}});
-        }
+    // Context = the timer itself: when completeRequest disarms and deletes
+    // the timer, this connection is severed, so the lambda can never fire
+    // after pr has been deleted (previously the context was `this`, so a
+    // late/spurious timeout dereferenced freed PendingRequest — UAF).
+    connect(timeout, &QTimer::timeout, timeout, [pr, this]() {
+        completeRequest(pr, false, QJsonObject{{"error", "Timeout"}});
     });
     timeout->start(m_requestTimeoutMs);
-    pr->requestTimerId = timeout->timerId();
+    pr->timeout = timeout;
 
     connect(pr->socket, &QLocalSocket::connected, this,
             [pr]() { pr->socket->write(pr->sendBuffer); });
