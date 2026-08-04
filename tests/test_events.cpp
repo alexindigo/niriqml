@@ -202,6 +202,43 @@ private slots:
         QVERIFY(guard.isNull());
     }
 
+    void clearFocusOnNullId()
+    {
+        // Bootstrap two windows — id=1 focused, id=2 not
+        QJsonArray windows;
+        QJsonObject w1, w2;
+        w1["id"] = 1;
+        w1["title"] = QStringLiteral("focused");
+        w1["is_focused"] = true;
+        w2["id"] = 2;
+        w2["title"] = QStringLiteral("unfocused");
+        w2["is_focused"] = false;
+        windows.append(w1);
+        windows.append(w2);
+        emitEvent("WindowsChanged", {{"windows", windows.toVariantList()}});
+
+        QCOMPARE(NiriEvents::instance()->lastFocusedWindowId(), quint64(1));
+
+        QSignalSpy spy(NiriEvents::instance(), &NiriEvents::windowFocusChanged);
+
+        // niri sends WindowFocusChanged { id: null } (JSON decodes as 0)
+        // when focus clears — e.g. switching to an empty workspace.
+        emitEvent("WindowFocusChanged", {{"id", 0}});
+
+        // Pre-fix: id==0 silently dropped. Focused state stays stale forever.
+        QEXPECT_FAIL("", "id==0 silently dropped — focus state never clears", Continue);
+        QCOMPARE(NiriEvents::instance()->lastFocusedWindowId(), quint64(0));
+        // Pre-fix: windowFocusChanged never emitted for id==0.
+        QEXPECT_FAIL("", "signal not emitted for null-id", Continue);
+        QCOMPARE(spy.count(), 1);
+        // Pre-fix: cached snapshot still has is_focused==true for id=1.
+        QEXPECT_FAIL("", "snapshot isFocused flags not cleared", Continue);
+        for (const QVariant &v : NiriEvents::instance()->lastWindowsSnapshot()) {
+            NiriWindow w = v.value<NiriWindow>();
+            QVERIFY(!w.isFocused);
+        }
+    }
+
     void workspaceReactiveHandlesActivation()
     {
         // Bootstrap: send WorkspacesChanged with two workspaces
