@@ -41,6 +41,7 @@ signals:
 
 private:
     explicit NiriConnection(QObject *parent = nullptr);
+    ~NiriConnection() override;
 
     void onConnected();
     void onDisconnected();

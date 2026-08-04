@@ -37,6 +37,18 @@ NiriConnection::NiriConnection(QObject *parent) : QObject(parent)
     });
 }
 
+NiriConnection::~NiriConnection()
+{
+    // Static singleton: destroyed during process teardown, when Qt's event
+    // dispatcher may already be gone. ~QLocalSocket would attempt a graceful
+    // disconnectFromHost(), which starts a QTimer and segfaults. Close the
+    // socket immediately (no timers) and stop the reconnect timer first.
+    m_intentionalDisconnect = true;
+    m_reconnectTimer.stop();
+    if (m_socket.state() != QLocalSocket::UnconnectedState)
+        m_socket.abort();
+}
+
 bool NiriConnection::isConnected() const
 {
     return m_connected;
