@@ -238,3 +238,30 @@ public:
     }
     bool operator!=(const NiriKeyboardLayouts &o) const { return !(*this == o); }
 };
+
+struct PeerInfo
+{
+    Q_GADGET
+    QML_VALUE_TYPE(peerInfo)
+    QML_STRUCTURED_VALUE
+
+    Q_PROPERTY(qint64 pid MEMBER pid)
+    Q_PROPERTY(quint32 uid MEMBER uid)
+    Q_PROPERTY(quint32 gid MEMBER gid)
+    Q_PROPERTY(QString peerSocketPath MEMBER peerSocketPath)
+    Q_PROPERTY(QString peerSecurityContext MEMBER peerSecurityContext)
+
+public:
+    qint64 pid = -1;
+    quint32 uid = 0;
+    quint32 gid = 0;
+    QString peerSocketPath;
+    QString peerSecurityContext;
+
+    bool operator==(const PeerInfo &o) const
+    {
+        return pid == o.pid && uid == o.uid && gid == o.gid && peerSocketPath == o.peerSocketPath
+                && peerSecurityContext == o.peerSecurityContext;
+    }
+    bool operator!=(const PeerInfo &o) const { return !(*this == o); }
+};

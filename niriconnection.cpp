@@ -4,6 +4,13 @@
 #include <QJsonParseError>
 #include <QJSEngine>
 #include <QDebug>
+#include <QVector>
+
+#ifdef Q_OS_LINUX
+#  include <sys/socket.h>
+#  include <sys/types.h>
+#  include <sys/un.h>
+#endif
 
 NiriConnection *NiriConnection::create(QQmlEngine *, QJSEngine *jsEngine)
 {
@@ -47,6 +54,49 @@ NiriConnection::~NiriConnection()
     m_reconnectTimer.stop();
     if (m_socket.state() != QLocalSocket::UnconnectedState)
         m_socket.abort();
+}
+
+PeerInfo NiriConnection::peerInfo() const
+{
+    PeerInfo info;
+#ifdef Q_OS_LINUX
+    if (!m_connected)
+        return info;
+
+    struct ucred cred;
+    socklen_t len = sizeof(cred);
+    if (getsockopt(m_socket.socketDescriptor(), SOL_SOCKET, SO_PEERCRED, &cred, &len) == 0) {
+        info.pid = static_cast<qint64>(cred.pid);
+        info.uid = static_cast<quint32>(cred.uid);
+        info.gid = static_cast<quint32>(cred.gid);
+    }
+
+    struct sockaddr_un addr;
+    len = sizeof(addr);
+    if (getsockopt(m_socket.socketDescriptor(), SOL_SOCKET, SO_PEERNAME, &addr, &len) == 0
+        && addr.sun_path[0] != '\0') {
+        info.peerSocketPath = QString::fromUtf8(addr.sun_path);
+    }
+
+    // SO_PEERSEC requires two calls: first to get the buffer length,
+    // second to read the actual label. Using a dummy buffer for the
+    // first call avoids passing nullptr to getsockopt (undefined on
+    // some implementations).
+    char secBuf;
+    socklen_t secLen = sizeof(secBuf);
+    if (getsockopt(m_socket.socketDescriptor(), SOL_SOCKET, SO_PEERSEC, &secBuf, &secLen) == 0
+        && secLen > 0) {
+        // secLen is now the actual label length. SELinux labels are
+        // null-terminated, so the returned length includes the NUL
+        // byte — we skip it in fromUtf8.
+        QVector<char> buf(secLen);
+        if (getsockopt(m_socket.socketDescriptor(), SOL_SOCKET, SO_PEERSEC, buf.data(), &secLen)
+            == 0) {
+            info.peerSecurityContext = QString::fromUtf8(buf.data(), secLen - 1);
+        }
+    }
+#endif
+    return info;
 }
 
 bool NiriConnection::isConnected() const

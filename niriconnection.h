@@ -10,6 +10,7 @@
 #include <QtQml/qqmlregistration.h>
 
 #include "nirilinebuffer.h"
+#include "niritypes.h"
 
 class NiriConnection : public QObject
 {
@@ -20,6 +21,7 @@ class NiriConnection : public QObject
     Q_PROPERTY(bool isConnected READ isConnected NOTIFY connectedChanged)
     Q_PROPERTY(QString socketPath READ socketPath NOTIFY connectedChanged)
     Q_PROPERTY(QString errorString READ errorString NOTIFY connectedChanged)
+    Q_PROPERTY(PeerInfo peerInfo READ peerInfo NOTIFY connectedChanged)
 
 public:
     static NiriConnection *create(QQmlEngine *qmlEngine, QJSEngine *jsEngine);
@@ -28,6 +30,7 @@ public:
     bool isConnected() const;
     QString socketPath() const;
     QString errorString() const;
+    PeerInfo peerInfo() const;
 
 public slots:
     void connectToSocket(const QString &path = QString());
