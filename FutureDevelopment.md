@@ -19,34 +19,6 @@ README-snippet test.
 - **Touch gestures** — gesture definition and query
 - **Input** — keyboard/mouse state queries
 
-## Connection lifecycle & diagnostics
-
-Observed while VM-testing PeerInfo (nested niri under headless cage,
-2026-08-07):
-
-- **Event-stream reconnect churn** — confirmed 2026-08-07 as a niri-side
-  bug (not niriqml). niri 26.04 logs `WARN niri::ipc::server: error
-  handling IPC client: error writing reply` (Broken pipe) on every client
-  disconnect. niriqml's auto-reconnect handles it seamlessly. Root cause
-  is in niri's `src/ipc/server.rs` — `handle_client()` lacks the
-  `BrokenPipe` guard that `handle_event_stream_client()` already has.
-  Fix submitted upstream (PR #4180, mailing list patch). Impact: cosmetic
-  only. See `KNOWN_ISSUE.md` for details.
-- **`PeerInfo.peerSocketPath` is always empty** — SO_PEERNAME on the server
-  side of an *accepted* unix connection is unnamed, so the field can never
-  carry a value in practice. Meanwhile the existing `socketPath` property
-  already holds the path we connected to (the useful identity, matching
-  `$NIRI_SOCKET`). Suggest: drop `peerSocketPath` from PeerInfo, or alias it
-  to the connect-time path.
-- **Auto-connect with empty discovery** — with `NIRI_SOCKET` unset, the
-  singleton attempts `connecting to "(empty!)"` and warns
-  `QLocalSocket::connectToServer: Invalid name`. Gate the attempt on
-  successful socket discovery and log one clean info line instead.
-- **Document/autoConnect opt-out** — the singleton connects on creation
-  (observed connected before an explicit `connectToSocket()` call). Fine as
-  a default; add an `autoConnect` Q_PROPERTY (default `true`) so test
-  harnesses and tooling can control connect timing explicitly.
-
 ## Testing
 
 - **Nested-niri harness pattern** — `cage` headless (`WLR_BACKENDS=headless`)
