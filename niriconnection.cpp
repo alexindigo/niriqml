@@ -9,7 +9,6 @@
 #ifdef Q_OS_LINUX
 #  include <sys/socket.h>
 #  include <sys/types.h>
-#  include <sys/un.h>
 #endif
 
 NiriConnection *NiriConnection::create(QQmlEngine *, QJSEngine *jsEngine)
@@ -71,12 +70,6 @@ PeerInfo NiriConnection::peerInfo() const
         info.gid = static_cast<quint32>(cred.gid);
     }
 
-    struct sockaddr_un addr;
-    len = sizeof(addr);
-    if (getsockopt(m_socket.socketDescriptor(), SOL_SOCKET, SO_PEERNAME, &addr, &len) == 0
-        && addr.sun_path[0] != '\0') {
-        info.peerSocketPath = QString::fromUtf8(addr.sun_path);
-    }
 
     // SO_PEERSEC requires two calls: first to get the buffer length,
     // second to read the actual label. Using a dummy buffer for the
