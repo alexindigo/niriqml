@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-08-07
+
+### Feature
+
+- `NiriConnection.peerInfo` — returns a `PeerInfo` gadget (pid, uid, gid,
+  peerSecurityContext) with the compositor's identity via
+  `SO_PEERCRED`/`getsockopt`. Kernel-authoritative — no /proc scanning
+  needed. Unblocks Atmosphera's session-config feature (`4aa88d1`)
+
+### Fix
+
+- Dropped `peerSocketPath` from `PeerInfo` — `SO_PEERNAME` is not a valid
+  socket option on Linux, and the value is redundant with the existing
+  `socketPath` property (`b071699`)
+- `connectToSocket()` now guards against an empty socket path — no more
+  `QLocalSocket::connectToServer: Invalid name` warning when `NIRI_SOCKET`
+  is unset (`ccaa478`)
+
+### Docs
+
+- `KNOWN_ISSUES.md` — documents niri 26.04 "error writing reply" / Broken
+  pipe WARN. Confirmed as a niri-side bug (missing `BrokenPipe` guard in
+  `handle_client()`). Fix submitted upstream via mailing list patch
+  (`3a42d97`)
+
 ## 2026-08-03
 
 ### Fix
