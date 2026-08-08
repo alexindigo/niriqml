@@ -215,6 +215,27 @@ NiriRequests.sendRaw({"Action": {"Quit": {}}})  // raw action object
 
 Prerequisites: Qt 6.5+, CMake 3.16+, niri ≥ 26.04.
 
+### Arch Linux (AUR)
+
+```bash
+yay -S qt6-niriqml      # release
+yay -S qt6-niriqml-git  # git master
+```
+
+If AUR is unavailable, install directly from the GitHub mirrors:
+
+```bash
+# Release
+git clone https://github.com/alexindigo/aur-qt6-niriqml.git
+cd aur-qt6-niriqml && makepkg -si
+
+# Git master
+git clone https://github.com/alexindigo/aur-qt6-niriqml-git.git
+cd aur-qt6-niriqml-git && makepkg -si
+```
+
+### Build from source
+
 ```bash
 scripts/build          # → build-release/
 scripts/install        # installs to system Qt QML path
