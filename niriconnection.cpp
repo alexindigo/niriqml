@@ -70,7 +70,6 @@ PeerInfo NiriConnection::peerInfo() const
         info.gid = static_cast<quint32>(cred.gid);
     }
 
-
     // SO_PEERSEC requires two calls: first to get the buffer length,
     // second to read the actual label. Using a dummy buffer for the
     // first call avoids passing nullptr to getsockopt (undefined on
