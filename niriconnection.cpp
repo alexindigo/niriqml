@@ -117,8 +117,13 @@ void NiriConnection::connectToSocket(const QString &path)
     m_readBuffer.clear();
 
     m_socketPath = path.isEmpty() ? QString::fromUtf8(qgetenv("NIRI_SOCKET")) : path;
-    qInfo() << "NiriConnection: connecting to"
-            << (m_socketPath.isEmpty() ? "(empty!)" : m_socketPath);
+    // Don't attempt to connect with an empty path — QLocalSocket warns
+    // "Invalid name" and produces no useful behavior.
+    if (m_socketPath.isEmpty()) {
+        qDebug() << "NiriConnection: no socket path (NIRI_SOCKET unset or niri not running)";
+        return;
+    }
+    qInfo() << "NiriConnection: connecting to" << m_socketPath;
     m_socket.connectToServer(m_socketPath);
 }
 
