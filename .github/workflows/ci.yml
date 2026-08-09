@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [master]
+    tags: ['v*']
   pull_request:
     branches: [master]
 
@@ -33,7 +34,7 @@ jobs:
             -G Ninja
 
       - name: Build
-        run: cmake --build build -j$(nproc) --verbose 2>&1 | tail -30 || true
+        run: cmake --build build -j$(nproc)
 
       - name: Test (headless)
         # Exclude live tests (need NIRI_SOCKET) and test_api
@@ -71,3 +72,48 @@ jobs:
 
       - name: clang-format check
         run: clang-format-20 --dry-run --Werror niri*.cpp niri*.h tests/*.cpp tests/*.h
+
+  release:
+    runs-on: ubuntu-24.04
+    container: ghcr.io/archlinux/archlinux:base-devel
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Init pacman keyring
+        run: |
+          pacman-key --init
+          pacman-key --populate archlinux
+
+      - name: Install deps
+        run: |
+          pacman -Syu --noconfirm \
+            qt6-base qt6-declarative \
+            cmake ninja gcc
+
+      - name: Configure
+        run: |
+          cmake -B build -S . \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TEST_MODE=OFF \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -G Ninja
+
+      - name: Build
+        run: cmake --build build -j$(nproc)
+
+      - name: Package
+        run: |
+          mkdir -p release/{usr/lib,usr/lib/qt6/qml/Niri,usr/include/niriqml}
+          cp build/libniriqml.so release/usr/lib/
+          cp build/Niri/* release/usr/lib/qt6/qml/Niri/
+          cp niri*.h release/usr/include/niriqml/
+          tar -C release -czf \
+            qt6-niriqml-${GITHUB_REF_NAME#v}-linux-x86_64.tar.gz \
+            usr/
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: qt6-niriqml-*.tar.gz
+          draft: false
