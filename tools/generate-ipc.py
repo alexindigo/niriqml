@@ -51,7 +51,7 @@ class Compiler:
     def __init__(self, schema, bindings):
         self.schema = schema
         self.bindings = bindings
-        if set(bindings) - {"formatVersion", "types", "tuples", "actions", "requests"} or bindings.get("formatVersion") != 1:
+        if set(bindings) - {"formatVersion", "types", "tuples", "actions", "requests", "events"} or bindings.get("formatVersion") != 1:
             raise SchemaError("unsupported binding manifest")
         self.defs = schema.get("$defs", {})
         self.ir = {}
@@ -212,6 +212,25 @@ class Compiler:
         return result
 
     def validate_bindings(self):
+        events = self.bindings.get("events", {})
+        if set(events) != {v["tag"] for v in self.ir["Event"]["variants"]}:
+            raise SchemaError("event bindings must cover exactly the event inventory")
+        names = set()
+        for variant in self.ir["Event"]["variants"]:
+            tag = variant["tag"]
+            binding = events[tag]
+            if set(binding) - {"name", "arguments", "aliases"}:
+                raise SchemaError(f"{tag}: event binding contains more than names/order")
+            fields = variant["payload"]["fields"]
+            keys = {f["wire"] for f in fields}
+            order = binding.get("arguments", [f["wire"] for f in fields])
+            if len(order) != len(keys) or set(order) != keys or set(binding.get("aliases", {})) - keys:
+                raise SchemaError(f"{tag}: event arguments are not a field permutation")
+            name = identifier(binding.get("name", tag[:1].lower() + tag[1:]), tag)
+            aliases = [identifier(binding.get("aliases", {}).get(f["wire"], f["name"]), tag) for f in fields]
+            if name in names or len(aliases) != len(set(aliases)):
+                raise SchemaError(f"{tag}: colliding event name")
+            names.add(name)
         requests = self.bindings.get("requests", {})
         request_tags = {v["tag"] for v in self.ir["Request"]["variants"]}
         response_tags = {v["tag"] for v in self.ir["Response"]["variants"]} | {"Err"}
@@ -307,7 +326,7 @@ class CppEmitter:
 
     def __init__(self, compiler, hashes):
         self.c = compiler
-        self.types = {n: ir for n, ir in compiler.ir.items() if (n not in ROOT_GROUPS or n in {"Action", "OutputAction"}) and n != "Result_of_Response_or_string"}
+        self.types = {n: ir for n, ir in compiler.ir.items() if (n not in ROOT_GROUPS or n in {"Action", "OutputAction", "Event"}) and n != "Result_of_Response_or_string"}
         self.hashes = hashes
         self.ordered = []
         visiting = set()
@@ -1132,6 +1151,237 @@ class RequestEmitter(CppEmitter):
         return {"generated/niriipcrequests_generated.h": "\n".join(h), "generated/niriipcrequests_generated.cpp": "\n".join(cpp), "generated/ipc-requests.json": json.dumps(rows, indent=2, sort_keys=True) + "\n", "docs/generated/IPC-API.md": "\n".join(docs) + "\n"}
 
 
+class EventEmitter(CppEmitter):
+    def fields(self, variant):
+        tag = variant["tag"]
+        binding = self.c.bindings["events"][tag]
+        fields = variant["payload"]["fields"]
+        order = binding.get("arguments", [f["wire"] for f in fields])
+        result = []
+        for wire in order:
+            field = next(f for f in fields if f["wire"] == wire)
+            tuple_binding = self.c.tuples.get(f"Event/{tag}/{wire}/items")
+            result.append({**field, "argument": binding.get("aliases", {}).get(wire, field["name"]), "tupleBinding": tuple_binding})
+        return result
+
+    def signal_type(self, field, qml=False):
+        ir = field["type"]
+        if qml:
+            if ir["kind"] == "array": return "const QVariantList &"
+            if ir["kind"] == "optional": return "const QVariant &"
+            if ir["kind"] == "integer": return "const QString &" if ir["format"] in {"uint64", "uint"} else "int "
+        typ = f"QList<{field['tupleBinding']['cppName']}>" if field["tupleBinding"] else self.cpp(ir)
+        return "const " + typ + " &" if ir["kind"] in {"array", "ref", "string"} else typ + " "
+
+    def emit(self):
+        h = [self.header(), "#pragma once", "", '#include "niriipccodec_generated.h"', "#include <functional>", "", "// clang-format off", "namespace NiriIpc {", "bool decodeEvent(const NiriWire::WireValue &wire, NiriEvent &event, DecodeError &error);", "} // namespace NiriIpc", "", "class NiriNativeEvents : public QObject", "{", "    Q_OBJECT", "public:", "    using QObject::QObject;", "signals:"]
+        qml_signals = []
+        forwarding = []
+        publishing = []
+        rows = []
+        known_tags = " || ".join("tag == QStringLiteral(" + json.dumps(v["tag"]) + ")" for v in self.c.ir["Event"]["variants"])
+        cpp = [self.header(), '#include "niriipcevents_generated.h"', "", "// clang-format off", "namespace NiriIpc {", "bool decodeEvent(const NiriWire::WireValue &wire, NiriEvent &event, DecodeError &error)", "{", "    QString tag;", "    const NiriWire::WireValue *payload = nullptr;", "    if (wire.stringValue()) tag = *wire.stringValue();", "    else if (wire.objectValue() && wire.objectValue()->size() == 1) {", "        tag = wire.objectValue()->first().first; payload = &wire.objectValue()->first().second;", "    }", f"    if (({known_tags}) && (!payload || !payload->objectValue()))", '        return fail(error, childPath(QStringLiteral("$"), tag), QStringLiteral("expected event payload object"));', '    return decode(wire, event, &error, QStringLiteral("$"));', "}", "} // namespace NiriIpc", ""]
+        for variant in self.c.ir["Event"]["variants"]:
+            tag = variant["tag"]
+            method = self.c.bindings["events"][tag].get("name", tag[:1].lower() + tag[1:])
+            fields = self.fields(variant)
+            native_signature = ", ".join(self.signal_type(f) + f["argument"] for f in fields)
+            qml_signature = ", ".join(self.signal_type(f, True) + f["argument"] for f in fields)
+            h += [f"    void {method}({native_signature});"]
+            qml_signals += [f"    void {method}({qml_signature});"]
+            forwarding += [f"    connect(source, &NiriIpcEvents::{method}, this, &NiriIpcEvents::{method});"]
+            publishing += [f"    case NiriEvent::{tag}: {{", f"        const auto &payload = std::get<NiriEvent::{tag}Value>(event.value).payload;"]
+            native_args, qml_args = [], []
+            for field in fields:
+                value = "payload." + field["name"]
+                if field["tupleBinding"]:
+                    binding = field["tupleBinding"]
+                    local = "native_" + field["name"]
+                    publishing += [f"        QList<{binding['cppName']}> {local};", f"        for (const auto &tuple : {value}) {{", f"            {binding['cppName']} item;"]
+                    publishing += [f"            item.{member} = std::get<{i}>(tuple);" for i, member in enumerate(binding["members"])]
+                    publishing += [f"            {local}.append(item);", "        }"]
+                    value = local
+                native_args.append(value)
+                ir = field["type"]
+                if ir["kind"] in {"optional", "array"}:
+                    value = "NiriIpc::qmlValue(" + value + ")" + (".toList()" if ir["kind"] == "array" else "")
+                elif ir["kind"] == "integer" and ir["format"] in {"uint", "uint64"}:
+                    value = "QString::number(" + value + ")"
+                qml_args.append(value)
+            publishing += [f"        emit m_native.{method}({', '.join(native_args)});", "        if (!current()) return;", f"        emit {method}({', '.join(qml_args)});", "        return;", "    }"]
+            rows.append({"variant": tag, "signal": method, "arguments": [{"wire": f["wire"], "name": f["argument"], "type": f["type"]} for f in fields]})
+        h += ["};", "", "class NiriIpcEvents : public QObject", "{", "    Q_OBJECT", "public:", "    using QObject::QObject;", "    NiriNativeEvents *nativeEvents() { return &m_native; }", "    void forwardEventSignals(NiriIpcEvents *source);", "    void publishEvent(const NiriEvent &event, const std::function<bool()> &current);", "signals:", *qml_signals, "private:", "    NiriNativeEvents m_native;", "};", "// clang-format on", ""]
+        cpp += ["void NiriIpcEvents::forwardEventSignals(NiriIpcEvents *source)", "{", *forwarding, "}", "", "void NiriIpcEvents::publishEvent(const NiriEvent &event, const std::function<bool()> &current)", "{", "    if (!current()) return;", "    switch (event.kind()) {", *publishing, "    default: return;", "    }", "}", "// clang-format on", ""]
+        return {"generated/niriipcevents_generated.h": "\n".join(h), "generated/niriipcevents_generated.cpp": "\n".join(cpp), "generated/ipc-events.json": json.dumps(rows, indent=2, sort_keys=True) + "\n"}
+
+
+class ReferenceEmitter(EventEmitter):
+    def qml_type(self, ir):
+        kind = ir["kind"]
+        if kind == "ref":
+            name = self.c.name(ir["name"])
+            return self.c.bindings["types"].get(ir["name"], {}).get("qmlName", name[:1].lower() + name[1:])
+        if kind == "optional": return "null / " + self.qml_type(ir["item"])
+        if kind == "integer": return "string" if ir["format"] in {"uint", "uint64", "int", "int64"} else "number"
+        if kind == "number": return "real"
+        if kind == "array": return "list<" + self.qml_type(ir["item"]) + ">"
+        if kind == "tuple": return "[" + ", ".join(self.qml_type(v) for v in ir["items"]) + "]"
+        if kind == "map": return "map<string, " + self.qml_type(ir["item"]) + ">"
+        if kind == "boolean": return "bool"
+        return kind
+
+    def shape(self, ir):
+        kind = ir["kind"]
+        if kind == "ref": return "<" + ir["name"] + ">"
+        if kind == "optional": return "null / " + self.shape(ir["item"])
+        if kind == "integer": return "<" + ir["format"] + ">"
+        if kind == "number": return "<finite " + ir["format"] + ">"
+        if kind == "record": return "{" + ",".join(json.dumps(f["wire"]) + ":" + self.shape(f["type"]) for f in ir["fields"]) + "}"
+        if kind == "array": return "[" + self.shape(ir["item"]) + (f" x {ir['max']}" if ir["max"] is not None else ", ...") + "]"
+        if kind == "tuple": return "[" + ",".join(self.shape(v) for v in ir["items"]) + "]"
+        if kind == "map": return '{"<arbitrary string>":' + self.shape(ir["item"]) + ", ...}"
+        return "<" + kind + ">"
+
+    def variant_shape(self, variant):
+        return json.dumps(variant["tag"]) if variant["payload"] is None else "{" + json.dumps(variant["tag"]) + ":" + self.shape(variant["payload"]) + "}"
+
+    def emit(self):
+        docs = ["# Generated IPC API", "", self.header("<!--").replace("\n", " -->\n"),
+                "Pinned to niri v26.04. All literal keys, tags and container shapes below are",
+                "wire-exact. Angle-bracket values are type placeholders, NOT wire strings;",
+                "`null / T` means null or T. Named placeholders refer to the value sections.",
+                "Typed encoding emits every known field, including explicit null for absent",
+                "options. Received optional record fields may be omitted. Required fields never",
+                "receive CLI-derived defaults. Typed outbound values reject unknown fields and",
+                "variants; received unknown data is retained. Raw access remains unrestricted.",
+                "", "QML reads u64/usize/i64 as decimal strings and absent options as real null.",
+                "Typed inputs also accept exact integral Number values, but cannot recover an",
+                "integer already rounded by JavaScript. Use strings for arbitrary caller IDs.",
+                "u32 and smaller integers remain numeric, with checked native width/range.",
+                "Enums/unions expose kind, known, valid, wireName/tag and raw; inactive payloads",
+                "are null. Invalid construction exposes valid=false and an error, never a",
+                "default success. Records expose read-only fields and retained extensions.",
+                "", "## Actions", "", "All 141 methods return retainable NiriHandledReply through the one request",
+                "path. Optional positions before required arguments need explicit null to skip;",
+                "trailing optional positions may be omitted. Required bools remain required.",
+                "Union arguments accept NiriArgs values or validated plain wire/camelCase objects.",
+                "", "| # | QML call | Native arguments | Exact wire shape |", "|---|---|---|---|"]
+        action_emitter = ActionEmitter(self.c, self.hashes)
+        for i, variant in enumerate(self.c.ir["Action"]["variants"], 1):
+            fields = action_emitter.action_fields(variant)
+            method = self.c.bindings.get("actions", {}).get(variant["tag"], {}).get("name", variant["tag"][:1].lower() + variant["tag"][1:])
+            sig = ", ".join(f["name"] + ": " + self.qml_type(f["type"]) for f in fields)
+            native = ", ".join(self.cpp(f["type"]) + " " + f["name"] for f in fields)
+            docs.append(f'| {i} | `NiriActions.{method}({sig}) -> NiriHandledReply` | `{native or "none"}` | `{{"Action":{self.variant_shape(variant)}}}` |')
+        docs += ["", "## Requests", "", "All 16 requests accept trailing `options = {}` with timeoutMs/connectTimeoutMs.",
+                 "Picks default timeoutMs=-1 (no response deadline); explicit overrides apply.",
+                 "eventStream() observes the session's actual acknowledgement and leaves the",
+                 "stream open. It never opens a one-shot socket, and late calls reuse the current",
+                 "actual acknowledgement. Cancelling an observer does not stop the shared stream.",
+                 "returnError() expects Err and reports it through the common error contract;",
+                 "unexpected Ok is Decode. All completion is queued and replies are retainable.",
+                 "", "| # | QML call | Reply / expected response | Wire shape | Pairing source |", "|---|---|---|---|---|"]
+        request_emitter = RequestEmitter(self.c, self.hashes)
+        for i, variant in enumerate(self.c.ir["Request"]["variants"], 1):
+            binding = self.c.bindings["requests"][variant["tag"]]
+            method = binding.get("name", variant["tag"][:1].lower() + variant["tag"][1:])
+            sig = ", ".join(f["name"] + ": " + self.qml_type(f["type"]) for f in request_emitter.fields(variant))
+            reply = "NiriPendingReply" if binding["response"] == "Err" else "Niri" + binding["response"] + "Reply"
+            docs.append(f'| {i} | `NiriRequests.{method}({sig}{", " if sig else ""}options = {{}})` | `{reply}` / {binding["response"]} | `{self.variant_shape(variant)}` | `{binding["source"]}` |')
+        docs += ["", "## Typed replies", "", "Each of the 14 response kinds has an uncreatable named pending-reply subclass.",
+                 "`result` is read-only, notified with finished; native result() returns the",
+                 "canonical C++ value. Success requires the expected discriminator and complete",
+                 "validated payload. Decode failures retain the raw envelope and fieldPath.",
+                 'Every reply envelope is exactly `{"Ok":<Response>}` or `{"Err":<string>}`.',
+                 "Inherited value is the QML convenience projection; Handled remains the string",
+                 '"Handled", while result is a niriHandled unit gadget with wireName="Handled".',
+                 "", "| # | Reply | Native result() | QML result | Exact Ok response |", "|---|---|---|---|---|"]
+        for i, variant in enumerate(self.c.ir["Response"]["variants"], 1):
+            payload = variant["payload"]
+            docs.append(f'| {i} | `Niri{variant["tag"]}Reply` | `{self.cpp(payload) if payload else "NiriHandled"}` | `{self.qml_type(payload) if payload else "niriHandled"}` | `{{"Ok":{self.variant_shape(variant)}}}` |')
+        docs += ["", "## Events", "", "The 19 native and QML signals below publish the SAME decoded event after the",
+                 "coordinator's existing state updates. Generated buses do not parse or cache.",
+                 "Native C++ uses NiriEvents::nativeEvents() (not invokable from QML). The QML",
+                 "singleton inherits the projected signals. An epoch change during a native",
+                 "callback suppresses the stale QML/raw continuation.",
+                 "", "| # | QML signal | Native C++ signal | Exact event wire shape |", "|---|---|---|---|"]
+        for i, variant in enumerate(self.c.ir["Event"]["variants"], 1):
+            fields = self.fields(variant)
+            method = self.c.bindings["events"][variant["tag"]].get("name", variant["tag"][:1].lower() + variant["tag"][1:])
+            qml = ", ".join(f["argument"] + ": " + ("list<niriWindowLayoutChange>" if f["tupleBinding"] else self.qml_type(f["type"])) for f in fields)
+            native = ", ".join(self.signal_type(f) + f["argument"] for f in fields)
+            docs.append(f'| {i} | `{method}({qml})` | `{method}({native})` | `{self.variant_shape(variant)}` |')
+        docs += ["", "Known event bodies must be objects before any field lookup. Malformed known",
+                 "events emit decodeError(path, message, payload) then rawEvent(name, payload),",
+                 "with no default typed signal or state update. Unknown variants emit",
+                 "unknownEvent(name, payload) then rawEvent. rawEvent is retained for ALL events.",
+                 "Its payload is QVariant/var, not QVariantMap: object bodies remain objects,",
+                 "malformed scalar/array/null bodies remain intact, and future unit variants",
+                 "retain their original string. Raw integers use the lossless raw projection.",
+                 "", "## NiriArgs factories", "", "Factories take one checked input value for a record or variant payload; true",
+                 "unit variants take no argument. Wire and camelCase field spellings are accepted",
+                 "on input, but not both for one member. Output always uses the literal wire name.",
+                 "", "| # | QML factory | Successful type | Exact wire value |", "|---|---|---|---|"]
+        index = 0
+        for name in self.ordered:
+            ir = self.types[name]
+            if ir["kind"] == "record":
+                entries = [(name[:1].lower() + name[1:], "input", self.shape(ir))]
+            else:
+                variants = ir.get("variants", [{"tag": v, "payload": None} for v in ir.get("values", [])])
+                entries = [(name[:1].lower() + name[1:] + self.alias(name, v["tag"]), "input" if v["payload"] is not None else "", self.variant_shape(v)) for v in variants]
+            for method, args, wire in entries:
+                index += 1
+                docs.append(f'| {index} | `NiriArgs.{method}({args})` | `{self.qml_type({"kind":"ref", "name":name})}` | `{wire}` |')
+        docs += ["", "## Records and variant payloads", "", "Every wire record and generated variant-payload record is listed below. Native",
+                 "fields are canonical; QML properties bridge wide integers, optionals and",
+                 "collections. All modeled fields and retained extensions participate in equality.",
+                 "True unit variants are strings, not empty objects. Empty struct variants are",
+                 "objects with an empty object body. See the factory table for each union tag."]
+        records = []
+        for name in self.ordered:
+            ir = self.types[name]
+            if ir["kind"] == "record":
+                records.append((self.c.name(name), self.qml_type({"kind":"ref", "name":name}), ir))
+            for variant in ir.get("variants", []):
+                if variant["payload"] and variant["payload"]["kind"] == "record":
+                    cpp = self.variant_record_name(name, variant["tag"])
+                    records.append((cpp, cpp[:1].lower() + cpp[1:], variant["payload"]))
+        for cpp, qml, ir in sorted(records):
+            docs += ["", f"### {cpp} ({qml})", "", "Wire shape: `" + self.shape(ir) + "`.", "", "| # | Wire field | QML property/type | Native field/type | Required on receive |", "|---|---|---|---|---|"]
+            for i, field in enumerate(ir["fields"], 1):
+                docs.append(f'| {i} | `{field["wire"]}` | `{field["name"]}: {self.qml_type(field["type"])}` | `{self.cpp(field["type"])} {field["name"]}` | {"yes" if field["required"] else "no"} |')
+            if not ir["fields"]:
+                docs.append("| 1 | none | none | none | object body still required |")
+            docs.append("\nRead-only `extensions` retains unknown received fields; outbound typed construction rejects them.")
+        docs += ["", "## Tuple, enum and union values", "", "| # | Type | Native representation | QML / wire contract |", "|---|---|---|---|"]
+        index = 0
+        for name in self.ordered:
+            ir = self.types[name]
+            if ir["kind"] == "record": continue
+            index += 1
+            tags = [v["tag"] for v in ir.get("variants", [])] or ir.get("values", [])
+            docs.append(f'| {index} | `{self.c.name(name)}` / `{self.qml_type({"kind":"ref", "name":name})}` | {"std::variant payloads" if any(v["payload"] is not None for v in ir.get("variants", [])) else "enum string wrapper"} | {", ".join("`" + self.alias(name, tag) + "`=" + "`" + tag + "`" for tag in tags)}; Unknown retains raw received value; Invalid is never successful construction |')
+        for binding in self.c.tuples.values():
+            index += 1
+            members = ", ".join(member + ": " + self.qml_type(ir) for member, ir in zip(binding["members"], binding["type"]["items"]))
+            docs.append(f'| {index} | `{binding["cppName"]}` / `{binding["qmlName"]}` | named typed tuple members | {members}; exact wire `{self.shape(binding["type"])}` |')
+        docs += ["", "Local value `niriHandled` exposes wireName=Handled and represents wire unit",
+                 '`"Handled"`. `niriInvalidArgument` exposes valid=false/error and has no valid',
+                 "wire encoding. Native optional values use std::optional, arrays use std::array,",
+                 "variable lists use QList, heterogeneous tuples use std::tuple, and maps use",
+                 "QMap<QString,T>. Named layout-change entries project tuple IDs to strings.", ""]
+        inventory = [self.header(), "#pragma once", "", "#include <array>", "", "// clang-format off", "namespace NiriIpcInventory {"]
+        for group in ROOT_GROUPS:
+            tags = [v["tag"] for v in self.c.ir[group]["variants"]]
+            inventory += [f"inline constexpr std::array<const char *, {len(tags)}> {group} = {{", *["    " + json.dumps(tag) + "," for tag in tags], "};"]
+        for name, group, section in (("ActionMethods", "Action", "actions"), ("RequestMethods", "Request", "requests"), ("EventSignals", "Event", "events")):
+            methods = [self.c.bindings.get(section, {}).get(v["tag"], {}).get("name", v["tag"][:1].lower() + v["tag"][1:]) for v in self.c.ir[group]["variants"]]
+            inventory += [f"inline constexpr std::array<const char *, {len(methods)}> {name} = {{", *["    " + json.dumps(method) + "," for method in methods], "};"]
+        inventory += ["} // namespace NiriIpcInventory", "// clang-format on", ""]
+        return {"docs/generated/IPC-API.md": "\n".join(docs), "generated/niriipcinventory_generated.h": "\n".join(inventory)}
+
+
 def outputs(root=ROOT):
     schema, bindings = load(root / SCHEMA), load(root / BINDINGS)
     compiler = Compiler(schema, bindings)
@@ -1147,12 +1397,15 @@ def outputs(root=ROOT):
     request_outputs = RequestEmitter(compiler, hashes).emit()
     result["docs/generated/IPC-API.md"] += request_outputs.pop("docs/generated/IPC-API.md")
     result.update(request_outputs)
+    result.update(EventEmitter(compiler, hashes).emit())
+    result.update(ReferenceEmitter(compiler, hashes).emit())
     result["generated/ipc-generated.cmake"] = result["generated/ipc-generated.cmake"].replace(
         "set(NIRIQML_GENERATED_SOURCES\n", "set(NIRIQML_GENERATED_SOURCES\n    generated/niriipcactions_generated.h\n    generated/niriipcactions_generated.cpp\n").replace(
         "set(NIRIQML_GENERATED_HEADERS\n", "set(NIRIQML_GENERATED_HEADERS\n    generated/niriipcactions_generated.h\n")
-    for group in ("requests", "replies"):
+    for group in ("requests", "replies", "events"):
         base = "generated/niriipc" + group + "_generated"
         result["generated/ipc-generated.cmake"] = result["generated/ipc-generated.cmake"].replace("set(NIRIQML_GENERATED_SOURCES\n", f"set(NIRIQML_GENERATED_SOURCES\n    {base}.h\n    {base}.cpp\n").replace("set(NIRIQML_GENERATED_HEADERS\n", f"set(NIRIQML_GENERATED_HEADERS\n    {base}.h\n")
+    result["generated/ipc-generated.cmake"] = result["generated/ipc-generated.cmake"].replace("set(NIRIQML_GENERATED_HEADERS\n", "set(NIRIQML_GENERATED_HEADERS\n    generated/niriipcinventory_generated.h\n").replace("set(NIRIQML_GENERATED_SOURCES\n", "set(NIRIQML_GENERATED_SOURCES\n    generated/niriipcinventory_generated.h\n")
     return result
 
 

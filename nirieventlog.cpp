@@ -50,7 +50,7 @@ QVariant NiriEventLog::data(const QModelIndex &index, int role) const
     case NameRole:
         return event.name;
     case PayloadRole:
-        return QVariant(event.payload);
+        return event.payload;
     default:
         return {};
     }
@@ -64,7 +64,7 @@ QHash<int, QByteArray> NiriEventLog::roleNames() const
     };
 }
 
-void NiriEventLog::appendEvent(const QString &name, const QVariantMap &payload)
+void NiriEventLog::appendEvent(const QString &name, const QVariant &payload)
 {
     if (!NiriSession::checkThread(this))
         return;

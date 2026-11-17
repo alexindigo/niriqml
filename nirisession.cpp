@@ -485,7 +485,7 @@ void NiriSession::processFrame(const std::shared_ptr<Attempt> &attempt, const QB
             publish(attempt->epoch);
         return;
     }
-    if (!members || members->size() != 1) {
+    if ((!members || members->size() != 1) && !document->root.stringValue()) {
         protocolError(attempt->epoch, QStringLiteral("Expected a single event variant"), frame);
         return;
     }
@@ -501,10 +501,14 @@ void NiriSession::applyEvent(const NiriWire::Document &document, quint64 token)
     emit eventFrame(document, token);
     if (token != m_epoch || m_status != Streaming)
         return;
-    const auto &event = document.root.objectValue()->first();
+    const auto *unit = document.root.stringValue();
+    const auto *object = document.root.objectValue();
     // Keep the legacy facade's observer ordering without sending its projection
     // back through a typed decoder. Both native handoffs share the parsed tree.
-    emit eventReceived(event.first, NiriWire::toQmlProjection(event.second).toMap(), token);
+    const auto name = unit ? *unit : object->first().first;
+    const auto payload =
+            unit ? QVariantMap{} : NiriWire::toQmlProjection(object->first().second).toMap();
+    emit eventReceived(name, payload, token);
     if (token != m_epoch || m_status != Streaming)
         return;
     emit eventPublication(document, token);

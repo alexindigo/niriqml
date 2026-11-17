@@ -1,5 +1,26 @@
 {
   "formatVersion": 1,
+  "events": {
+    "WorkspacesChanged": {},
+    "WorkspaceUrgencyChanged": {"aliases": {"id": "workspaceId"}},
+    "WorkspaceActivated": {"arguments": ["id", "focused"], "aliases": {"id": "workspaceId"}},
+    "WorkspaceActiveWindowChanged": {"arguments": ["workspace_id", "active_window_id"], "aliases": {"active_window_id": "windowId"}},
+    "WindowsChanged": {},
+    "WindowOpenedOrChanged": {},
+    "WindowClosed": {"aliases": {"id": "windowId"}},
+    "WindowFocusChanged": {"aliases": {"id": "windowId"}},
+    "WindowFocusTimestampChanged": {"arguments": ["id", "focus_timestamp"], "aliases": {"id": "windowId"}},
+    "WindowUrgencyChanged": {"aliases": {"id": "windowId"}},
+    "WindowLayoutsChanged": {},
+    "KeyboardLayoutsChanged": {"aliases": {"keyboard_layouts": "layouts"}},
+    "KeyboardLayoutSwitched": {},
+    "OverviewOpenedOrClosed": {},
+    "ConfigLoaded": {},
+    "ScreenshotCaptured": {},
+    "CastsChanged": {},
+    "CastStartedOrChanged": {},
+    "CastStopped": {}
+  },
   "requests": {
     "Version": {"response": "Version", "source": "v26.04:src/ipc/server.rs:274"},
     "Outputs": {"response": "Outputs", "source": "v26.04:src/ipc/server.rs:275-279"},

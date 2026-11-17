@@ -44,8 +44,13 @@ Wire protocol lifecycle. Connects to niri's Unix socket at `$NIRI_SOCKET`.
 
 ### NiriEvents
 
-Typed event dispatch. Subscribes to `NiriConnection::eventReceived` and emits
-one signal per niri event, plus a `rawEvent` catchall for forward-compat.
+All 19 released events have generated native C++ signals and QML projections.
+See the [complete signal and wire reference](docs/generated/IPC-API.md#events).
+The coordinator decodes the exact parsed event once, updates its existing
+snapshots, then publishes that same typed value. Native C++ observes
+`NiriEvents::nativeEvents()` with quint64/std::optional and typed records/lists.
+QML observes string IDs, real nulls and typed gadgets. The native accessor is not
+invokable from QML. A stop/endpoint change suppresses stale continuation.
 
 **Cached snapshots** (bootstrap late subscribers)
 
@@ -55,27 +60,25 @@ one signal per niri event, plus a `rawEvent` catchall for forward-compat.
 | `lastWorkspacesSnapshot()` | `list<niriWorkspace>` |
 | `lastKeyboardLayouts()` | `niriKeyboardLayouts` |
 | `lastOverviewOpen()` | `bool` |
-| `lastFocusedWindowId()` | `quint64` |
+| `lastFocusedWindowId()` | native `std::optional<quint64>` |
 
-**Signals**
+All existing QML signal names remain. The complete surface adds
+workspaceUrgencyChanged, windowUrgencyChanged, screenshotCaptured and castStopped.
+Layout changes carry named niriWindowLayoutChange entries (id/layout).
 
-| Signal | Parameters |
-|---|---|
-| `workspacesChanged(workspaces)` | `list<niriWorkspace>` |
-| `workspaceActivated(workspaceId, focused)` | `quint64 id`, `bool focused` |
-| `workspaceActiveWindowChanged(workspaceId, windowId)` | `quint64`, `quint64` |
-| `windowsChanged(windows)` | `list<niriWindow>` |
-| `windowOpenedOrChanged(window)` | `niriWindow` |
-| `windowClosed(windowId)` | `quint64` |
-| `windowFocusChanged(windowId)` | `quint64` |
-| `windowLayoutsChanged(changes)` | `list<var>` |
-| `keyboardLayoutsChanged(layouts)` | `niriKeyboardLayouts` |
-| `keyboardLayoutSwitched(idx)` | `int` |
-| `overviewOpenedOrClosed(isOpen)` | `bool` |
-| `configLoaded(failed)` | `bool` |
-| `castsChanged(casts)` | `list<var>` |
-| `windowFocusTimestampChanged(windowId, focusTimestamp)` | `quint64`, `niriTimestamp` |
-| `rawEvent(name, payload)` | `string`, `var` |
+| # | Diagnostic signal | Contract |
+|---|---|---|
+| 1 | `rawEvent(name, payload)` | Every current event, including known, unknown and malformed variants |
+| 2 | `unknownEvent(name, payload)` | Unknown variant; no invented typed signal/state update |
+| 3 | `decodeError(path, message, payload)` | Malformed known variant; no default typed signal/state update |
+
+Known event bodies must be objects before any field lookup, including variants
+whose fields are all optional. Diagnostic payloads are now QVariant/var instead
+of QVariantMap: ordinary bodies remain objects; scalar/array/null bodies are not
+discarded, and future unit variants retain their original string. Native
+callbacks that explicitly required QVariantMap must accept QVariant instead.
+The event log preserves the same raw value. Full canonical state/replay/readiness
+is the reducer/projection layer's separate contract, not an event-bus cache.
 
 ### NiriState
 

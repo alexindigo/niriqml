@@ -85,6 +85,33 @@ class GeneratorTest(unittest.TestCase):
         with self.assertRaisesRegex(GEN.SchemaError, "exactly the request inventory"):
             self.compiler()
 
+    def test_event_names_and_arguments(self):
+        compiler = self.compiler()
+        event = next(v for v in compiler.ir["Event"]["variants"] if v["tag"] == "WorkspaceActiveWindowChanged")
+        fields = GEN.EventEmitter(compiler, {}).fields(event)
+        self.assertEqual([f["wire"] for f in fields], ["workspace_id", "active_window_id"])
+        self.assertEqual([f["argument"] for f in fields], ["workspaceId", "windowId"])
+        self.bindings["events"]["WindowClosed"]["fields"] = {"id": "uint64"}
+        with self.assertRaisesRegex(GEN.SchemaError, "more than names/order"):
+            self.compiler()
+
+    def test_reference_completeness(self):
+        compiler = self.compiler()
+        emitter = GEN.ReferenceEmitter(compiler, {})
+        outputs = emitter.emit()
+        text = outputs["docs/generated/IPC-API.md"]
+        for group in GEN.ROOT_GROUPS:
+            for variant in compiler.ir[group]["variants"]:
+                self.assertIn(variant["tag"], text)
+        for name in emitter.ordered:
+            ir = emitter.types[name]
+            if ir["kind"] == "record":
+                self.assertIn("### " + compiler.name(name), text)
+            for variant in ir.get("variants", []):
+                if variant["payload"] and variant["payload"]["kind"] == "record":
+                    self.assertIn("### " + emitter.variant_record_name(name, variant["tag"]), text)
+        self.assertIn("19> Event", outputs["generated/niriipcinventory_generated.h"])
+
     def test_reject_bad_ref_and_ambiguous_union(self):
         for ref in ("https://example.invalid/schema", "#/$defs/DoesNotExist"):
             with self.assertRaises(GEN.SchemaError):
