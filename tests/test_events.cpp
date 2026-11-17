@@ -4,6 +4,8 @@
 // that NiriEvents dispatches the correct typed signals and updates its
 // cached snapshots. No live niri socket needed.
 
+#include <QDir>
+#include <QElapsedTimer>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QMetaObject>
@@ -11,7 +13,10 @@
 #include <QTest>
 
 #include <QLocalServer>
+#include <QLocalSocket>
 #include <QPointer>
+#include <QScopeGuard>
+#include <QTemporaryDir>
 
 #include "niriconnection.h"
 #include "nirievents.h"
@@ -161,28 +166,44 @@ private slots:
 
     void socketTimeoutFailsAfterDelay()
     {
+        QTemporaryDir socketDir(QDir::tempPath() + QStringLiteral("/niriqml-hang-XXXXXX"));
+        QVERIFY(socketDir.isValid());
         QLocalServer hangServer;
-        QVERIFY(hangServer.listen(QStringLiteral("niriqml-test-hang")));
-        // Save old env and point at hanging server
-        QByteArray oldSock = qgetenv("NIRI_SOCKET");
-        qputenv("NIRI_SOCKET", "/tmp/niriqml-test-hang");
+        QVERIFY(hangServer.listen(socketDir.filePath(QStringLiteral("socket"))));
+        const bool socketWasSet = qEnvironmentVariableIsSet("NIRI_SOCKET");
+        const QByteArray oldSock = qgetenv("NIRI_SOCKET");
+        auto *requests = NiriRequests::instance();
+        const int oldTimeout = requests->requestTimeoutMs();
+        const auto restore = qScopeGuard([&]() {
+            requests->setRequestTimeoutMs(oldTimeout);
+            if (socketWasSet)
+                qputenv("NIRI_SOCKET", oldSock);
+            else
+                qunsetenv("NIRI_SOCKET");
+        });
+        qputenv("NIRI_SOCKET", hangServer.fullServerName().toUtf8());
         // Disconnect so the socket path is read from env next time
         NiriConnection::instance()->disconnect();
 
-        NiriRequests::instance()->setRequestTimeoutMs(100);
-        NiriPendingReply *reply = NiriRequests::instance()->version();
+        requests->setRequestTimeoutMs(100);
+        QElapsedTimer elapsed;
+        elapsed.start();
+        NiriPendingReply *reply = requests->version();
         QSignalSpy spy(reply, &NiriPendingReply::finished);
 
-        // Wait longer than the 100ms timeout
+        // Prove this is a connected peer withholding a reply, not a bad endpoint.
+        QTRY_VERIFY_WITH_TIMEOUT(hangServer.hasPendingConnections(), 500);
+        QLocalSocket *peer = hangServer.nextPendingConnection();
+        QVERIFY(peer);
+        QTRY_VERIFY_WITH_TIMEOUT(peer->canReadLine(), 500);
+        QCOMPARE(peer->readLine(), QByteArray("\"Version\"\n"));
+        QCOMPARE(spy.count(), 0);
+
         QVERIFY(spy.wait(500));
+        QCOMPARE(spy.count(), 1);
+        QVERIFY(elapsed.elapsed() >= 90); // Qt's coarse timer may fire up to 5% early.
         QVERIFY(reply->isError());
         QCOMPARE(reply->error().message, QStringLiteral("Timeout"));
-
-        // Restore env + timeout. Do NOT reconnect NiriConnection here —
-        // disconnect/connect cycle causes heap corruption at process exit.
-        hangServer.close();
-        NiriRequests::instance()->setRequestTimeoutMs(5000);
-        qputenv("NIRI_SOCKET", oldSock);
     }
 
     void pendingReplyDeletedAfterFinished()
