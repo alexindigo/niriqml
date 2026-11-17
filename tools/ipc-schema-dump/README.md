@@ -49,10 +49,16 @@ or network fetching to the ordinary CMake build.
 
 ## Serde reference vectors
 
-`--vectors` constructs released Rust records and every supporting enum/union
-alternative directly, then serializes them with niri-ipc's own serde. It does
+`--vectors` constructs released Rust records and every supporting enum/union,
+Action, Request, OutputAction, Response and Event alternative directly, then
+serializes them with niri-ipc's own serde. It does
 not use the Python generator or schema to construct expected JSON. The fixture
 includes absent/present options, signed bounds, u64 max, 2^53+1 and escaping.
+`vectors` holds supporting values; `surfaceVectors` holds the five protocol
+inventories (16/141/9/14/19), with every OutputAction also embedded in a Request.
+All optional action/event fields and nullable responses have null and present
+examples. The explicit workspace-move regression uses window 123, workspace
+Id 456 and focus false. Width/height include all four SizeChange alternatives.
 
 Run maintenance only in the assigned DigitalOcean guest/container through the
 project's guest helper (cwd `/w/src`, TMPDIR `/w/tmp`):
@@ -67,6 +73,9 @@ cmp /w/build/serde-vectors.json tests/fixtures/serde-v26.04/vectors.json
 
 When intentionally updating the pin, replace the tracked fixture from this
 output and run `test_generator` and `test_codec`. They require complete released
-type/alternative coverage and null/present examples for each optional record
-field. Hand-written unknown/future variants are tested separately; they cannot
+type/alternative coverage and null/present examples for each optional record,
+action and event field. The inventory test rejects missing or extra protocol
+variants; codec tests cover supporting values, while callable/event tests consume
+the protocol vectors as their generated surfaces are integrated.
+Hand-written unknown/future variants are tested separately; they cannot
 be serialized by the pinned Rust enum. Ordinary CMake builds do not need Rust.

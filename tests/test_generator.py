@@ -122,6 +122,44 @@ class GeneratorTest(unittest.TestCase):
                 actual = {value if isinstance(value, str) else next(iter(value)) for value in values}
                 self.assertEqual(actual, expected, name)
 
+    def test_serde_surface_inventory(self):
+        compiler = self.compiler()
+        document = GEN.load(ROOT / "tests/fixtures/serde-v26.04/vectors.json")
+        by_type = {}
+        names = set()
+        for row in document["surfaceVectors"]:
+            self.assertNotIn(row["name"], names)
+            names.add(row["name"])
+            by_type.setdefault(row["type"], []).append(row["value"])
+        self.assertEqual(set(by_type), set(GEN.ROOT_GROUPS))
+        for name, count in GEN.ROOT_GROUPS.items():
+            ir = compiler.ir[name]
+            expected = {v["tag"] for v in ir["variants"]}
+            values = by_type[name]
+            actual = {value if isinstance(value, str) else next(iter(value)) for value in values}
+            self.assertEqual(len(expected), count)
+            self.assertEqual(actual, expected, name)
+            for variant in ir["variants"]:
+                payload = variant["payload"]
+                matching = [value[variant["tag"]] for value in values if isinstance(value, dict) and variant["tag"] in value]
+                if payload is None:
+                    self.assertIn(variant["tag"], values)
+                elif payload["kind"] == "record":
+                    for field in payload["fields"]:
+                        self.assertTrue(all(field["wire"] in value for value in matching), (name, variant["tag"], field))
+                        if field["type"]["kind"] == "optional":
+                            self.assertTrue(any(value[field["wire"]] is None for value in matching), (name, variant["tag"], field))
+                            self.assertTrue(any(value[field["wire"]] is not None for value in matching), (name, variant["tag"], field))
+                elif payload["kind"] == "optional":
+                    self.assertIn(None, matching)
+                    self.assertTrue(any(value is not None for value in matching))
+        explicit = {"Action": {"MoveWindowToWorkspace": {"window_id": 123, "reference": {"Id": 456}, "focus": False}}}
+        self.assertIn(explicit, by_type["Request"])
+        # The independent oracle includes all OutputAction alternatives embedded
+        # in actual Request::Output, not only isolated supporting values.
+        embedded = [value["Output"]["action"] for value in by_type["Request"] if isinstance(value, dict) and "Output" in value]
+        self.assertEqual(embedded, by_type["OutputAction"])
+
     def test_determinism_and_read_only_check(self):
         with tempfile.TemporaryDirectory(prefix="niriqml-generator-") as temporary:
             root = pathlib.Path(temporary)
