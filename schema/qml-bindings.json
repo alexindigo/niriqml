@@ -1,0 +1,17 @@
+{
+  "formatVersion": 1,
+  "types": {
+    "LayerSurface": {
+      "fields": {
+        "namespace": "namespaceName"
+      }
+    },
+    "Transform": {
+      "variants": {
+        "90": "Rotate90",
+        "180": "Rotate180",
+        "270": "Rotate270"
+      }
+    }
+  }
+}

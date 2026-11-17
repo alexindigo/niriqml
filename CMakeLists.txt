@@ -166,6 +166,12 @@ option(BUILD_TEST_MODE "Build C++ test executables" ON)
 
 if(BUILD_TEST_MODE)
     find_package(Qt6 REQUIRED COMPONENTS QuickTest Test)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    enable_testing()
+    add_test(NAME test_generated_staleness
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/generate-ipc.py --check)
+    add_test(NAME test_generator
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_generator.py)
 
     macro(add_niriqml_test NAME)
         add_executable(${NAME} tests/${NAME}.cpp)
