@@ -1,7 +1,7 @@
 #include "nirirequests.h"
 #include "nirirequestsequence.h"
 #include "niritypes.h"
-#include "niriutils.h"
+#include "generated/niriipccodec_generated.h"
 #include <QCoreApplication>
 #include <QJSValue>
 #include <QJsonArray>
@@ -241,80 +241,47 @@ void NiriRequests::sendJson(const QJsonValue &request, Callback callback)
             });
 }
 
-// Transitional named decoders. E6 replaces these compatibility gadget
-// conversions with generated field/range validation; the response discriminator
-// and outer payload kind are checked here before any conversion can default.
+namespace {
+template <typename T>
+bool decodeProjected(const WireValue &wire, QVariant &value, NiriError &error, const QString &path)
+{
+    T typed{};
+    NiriIpc::DecodeError detail;
+    if (!NiriIpc::decode(wire, typed, &detail, path)) {
+        error.message = detail.message;
+        error.fieldPath = detail.path;
+        return false;
+    }
+    value = NiriIpc::qmlValue(typed);
+    return true;
+}
+} // namespace
+
 NiriPendingReply *NiriRequests::query(const QString &kind)
 {
     if (!NiriSession::checkThread(this))
         return nullptr;
     auto decode = [kind](const WireValue &ok, QVariant &value, NiriError &error) {
         const auto *payload = ok.lookup(kind);
-        const bool list = kind == "Windows" || kind == "Workspaces";
-        const bool focused = kind == "FocusedWindow" || kind == "FocusedOutput";
-        bool valid = ok.objectValue() && ok.objectValue()->size() == 1 && payload;
-        if (valid) {
-            if (kind == "Version")
-                valid = payload->stringValue();
-            else if (list)
-                valid = payload->arrayValue();
-            else
-                valid = payload->objectValue()
-                        || (focused && payload->type() == WireValue::Type::Null);
-        }
-        if (!valid) {
+        if (!ok.objectValue() || ok.objectValue()->size() != 1 || !payload) {
             error.message = QStringLiteral("Expected %1 response and payload type").arg(kind);
             error.fieldPath = QStringLiteral("$.Ok.%1").arg(kind);
             return false;
         }
-        if (kind == "Version") {
-            value = *payload->stringValue();
-            return true;
-        }
-        if (payload->type() == WireValue::Type::Null) {
-            value = QVariant::fromValue(nullptr);
-            return true;
-        }
-        auto gadget = [&error, &kind](const WireValue &wire, QMetaType type) {
-            const auto json = toQJsonValueLossy(wire);
-            if (!json) {
-                error.message = QStringLiteral("Response cannot be projected to a legacy gadget");
-                error.fieldPath = QStringLiteral("$.Ok.%1").arg(kind);
-                return QVariant();
-            }
-            return jsonToGadget(json->toObject(), type);
-        };
-        const auto type = (kind == "Windows" || kind == "FocusedWindow")
-                ? QMetaType::fromType<NiriWindow>()
-                : kind == "Workspaces"      ? QMetaType::fromType<NiriWorkspace>()
-                : kind == "KeyboardLayouts" ? QMetaType::fromType<NiriKeyboardLayouts>()
-                                            : QMetaType::fromType<NiriOutput>();
-        if (list) {
-            QVariantList items;
-            for (const auto &item : *payload->arrayValue()) {
-                if (!item.objectValue()) {
-                    error.message = QStringLiteral("Expected record in response array");
-                    error.fieldPath = QStringLiteral("$.Ok.%1[%2]").arg(kind).arg(items.size());
-                    return false;
-                }
-                items.append(gadget(item, type));
-            }
-            value = items;
-        } else if (kind == "Outputs") {
-            QVariantMap items;
-            for (const auto &item : *payload->objectValue()) {
-                if (!item.second.objectValue()) {
-                    error.message = QStringLiteral("Expected output record");
-                    error.fieldPath = QStringLiteral("$.Ok.Outputs.%1").arg(item.first);
-                    return false;
-                }
-                items.insert(item.first, gadget(item.second, type));
-            }
-            value = items;
-        } else {
-            value = gadget(*payload, type);
-        }
-        return error.message.isEmpty();
+        const auto path = QStringLiteral("$.Ok.%1").arg(kind);
+        if (kind == "Version")
+            return decodeProjected<QString>(*payload, value, error, path);
+        if (kind == "Windows")
+            return decodeProjected<QList<NiriWindow>>(*payload, value, error, path);
+        if (kind == "Workspaces")
+            return decodeProjected<QList<NiriWorkspace>>(*payload, value, error, path);
+        if (kind == "Outputs")
+            return decodeProjected<QMap<QString, NiriOutput>>(*payload, value, error, path);
+        if (kind == "FocusedWindow")
+            return decodeProjected<std::optional<NiriWindow>>(*payload, value, error, path);
+        if (kind == "FocusedOutput")
+            return decodeProjected<std::optional<NiriOutput>>(*payload, value, error, path);
+        return decodeProjected<NiriKeyboardLayouts>(*payload, value, error, path);
     };
     return dispatch(WireValue(kind), this, options(), nullptr, std::move(decode));
 }

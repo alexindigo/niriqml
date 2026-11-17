@@ -113,7 +113,7 @@ static int consumerProcess(const QString &kind)
     else if (kind == "workspaces")
         body = "NiriWorkspaces {}";
     else if (kind == "window")
-        body = "NiriWindow { windowId: 7 }";
+        body = "NiriWindow { windowId: \"7\" }";
     else if (kind == "workspace")
         body = "NiriWorkspace { workspaceName: \"main\" }";
     else if (kind == "log")

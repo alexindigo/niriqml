@@ -4,6 +4,7 @@
 
 #include "nirievents.h"
 #include "nirisession.h"
+#include "generated/niriipccodec_generated.h"
 
 NiriWorkspaceReactive::NiriWorkspaceReactive(QObject *parent) : QObject(parent)
 {
@@ -12,9 +13,9 @@ NiriWorkspaceReactive::NiriWorkspaceReactive(QObject *parent) : QObject(parent)
         return;
     connect(events, &NiriEvents::workspacesChanged, this,
             &NiriWorkspaceReactive::onWorkspacesChanged);
-    connect(events, &NiriEvents::workspaceActivated, this,
+    connect(events->nativeEvents(), &NiriNativeEvents::workspaceActivated, this,
             &NiriWorkspaceReactive::onWorkspaceActivated);
-    connect(events, &NiriEvents::workspaceActiveWindowChanged, this,
+    connect(events->nativeEvents(), &NiriNativeEvents::workspaceActiveWindowChanged, this,
             &NiriWorkspaceReactive::onWorkspaceActiveWindowChanged);
     NiriSession::instance()->ensureStarted();
 }
@@ -46,11 +47,18 @@ void NiriWorkspaceReactive::setWorkspaceName(const QString &name)
     }
 }
 
-quint64 NiriWorkspaceReactive::workspaceId() const
+std::optional<quint64> NiriWorkspaceReactive::workspaceId() const
 {
-    return NiriSession::checkThread(this) ? m_selectorId : 0;
+    return NiriSession::checkThread(this) ? m_selectorId : std::nullopt;
 }
-void NiriWorkspaceReactive::setWorkspaceId(quint64 id)
+void NiriWorkspaceReactive::setQmlWorkspaceId(const QVariant &id)
+{
+    std::optional<quint64> value;
+    NiriIpc::DecodeError error;
+    if (NiriIpc::idInput(id, value, error))
+        setWorkspaceId(value);
+}
+void NiriWorkspaceReactive::setWorkspaceId(std::optional<quint64> id)
 {
     if (!NiriSession::checkThread(this))
         return;
@@ -66,7 +74,7 @@ void NiriWorkspaceReactive::setWorkspaceId(quint64 id)
     QVariantList snapshot = NiriEvents::instance()->lastWorkspacesSnapshot();
     for (const QVariant &v : snapshot) {
         NiriWorkspace w = v.value<NiriWorkspace>();
-        if (w.id == id && id != 0) {
+        if (id && w.id == *id) {
             updateFrom(w);
             break;
         }
@@ -85,13 +93,13 @@ int NiriWorkspaceReactive::idx() const
 {
     return NiriSession::checkThread(this) ? m_data.idx : 0;
 }
-QString NiriWorkspaceReactive::name() const
+std::optional<QString> NiriWorkspaceReactive::name() const
 {
-    return NiriSession::checkThread(this) ? m_data.name : QString{};
+    return NiriSession::checkThread(this) ? m_data.name : std::nullopt;
 }
-QString NiriWorkspaceReactive::output() const
+std::optional<QString> NiriWorkspaceReactive::output() const
 {
-    return NiriSession::checkThread(this) ? m_data.output : QString{};
+    return NiriSession::checkThread(this) ? m_data.output : std::nullopt;
 }
 bool NiriWorkspaceReactive::isUrgent() const
 {
@@ -105,16 +113,16 @@ bool NiriWorkspaceReactive::isFocused() const
 {
     return NiriSession::checkThread(this) && m_data.isFocused;
 }
-quint64 NiriWorkspaceReactive::activeWindowId() const
+std::optional<quint64> NiriWorkspaceReactive::activeWindowId() const
 {
-    return NiriSession::checkThread(this) ? m_data.activeWindowId : 0;
+    return NiriSession::checkThread(this) ? m_data.activeWindowId : std::nullopt;
 }
 
 bool NiriWorkspaceReactive::matches(const NiriWorkspace &w) const
 {
     if (!m_selectorName.isEmpty())
         return w.name == m_selectorName;
-    if (m_selectorId != 0)
+    if (m_selectorId)
         return w.id == m_selectorId;
     return false;
 }
@@ -185,7 +193,8 @@ void NiriWorkspaceReactive::onWorkspaceActivated(quint64 workspaceId, bool focus
         emit workspaceChanged();
 }
 
-void NiriWorkspaceReactive::onWorkspaceActiveWindowChanged(quint64 workspaceId, quint64 windowId)
+void NiriWorkspaceReactive::onWorkspaceActiveWindowChanged(quint64 workspaceId,
+                                                           std::optional<quint64> windowId)
 {
     if (!m_valid || m_data.id != workspaceId)
         return;

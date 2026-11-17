@@ -127,10 +127,14 @@ private slots:
         events->dispatchEvent("WorkspacesChanged",
                               {{"workspaces",
                                 QVariantList{QVariantMap{{"id", 1},
+                                                         {"idx", 1},
+                                                         {"is_urgent", false},
                                                          {"output", "DP-1"},
                                                          {"is_active", true},
                                                          {"is_focused", true}},
                                              QVariantMap{{"id", 2},
+                                                         {"idx", 2},
+                                                         {"is_urgent", false},
                                                          {"output", "DP-1"},
                                                          {"is_active", false},
                                                          {"is_focused", false}}}}});
@@ -155,9 +159,13 @@ private slots:
     void urgentThreadGuard()
     {
         NiriWorkspaceReactive workspace;
-        NiriEvents::instance()->dispatchEvent(
-                "WorkspacesChanged",
-                {{"workspaces", QVariantList{QVariantMap{{"id", 1}, {"is_urgent", true}}}}});
+        NiriEvents::instance()->dispatchEvent("WorkspacesChanged",
+                                              {{"workspaces",
+                                                QVariantList{QVariantMap{{"id", 1},
+                                                                         {"idx", 1},
+                                                                         {"is_urgent", true},
+                                                                         {"is_active", false},
+                                                                         {"is_focused", false}}}}});
         workspace.setWorkspaceId(1);
         QVERIFY(workspace.isUrgent());
         bool urgent = true;

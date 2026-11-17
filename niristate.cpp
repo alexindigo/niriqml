@@ -39,10 +39,13 @@ NiriState::NiriState(QObject *parent) : QObject(parent)
     NiriEvents *events = NiriEvents::instance();
     connect(events, &NiriEvents::windowsChanged, this, &NiriState::onWindowsChanged);
     connect(events, &NiriEvents::windowOpenedOrChanged, this, &NiriState::onWindowOpenedOrChanged);
-    connect(events, &NiriEvents::windowClosed, this, &NiriState::onWindowClosed);
-    connect(events, &NiriEvents::windowFocusChanged, this, &NiriState::onWindowFocusChanged);
+    connect(events->nativeEvents(), &NiriNativeEvents::windowClosed, this,
+            &NiriState::onWindowClosed);
+    connect(events->nativeEvents(), &NiriNativeEvents::windowFocusChanged, this,
+            &NiriState::onWindowFocusChanged);
     connect(events, &NiriEvents::workspacesChanged, this, &NiriState::onWorkspacesChanged);
-    connect(events, &NiriEvents::workspaceActivated, this, &NiriState::onWorkspaceActivated);
+    connect(events->nativeEvents(), &NiriNativeEvents::workspaceActivated, this,
+            &NiriState::onWorkspaceActivated);
 
     // Bootstrap from cached snapshots for late instantiation
     QVariantList windows = events->lastWindowsSnapshot();
@@ -54,25 +57,25 @@ NiriState::NiriState(QObject *parent) : QObject(parent)
     NiriSession::instance()->ensureStarted();
 }
 
-quint64 NiriState::focusedWindowId() const
+std::optional<quint64> NiriState::focusedWindowId() const
 {
-    return NiriSession::checkThread(this) ? m_focusedWindowId : 0;
+    return NiriSession::checkThread(this) ? m_focusedWindowId : std::nullopt;
 }
-QString NiriState::focusedWindowAppId() const
+std::optional<QString> NiriState::focusedWindowAppId() const
 {
-    return NiriSession::checkThread(this) ? m_focusedWindowAppId : QString{};
+    return NiriSession::checkThread(this) ? m_focusedWindowAppId : std::nullopt;
 }
-QString NiriState::focusedWindowTitle() const
+std::optional<QString> NiriState::focusedWindowTitle() const
 {
-    return NiriSession::checkThread(this) ? m_focusedWindowTitle : QString{};
+    return NiriSession::checkThread(this) ? m_focusedWindowTitle : std::nullopt;
 }
-quint64 NiriState::focusedWorkspaceId() const
+std::optional<quint64> NiriState::focusedWorkspaceId() const
 {
-    return NiriSession::checkThread(this) ? m_focusedWorkspaceId : 0;
+    return NiriSession::checkThread(this) ? m_focusedWorkspaceId : std::nullopt;
 }
-QString NiriState::activeOutput() const
+std::optional<QString> NiriState::activeOutput() const
 {
-    return NiriSession::checkThread(this) ? m_activeOutput : QString{};
+    return NiriSession::checkThread(this) ? m_activeOutput : std::nullopt;
 }
 int NiriState::windowCount() const
 {
@@ -85,20 +88,21 @@ int NiriState::workspaceCount() const
 
 void NiriState::syncFocusedWindowInfo()
 {
-    auto it = m_windowsById.constFind(m_focusedWindowId);
+    auto it = m_focusedWindowId ? m_windowsById.constFind(*m_focusedWindowId)
+                                : m_windowsById.constEnd();
     if (it != m_windowsById.constEnd()) {
         m_focusedWindowAppId = it->appId;
         m_focusedWindowTitle = it->title;
     } else {
-        m_focusedWindowAppId.clear();
-        m_focusedWindowTitle.clear();
+        m_focusedWindowAppId.reset();
+        m_focusedWindowTitle.reset();
     }
 }
 
 void NiriState::onWindowsChanged(const QVariantList &windows)
 {
     m_windowsById.clear();
-    quint64 newFocusedId = 0;
+    std::optional<quint64> newFocusedId;
     for (const QVariant &v : windows) {
         NiriWindow w = v.value<NiriWindow>();
         m_windowsById[w.id] = w;
@@ -106,8 +110,7 @@ void NiriState::onWindowsChanged(const QVariantList &windows)
             newFocusedId = w.id;
     }
     m_windowCount = m_windowsById.size();
-    if (newFocusedId != 0)
-        m_focusedWindowId = newFocusedId;
+    m_focusedWindowId = newFocusedId;
     syncFocusedWindowInfo();
     emit stateChanged();
 }
@@ -136,14 +139,14 @@ void NiriState::onWindowClosed(quint64 id)
     m_windowCount = m_windowsById.size();
 
     if (m_focusedWindowId == id) {
-        m_focusedWindowId = 0;
-        m_focusedWindowAppId.clear();
-        m_focusedWindowTitle.clear();
+        m_focusedWindowId.reset();
+        m_focusedWindowAppId.reset();
+        m_focusedWindowTitle.reset();
     }
     emit stateChanged();
 }
 
-void NiriState::onWindowFocusChanged(quint64 id)
+void NiriState::onWindowFocusChanged(std::optional<quint64> id)
 {
     if (m_focusedWindowId == id)
         return;
@@ -155,8 +158,8 @@ void NiriState::onWindowFocusChanged(quint64 id)
 void NiriState::onWorkspacesChanged(const QVariantList &workspaces)
 {
     m_workspacesById.clear();
-    quint64 newFocused = 0;
-    QString newActiveOutput;
+    std::optional<quint64> newFocused;
+    std::optional<QString> newActiveOutput;
     for (const QVariant &v : workspaces) {
         NiriWorkspace ws = v.value<NiriWorkspace>();
         m_workspacesById[ws.id] = ws;
@@ -166,10 +169,8 @@ void NiriState::onWorkspacesChanged(const QVariantList &workspaces)
         }
     }
     m_workspaceCount = m_workspacesById.size();
-    if (newFocused != 0) {
-        m_focusedWorkspaceId = newFocused;
-        m_activeOutput = newActiveOutput;
-    }
+    m_focusedWorkspaceId = newFocused;
+    m_activeOutput = newActiveOutput;
     emit stateChanged();
 }
 
@@ -180,7 +181,7 @@ void NiriState::onWorkspaceActivated(quint64 workspaceId, bool focused)
     auto it = m_workspacesById.find(workspaceId);
     if (it == m_workspacesById.end())
         return;
-    const QString output = it->output;
+    const auto output = it->output;
     for (auto wit = m_workspacesById.begin(); wit != m_workspacesById.end(); ++wit) {
         if (wit->output == output)
             wit->isActive = (wit->id == workspaceId);
@@ -189,8 +190,7 @@ void NiriState::onWorkspaceActivated(quint64 workspaceId, bool focused)
 
     if (focused) {
         m_focusedWorkspaceId = workspaceId;
-        if (!output.isEmpty())
-            m_activeOutput = output;
+        m_activeOutput = output;
     }
     emit stateChanged();
 }

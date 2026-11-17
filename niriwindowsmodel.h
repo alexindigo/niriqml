@@ -37,7 +37,7 @@ private slots:
     void onWindowsChanged(const QVariantList &windows);
     void onWindowOpenedOrChanged(const NiriWindow &window);
     void onWindowClosed(quint64 id);
-    void onWindowFocusChanged(quint64 id);
+    void onWindowFocusChanged(std::optional<quint64> id);
 
 private:
     QList<NiriWindow> m_windows;

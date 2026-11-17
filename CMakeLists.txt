@@ -69,6 +69,9 @@ set(NIRIQML_SOURCES
     niriwire.h
 )
 
+include(generated/ipc-generated.cmake)
+list(APPEND NIRIQML_SOURCES ${NIRIQML_GENERATED_SOURCES})
+
 add_library(niriqml SHARED)
 add_library(niriqml::niriqml ALIAS niriqml)
 qt_add_qml_module(niriqml
@@ -143,6 +146,8 @@ install(FILES
     niriwire.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/niriqml
 )
+install(FILES ${NIRIQML_GENERATED_HEADERS}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/niriqml/generated)
 
 configure_package_config_file(cmake/niriqmlConfig.cmake.in
     ${CMAKE_CURRENT_BINARY_DIR}/niriqmlConfig.cmake
@@ -196,6 +201,7 @@ if(BUILD_TEST_MODE)
     add_niriqml_test(test_session)
     add_niriqml_test(test_session_review)
     add_niriqml_test(test_requests)
+    add_niriqml_test(test_codec)
     add_niriqml_test(test_types)
     add_niriqml_test(test_converter)
     add_niriqml_test(test_events)

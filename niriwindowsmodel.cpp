@@ -11,8 +11,10 @@ NiriWindowsModel::NiriWindowsModel(QObject *parent) : QAbstractListModel(parent)
     connect(events, &NiriEvents::windowsChanged, this, &NiriWindowsModel::onWindowsChanged);
     connect(events, &NiriEvents::windowOpenedOrChanged, this,
             &NiriWindowsModel::onWindowOpenedOrChanged);
-    connect(events, &NiriEvents::windowClosed, this, &NiriWindowsModel::onWindowClosed);
-    connect(events, &NiriEvents::windowFocusChanged, this, &NiriWindowsModel::onWindowFocusChanged);
+    connect(events->nativeEvents(), &NiriNativeEvents::windowClosed, this,
+            &NiriWindowsModel::onWindowClosed);
+    connect(events->nativeEvents(), &NiriNativeEvents::windowFocusChanged, this,
+            &NiriWindowsModel::onWindowFocusChanged);
 
     // Bootstrap from cached snapshot for late subscribers
     QVariantList snapshot = events->lastWindowsSnapshot();
@@ -42,15 +44,15 @@ QVariant NiriWindowsModel::data(const QModelIndex &index, int role) const
     case WindowRole:
         return QVariant::fromValue(w);
     case IdRole:
-        return QVariant::fromValue(w.id);
+        return w.qmlId();
     case TitleRole:
-        return w.title;
+        return w.qmlTitle();
     case AppIdRole:
-        return w.appId;
+        return w.qmlAppId();
     case PidRole:
-        return w.pid;
+        return w.qmlPid();
     case WorkspaceIdRole:
-        return QVariant::fromValue(w.workspaceId);
+        return w.qmlWorkspaceId();
     case IsFocusedRole:
         return w.isFocused;
     case IsFloatingRole:
@@ -127,12 +129,12 @@ void NiriWindowsModel::onWindowClosed(quint64 id)
     endRemoveRows();
 }
 
-void NiriWindowsModel::onWindowFocusChanged(quint64 id)
+void NiriWindowsModel::onWindowFocusChanged(std::optional<quint64> id)
 {
     // Update isFocused flag on all rows; emit dataChanged for changed rows only
     for (int i = 0; i < m_windows.size(); ++i) {
         bool wasFocused = m_windows[i].isFocused;
-        bool nowFocused = (m_windows[i].id == id);
+        bool nowFocused = id && m_windows[i].id == *id;
         if (wasFocused != nowFocused) {
             m_windows[i].isFocused = nowFocused;
             QModelIndex idx = index(i);

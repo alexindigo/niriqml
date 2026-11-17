@@ -2,11 +2,13 @@ use schemars::{generate::SchemaSettings, JsonSchema};
 use serde_json::{json, Value};
 use std::io::{self, Write};
 
+mod vectors;
+
 const RELEASE: &str = "v26.04";
 const COMMIT: &str = "8ed0da44d974c32c6877d2f4630c314da0717ecb";
 const SCHEMARS_VERSION: &str = "1.2.1";
 const EXTRACTION_FORMAT_VERSION: u32 = 1;
-const USAGE: &str = "usage: niriqml-ipc-schema-dump [--contract deserialize|serialize]";
+const USAGE: &str = "usage: niriqml-ipc-schema-dump [--contract deserialize|serialize | --vectors]";
 
 // This is an extraction index, not a message in niri's wire protocol.
 // The properties' actual refs identify the roots, including the Reply alias.
@@ -95,6 +97,14 @@ fn write_schema(contract: Contract) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn main() {
+    if std::env::args().skip(1).collect::<Vec<_>>() == ["--vectors"] {
+        let result = vectors::write_vectors();
+        if let Err(error) = result {
+            eprintln!("vector serialization failed: {error}");
+            std::process::exit(1);
+        }
+        return;
+    }
     let contract = parse_contract(std::env::args().skip(1)).unwrap_or_else(|message| {
         eprintln!("{message}");
         std::process::exit(2);

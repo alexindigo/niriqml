@@ -1,308 +1,212 @@
 #include <QTest>
+#include <future>
+#include <vector>
 
 #include "niriutils.h"
 #include "niritypes.h"
 
+namespace {
+QJsonObject windowJson()
+{
+    return {{"id", 42},
+            {"title", "Test Window"},
+            {"app_id", "com.test.App"},
+            {"pid", -12345},
+            {"workspace_id", 3},
+            {"is_focused", true},
+            {"is_floating", false},
+            {"is_urgent", false},
+            {"layout",
+             QJsonObject{{"pos_in_scrolling_layout", QJsonArray{3, 1}},
+                         {"tile_size", QJsonArray{1420.0, 914.0}},
+                         {"window_size", QJsonArray{1420, 914}},
+                         {"tile_pos_in_workspace_view", QJsonValue::Null},
+                         {"window_offset_in_tile", QJsonArray{0.0, 0.0}}}},
+            {"focus_timestamp", QJsonObject{{"secs", 1000}, {"nanos", 500}}}};
+}
+QJsonObject workspaceJson()
+{
+    return {{"id", 5},
+            {"idx", 2},
+            {"name", QJsonValue::Null},
+            {"output", "eDP-1"},
+            {"is_urgent", false},
+            {"is_active", true},
+            {"is_focused", true},
+            {"active_window_id", 42}};
+}
+} // namespace
+
 class TestConverter : public QObject
 {
     Q_OBJECT
-
 private slots:
-    void testToSnakeCase();
-    void windowFromJson();
-    void windowNullFields();
-    void workspaceFromJson();
-    void windowLayoutFromJson();
-    void missingFieldKeepsDefault();
-    void extraFieldIgnored();
-    void u64IdsPreserved();
-    void keyboardLayoutsFromJson();
-    void nestedLayoutRecursion();
-    void outputWithModesFromJson();
-    void snakeCaseCacheReusesEntries();
+    void testToSnakeCase()
+    {
+        for (const auto &pair : {qMakePair("appId", "app_id"), qMakePair("isFocused", "is_focused"),
+                                 qMakePair("posInScrollingLayout", "pos_in_scrolling_layout"),
+                                 qMakePair("tilePosInWorkspaceView", "tile_pos_in_workspace_view"),
+                                 qMakePair("activeWindowId", "active_window_id"),
+                                 qMakePair("windowOffsetInTile", "window_offset_in_tile"),
+                                 qMakePair("id", "id"), qMakePair("pid", "pid"), qMakePair("", "")})
+            QCOMPARE(toSnakeCase(QByteArray(pair.first)), QByteArray(pair.second));
+    }
+    void windowFromJson()
+    {
+        const auto w = fromNiriJson<NiriWindow>(windowJson());
+        QCOMPARE(w.id, 42ull);
+        QCOMPARE(w.title, std::optional<QString>("Test Window"));
+        QCOMPARE(w.appId, std::optional<QString>("com.test.App"));
+        QCOMPARE(w.pid, std::optional<qint32>(-12345));
+        QCOMPARE(w.workspaceId, std::optional<quint64>(3));
+        QVERIFY(w.isFocused);
+        QVERIFY(!w.isFloating);
+        QVERIFY(!w.isUrgent);
+        QVERIFY((w.layout.posInScrollingLayout == std::array<quint64, 2>{3, 1}));
+        QVERIFY((w.layout.tileSize == std::array<double, 2>{1420.0, 914.0}));
+        QVERIFY((w.layout.windowSize == std::array<qint32, 2>{1420, 914}));
+        QVERIFY(!w.layout.tilePosInWorkspaceView);
+        QVERIFY((w.layout.windowOffsetInTile == std::array<double, 2>{0, 0}));
+        QVERIFY(w.focusTimestamp);
+        QCOMPARE(w.focusTimestamp->secs, 1000ull);
+        QCOMPARE(w.focusTimestamp->nanos, 500u);
+    }
+    void windowNullFields()
+    {
+        auto json = windowJson();
+        for (const auto &field : {"title", "app_id", "pid", "workspace_id", "focus_timestamp"})
+            json[field] = QJsonValue::Null;
+        const auto w = fromNiriJson<NiriWindow>(json);
+        QCOMPARE(w.id, 42ull);
+        QVERIFY(!w.title);
+        QVERIFY(!w.appId);
+        QVERIFY(!w.pid);
+        QVERIFY(!w.workspaceId);
+        QVERIFY(!w.focusTimestamp);
+        json["title"] = "";
+        QVERIFY(fromNiriJson<NiriWindow>(json).title.has_value());
+    }
+    void workspaceFromJson()
+    {
+        const auto ws = fromNiriJson<NiriWorkspace>(workspaceJson());
+        QCOMPARE(ws.id, 5ull);
+        QCOMPARE(ws.idx, quint8(2));
+        QVERIFY(!ws.name);
+        QCOMPARE(ws.output, std::optional<QString>("eDP-1"));
+        QVERIFY(ws.isActive);
+        QCOMPARE(ws.activeWindowId, std::optional<quint64>(42));
+    }
+    void windowLayoutFromJson()
+    {
+        const auto layout = fromNiriJson<NiriWindowLayout>(windowJson()["layout"].toObject());
+        QVERIFY((layout.tileSize == std::array<double, 2>{1420.0, 914.0}));
+        QVERIFY((layout.windowSize == std::array<qint32, 2>{1420, 914}));
+        QVERIFY((layout.windowOffsetInTile == std::array<double, 2>{0.0, 0.0}));
+    }
+    void missingRequiredRejected()
+    {
+        QVERIFY(!jsonToGadget({{"id", 1}}, QMetaType::fromType<NiriWorkspace>()).isValid());
+        auto json = workspaceJson();
+        json.remove("name");
+        const auto value = jsonToGadget(json, QMetaType::fromType<NiriWorkspace>());
+        QVERIFY(value.isValid());
+        QVERIFY(!value.value<NiriWorkspace>().name);
+    }
+    void extraFieldRetained()
+    {
+        auto json = windowJson();
+        json["unknown_new_field"] = 42;
+        json["another_unknown"] = "retained";
+        const auto w = fromNiriJson<NiriWindow>(json);
+        QCOMPARE(w.id, 42ull);
+        QCOMPARE(w.title, std::optional<QString>("Test Window"));
+        QCOMPARE(w.extensions.size(), 2);
+    }
+    void u64IdsPreserved()
+    {
+        const quint64 largeId = 4294967300ull;
+        auto json = windowJson();
+        json["id"] = qint64(largeId);
+        QCOMPARE(fromNiriJson<NiriWindow>(json).id, largeId);
+    }
+    void keyboardLayoutsFromJson()
+    {
+        const auto kl = fromNiriJson<NiriKeyboardLayouts>(
+                {{"names", QJsonArray{"English (US)", "Russian (Macintosh)"}}, {"current_idx", 0}});
+        QCOMPARE(kl.names, QList<QString>({"English (US)", "Russian (Macintosh)"}));
+        QCOMPARE(kl.currentIdx, quint8(0));
+    }
+    void nestedLayoutRecursion()
+    {
+        auto json = windowJson();
+        json["id"] = 99;
+        auto layout = json["layout"].toObject();
+        layout["tile_size"] = QJsonArray{800.0, 600.0};
+        layout["window_size"] = QJsonArray{800, 600};
+        json["layout"] = layout;
+        json["focus_timestamp"] = QJsonObject{{"secs", 5000}, {"nanos", 0}};
+        const auto w = fromNiriJson<NiriWindow>(json);
+        QCOMPARE(w.id, 99ull);
+        QVERIFY((w.layout.tileSize == std::array<double, 2>{800, 600}));
+        QVERIFY((w.layout.windowSize == std::array<qint32, 2>{800, 600}));
+        QVERIFY(w.focusTimestamp);
+        QCOMPARE(w.focusTimestamp->secs, 5000ull);
+        QCOMPARE(w.focusTimestamp->nanos, 0u);
+    }
+    void outputWithModesFromJson()
+    {
+        const auto output =
+                fromNiriJson<NiriOutput>({{"name", "eDP-1"},
+                                          {"make", "BOE"},
+                                          {"model", "NE135A1M-NY1"},
+                                          {"modes",
+                                           QJsonArray{QJsonObject{{"width", 2880},
+                                                                  {"height", 1920},
+                                                                  {"refresh_rate", 120000},
+                                                                  {"is_preferred", true}},
+                                                      QJsonObject{{"width", 2880},
+                                                                  {"height", 1920},
+                                                                  {"refresh_rate", 60001},
+                                                                  {"is_preferred", true}}}},
+                                          {"current_mode", 0},
+                                          {"is_custom_mode", false},
+                                          {"vrr_supported", true},
+                                          {"vrr_enabled", false}});
+        QCOMPARE(output.name, "eDP-1");
+        QCOMPARE(output.make, "BOE");
+        QCOMPARE(output.modes.size(), 2);
+        QCOMPARE(output.modes[0].width, quint16(2880));
+        QCOMPARE(output.modes[0].height, quint16(1920));
+        QCOMPARE(output.modes[0].refreshRate, quint32(120000));
+        QVERIFY(output.modes[0].isPreferred);
+        QCOMPARE(output.modes[1].refreshRate, quint32(60001));
+        QCOMPARE(output.currentMode, std::optional<quint64>(0));
+        QVERIFY(output.vrrSupported);
+        QVERIFY(!output.vrrEnabled);
+    }
+    void reentrantConversionHasNoSharedCache()
+    {
+        std::vector<std::future<bool>> jobs;
+        for (int i = 0; i < 8; ++i) {
+            jobs.push_back(std::async(std::launch::async, [] {
+                for (int n = 0; n < 100; ++n) {
+                    auto json = windowJson();
+                    json["id"] = n;
+                    const auto window = jsonToGadget(json, QMetaType::fromType<NiriWindow>());
+                    const auto workspace =
+                            jsonToGadget(workspaceJson(), QMetaType::fromType<NiriWorkspace>());
+                    if (window.value<NiriWindow>().id != quint64(n)
+                        || workspace.value<NiriWorkspace>().output != "eDP-1")
+                        return false;
+                }
+                return true;
+            }));
+        }
+        for (auto &job : jobs)
+            QVERIFY(job.get());
+        QCOMPARE(snakeCaseCacheSizeForTesting(), 0);
+    }
 };
-
-void TestConverter::testToSnakeCase()
-{
-    QCOMPARE(toSnakeCase(QByteArray("appId")), QByteArray("app_id"));
-    QCOMPARE(toSnakeCase(QByteArray("isFocused")), QByteArray("is_focused"));
-    QCOMPARE(toSnakeCase(QByteArray("posInScrollingLayout")),
-             QByteArray("pos_in_scrolling_layout"));
-    QCOMPARE(toSnakeCase(QByteArray("tilePosInWorkspaceView")),
-             QByteArray("tile_pos_in_workspace_view"));
-    QCOMPARE(toSnakeCase(QByteArray("activeWindowId")), QByteArray("active_window_id"));
-    QCOMPARE(toSnakeCase(QByteArray("windowOffsetInTile")), QByteArray("window_offset_in_tile"));
-    QCOMPARE(toSnakeCase(QByteArray("id")), QByteArray("id"));
-    QCOMPARE(toSnakeCase(QByteArray("pid")), QByteArray("pid"));
-    QCOMPARE(toSnakeCase(QByteArray("")), QByteArray(""));
-}
-
-void TestConverter::windowFromJson()
-{
-    QJsonObject json;
-    json["id"] = 42;
-    json["title"] = QStringLiteral("Test Window");
-    json["app_id"] = QStringLiteral("com.test.App");
-    json["pid"] = 12345;
-    json["workspace_id"] = 3;
-    json["is_focused"] = true;
-    json["is_floating"] = false;
-    json["is_urgent"] = false;
-
-    QJsonArray posInScrolling{3, 1};
-    QJsonArray tileSize{1420.0, 914.0};
-    QJsonArray windowSize{1420, 914};
-    QJsonArray offset{0.0, 0.0};
-    json["layout"] = QJsonObject{
-            {"pos_in_scrolling_layout", posInScrolling},
-            {"tile_size", tileSize},
-            {"window_size", windowSize},
-            {"tile_pos_in_workspace_view", QJsonValue::Null},
-            {"window_offset_in_tile", offset},
-    };
-    json["focus_timestamp"] = QJsonObject{
-            {"secs", qint64(1000)},
-            {"nanos", 500},
-    };
-
-    NiriWindow w = fromNiriJson<NiriWindow>(json);
-
-    QCOMPARE(w.id, 42ull);
-    QCOMPARE(w.title, QStringLiteral("Test Window"));
-    QCOMPARE(w.appId, QStringLiteral("com.test.App"));
-    QCOMPARE(w.pid, 12345u);
-    QCOMPARE(w.workspaceId, 3ull);
-    QCOMPARE(w.isFocused, true);
-    QCOMPARE(w.isFloating, false);
-    QCOMPARE(w.isUrgent, false);
-
-    QList<int> expectedPos{3, 1};
-    QCOMPARE(w.layout.posInScrollingLayout, expectedPos);
-    QList<double> expectedTile{1420.0, 914.0};
-    QCOMPARE(w.layout.tileSize, expectedTile);
-    QList<int> expectedWSize{1420, 914};
-    QCOMPARE(w.layout.windowSize, expectedWSize);
-    QList<double> expectedNullPos{};
-    QCOMPARE(w.layout.tilePosInWorkspaceView, expectedNullPos);
-    QList<double> expectedOff{0.0, 0.0};
-    QCOMPARE(w.layout.windowOffsetInTile, expectedOff);
-
-    QCOMPARE(w.focusTimestamp.secs, 1000ull);
-    QCOMPARE(w.focusTimestamp.nanos, 500u);
-}
-
-void TestConverter::windowNullFields()
-{
-    QJsonObject json;
-    json["id"] = 1;
-    json["title"] = QJsonValue::Null;
-    json["app_id"] = QJsonValue::Null;
-    json["workspace_id"] = QJsonValue::Null;
-
-    NiriWindow w = fromNiriJson<NiriWindow>(json);
-
-    QCOMPARE(w.id, 1ull);
-    QCOMPARE(w.title, QString{});
-    QCOMPARE(w.appId, QString{});
-    QCOMPARE(w.workspaceId, 0ull);
-}
-
-void TestConverter::workspaceFromJson()
-{
-    QJsonObject json;
-    json["id"] = 5;
-    json["idx"] = 2;
-    json["name"] = QJsonValue::Null;
-    json["output"] = QStringLiteral("eDP-1");
-    json["is_urgent"] = false;
-    json["is_active"] = true;
-    json["is_focused"] = true;
-    json["active_window_id"] = 42;
-
-    NiriWorkspace ws = fromNiriJson<NiriWorkspace>(json);
-
-    QCOMPARE(ws.id, 5ull);
-    QCOMPARE(ws.idx, 2);
-    QVERIFY(ws.name.isEmpty());
-    QCOMPARE(ws.output, QStringLiteral("eDP-1"));
-    QCOMPARE(ws.isActive, true);
-    QCOMPARE(ws.activeWindowId, 42ull);
-}
-
-void TestConverter::windowLayoutFromJson()
-{
-    QJsonObject json;
-    QJsonArray tileSize{1420.0, 914.0};
-    QJsonArray windowSize{1420, 914};
-    QJsonArray offset{0.0, 0.0};
-    json["tile_size"] = tileSize;
-    json["window_size"] = windowSize;
-    json["window_offset_in_tile"] = offset;
-
-    NiriWindowLayout layout = fromNiriJson<NiriWindowLayout>(json);
-
-    QList<double> expectedTile{1420.0, 914.0};
-    QCOMPARE(layout.tileSize, expectedTile);
-    QList<int> expectedWSize{1420, 914};
-    QCOMPARE(layout.windowSize, expectedWSize);
-    QList<double> expectedOff{0.0, 0.0};
-    QCOMPARE(layout.windowOffsetInTile, expectedOff);
-}
-
-void TestConverter::missingFieldKeepsDefault()
-{
-    QJsonObject json;
-    json["id"] = 1;
-
-    NiriWorkspace ws = fromNiriJson<NiriWorkspace>(json);
-
-    QCOMPARE(ws.id, 1ull);
-    QCOMPARE(ws.isUrgent, false);
-    QCOMPARE(ws.isActive, false);
-    QCOMPARE(ws.name, QString{});
-}
-
-void TestConverter::extraFieldIgnored()
-{
-    QJsonObject json;
-    json["id"] = 7;
-    json["title"] = QStringLiteral("Test");
-    json["unknown_new_field"] = 42;
-    json["another_unknown"] = QStringLiteral("ignored");
-
-    NiriWindow w = fromNiriJson<NiriWindow>(json);
-
-    QCOMPARE(w.id, 7ull);
-    QCOMPARE(w.title, QStringLiteral("Test"));
-}
-
-void TestConverter::u64IdsPreserved()
-{
-    quint64 largeId = 4294967300ull;
-    QJsonObject json;
-    json["id"] = qint64(largeId);
-
-    NiriWindow w = fromNiriJson<NiriWindow>(json);
-
-    QCOMPARE(w.id, largeId);
-}
-
-void TestConverter::keyboardLayoutsFromJson()
-{
-    QJsonArray names{QStringLiteral("English (US)"), QStringLiteral("Russian (Macintosh)")};
-    QJsonObject json;
-    json["names"] = names;
-    json["current_idx"] = 0;
-
-    NiriKeyboardLayouts kl = fromNiriJson<NiriKeyboardLayouts>(json);
-
-    QCOMPARE(kl.names.size(), 2);
-    QCOMPARE(kl.names[0], QStringLiteral("English (US)"));
-    QCOMPARE(kl.names[1], QStringLiteral("Russian (Macintosh)"));
-    QCOMPARE(kl.currentIdx, 0);
-}
-
-void TestConverter::nestedLayoutRecursion()
-{
-    QJsonObject layout;
-    QJsonArray tileSize{800.0, 600.0};
-    QJsonArray windowSize{800, 600};
-    QJsonArray offset{0.0, 0.0};
-    layout["tile_size"] = tileSize;
-    layout["window_size"] = windowSize;
-    layout["window_offset_in_tile"] = offset;
-
-    QJsonObject ts;
-    ts["secs"] = qint64(5000);
-    ts["nanos"] = 0;
-
-    QJsonObject json;
-    json["id"] = 99;
-    json["layout"] = layout;
-    json["focus_timestamp"] = ts;
-
-    NiriWindow w = fromNiriJson<NiriWindow>(json);
-
-    QCOMPARE(w.id, 99ull);
-    QList<double> expectedTile{800.0, 600.0};
-    QCOMPARE(w.layout.tileSize, expectedTile);
-    QList<int> expectedWSize{800, 600};
-    QCOMPARE(w.layout.windowSize, expectedWSize);
-    QCOMPARE(w.focusTimestamp.secs, 5000ull);
-    QCOMPARE(w.focusTimestamp.nanos, 0u);
-}
-
-void TestConverter::outputWithModesFromJson()
-{
-    QJsonArray modes;
-    modes.append(QJsonObject{
-            {"width", 2880},
-            {"height", 1920},
-            {"refresh_rate", 120000},
-            {"is_preferred", true},
-    });
-    modes.append(QJsonObject{
-            {"width", 2880},
-            {"height", 1920},
-            {"refresh_rate", 60001},
-            {"is_preferred", true},
-    });
-
-    QJsonObject json;
-    json["name"] = QStringLiteral("eDP-1");
-    json["make"] = QStringLiteral("BOE");
-    json["model"] = QStringLiteral("NE135A1M-NY1");
-    json["modes"] = modes;
-    json["current_mode"] = 0;
-    json["is_custom_mode"] = false;
-    json["vrr_supported"] = true;
-    json["vrr_enabled"] = false;
-
-    NiriOutput output = fromNiriJson<NiriOutput>(json);
-
-    QCOMPARE(output.name, QStringLiteral("eDP-1"));
-    QCOMPARE(output.make, QStringLiteral("BOE"));
-    QCOMPARE(output.modes.size(), 2);
-    QCOMPARE(output.modes[0].width, 2880u);
-    QCOMPARE(output.modes[0].height, 1920u);
-    QCOMPARE(output.modes[0].refreshRate, 120000u);
-    QCOMPARE(output.modes[0].isPreferred, true);
-    QCOMPARE(output.modes[1].refreshRate, 60001u);
-    QCOMPARE(output.currentMode, 0);
-    QCOMPARE(output.vrrSupported, true);
-    QCOMPARE(output.vrrEnabled, false);
-}
-
-void TestConverter::snakeCaseCacheReusesEntries()
-{
-    // On pre-fix code: snakeCaseCacheSizeForTesting() returns 0 (no cache).
-    // On post-fix code: cache grows by 1 per unique metaobject, not per conversion.
-
-    QJsonObject w;
-    w["id"] = 1;
-    jsonToGadget(w, QMetaType::fromType<NiriWindow>());
-    int size1 = snakeCaseCacheSizeForTesting();
-
-    QVERIFY(size1 > 0);
-
-    // Convert another NiriWindow — must produce correct gadget data.
-    QJsonObject w2;
-    w2["id"] = 2;
-    w2["title"] = QStringLiteral("cached");
-    QVariant v2 = jsonToGadget(w2, QMetaType::fromType<NiriWindow>());
-    NiriWindow nw2 = v2.value<NiriWindow>();
-    QCOMPARE(nw2.id, quint64(2));
-    QCOMPARE(nw2.title, QStringLiteral("cached"));
-
-    // Convert a different type — must produce correct gadget data.
-    QJsonObject ws;
-    ws["id"] = 3;
-    ws["output"] = QStringLiteral("HDMI-1");
-    QVariant v3 = jsonToGadget(ws, QMetaType::fromType<NiriWorkspace>());
-    NiriWorkspace nws = v3.value<NiriWorkspace>();
-    QCOMPARE(nws.id, quint64(3));
-    QCOMPARE(nws.output, QStringLiteral("HDMI-1"));
-}
 
 QTEST_MAIN(TestConverter)
 #include "test_converter.moc"

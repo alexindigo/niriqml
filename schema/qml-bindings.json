@@ -1,5 +1,12 @@
 {
   "formatVersion": 1,
+  "tuples": {
+    "Event/WindowLayoutsChanged/changes/items": {
+      "cppName": "NiriWindowLayoutChange",
+      "qmlName": "niriWindowLayoutChange",
+      "members": ["id", "layout"]
+    }
+  },
   "types": {
     "LayerSurface": {
       "fields": {

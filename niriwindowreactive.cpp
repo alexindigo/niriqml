@@ -2,6 +2,7 @@
 
 #include "nirievents.h"
 #include "nirisession.h"
+#include "generated/niriipccodec_generated.h"
 
 NiriWindowReactive::NiriWindowReactive(QObject *parent) : QObject(parent)
 {
@@ -10,19 +11,28 @@ NiriWindowReactive::NiriWindowReactive(QObject *parent) : QObject(parent)
         return;
     connect(events, &NiriEvents::windowOpenedOrChanged, this,
             &NiriWindowReactive::onWindowOpenedOrChanged);
-    connect(events, &NiriEvents::windowClosed, this, &NiriWindowReactive::onWindowClosed);
+    connect(events->nativeEvents(), &NiriNativeEvents::windowClosed, this,
+            &NiriWindowReactive::onWindowClosed);
     connect(events, &NiriEvents::windowsChanged, this, &NiriWindowReactive::onWindowsChanged);
-    connect(events, &NiriEvents::windowFocusChanged, this,
+    connect(events->nativeEvents(), &NiriNativeEvents::windowFocusChanged, this,
             &NiriWindowReactive::onWindowFocusChanged);
     NiriSession::instance()->ensureStarted();
 }
 
-quint64 NiriWindowReactive::windowId() const
+std::optional<quint64> NiriWindowReactive::windowId() const
 {
-    return NiriSession::checkThread(this) ? m_windowId : 0;
+    return NiriSession::checkThread(this) ? m_windowId : std::nullopt;
 }
 
-void NiriWindowReactive::setWindowId(quint64 id)
+void NiriWindowReactive::setQmlWindowId(const QVariant &id)
+{
+    std::optional<quint64> value;
+    NiriIpc::DecodeError error;
+    if (NiriIpc::idInput(id, value, error))
+        setWindowId(value);
+}
+
+void NiriWindowReactive::setWindowId(std::optional<quint64> id)
 {
     if (!NiriSession::checkThread(this))
         return;
@@ -54,21 +64,21 @@ quint64 NiriWindowReactive::id() const
 {
     return NiriSession::checkThread(this) ? m_data.id : 0;
 }
-QString NiriWindowReactive::title() const
+std::optional<QString> NiriWindowReactive::title() const
 {
-    return NiriSession::checkThread(this) ? m_data.title : QString{};
+    return NiriSession::checkThread(this) ? m_data.title : std::nullopt;
 }
-QString NiriWindowReactive::appId() const
+std::optional<QString> NiriWindowReactive::appId() const
 {
-    return NiriSession::checkThread(this) ? m_data.appId : QString{};
+    return NiriSession::checkThread(this) ? m_data.appId : std::nullopt;
 }
-quint32 NiriWindowReactive::pid() const
+std::optional<qint32> NiriWindowReactive::pid() const
 {
-    return NiriSession::checkThread(this) ? m_data.pid : 0;
+    return NiriSession::checkThread(this) ? m_data.pid : std::nullopt;
 }
-quint64 NiriWindowReactive::workspaceId() const
+std::optional<quint64> NiriWindowReactive::workspaceId() const
 {
-    return NiriSession::checkThread(this) ? m_data.workspaceId : 0;
+    return NiriSession::checkThread(this) ? m_data.workspaceId : std::nullopt;
 }
 bool NiriWindowReactive::isFocused() const
 {
@@ -86,9 +96,9 @@ NiriWindowLayout NiriWindowReactive::layout() const
 {
     return NiriSession::checkThread(this) ? m_data.layout : NiriWindowLayout{};
 }
-NiriTimestamp NiriWindowReactive::focusTimestamp() const
+std::optional<NiriTimestamp> NiriWindowReactive::focusTimestamp() const
 {
-    return NiriSession::checkThread(this) ? m_data.focusTimestamp : NiriTimestamp{};
+    return NiriSession::checkThread(this) ? m_data.focusTimestamp : std::nullopt;
 }
 
 void NiriWindowReactive::updateFrom(const NiriWindow &w)
@@ -121,7 +131,7 @@ void NiriWindowReactive::onWindowClosed(quint64 id)
 
 void NiriWindowReactive::onWindowsChanged(const QVariantList &windows)
 {
-    if (m_windowId == 0)
+    if (!m_windowId)
         return;
     for (const QVariant &v : windows) {
         NiriWindow w = v.value<NiriWindow>();
@@ -137,12 +147,12 @@ void NiriWindowReactive::onWindowsChanged(const QVariantList &windows)
     }
 }
 
-void NiriWindowReactive::onWindowFocusChanged(quint64 id)
+void NiriWindowReactive::onWindowFocusChanged(std::optional<quint64> id)
 {
-    if (m_windowId == 0 || !m_valid)
+    if (!m_windowId || !m_valid)
         return;
     bool wasFocused = m_data.isFocused;
-    bool nowFocused = (id == m_windowId);
+    bool nowFocused = id && id == m_windowId;
     if (wasFocused != nowFocused) {
         m_data.isFocused = nowFocused;
         emit windowChanged();

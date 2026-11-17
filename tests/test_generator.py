@@ -1,6 +1,5 @@
 """Maintenance compiler contracts. Execute only inside the assigned test guest."""
 
-import copy
 import importlib.util
 import json
 import os
@@ -71,6 +70,57 @@ class GeneratorTest(unittest.TestCase):
     def test_reject_duplicate_json_keys(self):
         with self.assertRaisesRegex(GEN.SchemaError, "duplicate JSON key"):
             json.loads('{"x":1,"x":2}', object_pairs_hook=GEN.unique_object)
+
+    def test_tuple_binding_names_and_shape(self):
+        compiler = self.compiler()
+        entry = compiler.tuples["Event/WindowLayoutsChanged/changes/items"]
+        self.assertEqual(entry["members"], ["id", "layout"])
+        self.assertEqual(entry["type"]["items"][0]["format"], "uint64")
+        binding = self.bindings["tuples"]["Event/WindowLayoutsChanged/changes/items"]
+        binding["members"] = ["id"]
+        with self.assertRaisesRegex(GEN.SchemaError, "shape mismatch"):
+            self.compiler()
+
+    def test_generated_name_collisions(self):
+        self.bindings["tuples"]["Event/WindowLayoutsChanged/changes/items"]["qmlName"] = "niriWindow"
+        with self.assertRaisesRegex(GEN.SchemaError, "tuple name collision"):
+            self.compiler()
+        self.bindings = GEN.load(ROOT / GEN.BINDINGS)
+        self.bindings["types"]["Window"] = {"cppName": "NiriCastTargetWindowPayload"}
+        with self.assertRaisesRegex(GEN.SchemaError, "colliding generated type"):
+            GEN.CppEmitter(self.compiler(), {}).emit()
+        self.bindings["types"]["Window"] = {"fields": {"title": "qmlId"}}
+        with self.assertRaisesRegex(GEN.SchemaError, "colliding generated member"):
+            GEN.CppEmitter(self.compiler(), {}).emit()
+
+    def test_unsupported_numeric_constraints_are_not_ignored(self):
+        with self.assertRaisesRegex(GEN.SchemaError, "unsupported numeric bound"):
+            self.compiler().normalize({"type": "integer", "format": "uint32", "minimum": 1}, "test")
+
+    def test_serde_vector_coverage(self):
+        compiler = self.compiler()
+        document = GEN.load(ROOT / "tests/fixtures/serde-v26.04/vectors.json")
+        self.assertEqual(document["source"]["commit"], self.schema["x-niri-source"]["commit"])
+        by_type = {}
+        names = set()
+        for row in document["vectors"]:
+            self.assertNotIn(row["name"], names)
+            names.add(row["name"])
+            by_type.setdefault(row["type"], []).append(row["value"])
+        types = {name: ir for name, ir in compiler.ir.items() if name not in GEN.ROOT_GROUPS and name != "Result_of_Response_or_string"}
+        self.assertEqual(set(by_type), set(types))
+        for name, ir in types.items():
+            values = by_type[name]
+            if ir["kind"] == "record":
+                for field in ir["fields"]:
+                    self.assertTrue(all(field["wire"] in value for value in values), (name, field))
+                    if field["type"]["kind"] == "optional":
+                        self.assertTrue(any(value[field["wire"]] is None for value in values), (name, field))
+                        self.assertTrue(any(value[field["wire"]] is not None for value in values), (name, field))
+            else:
+                expected = {v["tag"] for v in ir.get("variants", [])} | set(ir.get("values", []))
+                actual = {value if isinstance(value, str) else next(iter(value)) for value in values}
+                self.assertEqual(actual, expected, name)
 
     def test_determinism_and_read_only_check(self):
         with tempfile.TemporaryDirectory(prefix="niriqml-generator-") as temporary:

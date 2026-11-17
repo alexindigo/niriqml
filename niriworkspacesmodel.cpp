@@ -10,9 +10,9 @@ NiriWorkspacesModel::NiriWorkspacesModel(QObject *parent) : QAbstractListModel(p
         return;
     connect(events, &NiriEvents::workspacesChanged, this,
             &NiriWorkspacesModel::onWorkspacesChanged);
-    connect(events, &NiriEvents::workspaceActivated, this,
+    connect(events->nativeEvents(), &NiriNativeEvents::workspaceActivated, this,
             &NiriWorkspacesModel::onWorkspaceActivated);
-    connect(events, &NiriEvents::workspaceActiveWindowChanged, this,
+    connect(events->nativeEvents(), &NiriNativeEvents::workspaceActiveWindowChanged, this,
             &NiriWorkspacesModel::onWorkspaceActiveWindowChanged);
 
     // Bootstrap from cached snapshot for late subscribers
@@ -43,13 +43,13 @@ QVariant NiriWorkspacesModel::data(const QModelIndex &index, int role) const
     case WorkspaceRole:
         return QVariant::fromValue(w);
     case IdRole:
-        return QVariant::fromValue(w.id);
+        return w.qmlId();
     case IdxRole:
         return w.idx;
     case NameRole:
-        return w.name;
+        return w.qmlName();
     case OutputRole:
-        return w.output;
+        return w.qmlOutput();
     case IsUrgentRole:
         return w.isUrgent;
     case IsActiveRole:
@@ -57,7 +57,7 @@ QVariant NiriWorkspacesModel::data(const QModelIndex &index, int role) const
     case IsFocusedRole:
         return w.isFocused;
     case ActiveWindowIdRole:
-        return QVariant::fromValue(w.activeWindowId);
+        return w.qmlActiveWindowId();
     default:
         return {};
     }
@@ -102,7 +102,7 @@ void NiriWorkspacesModel::onWorkspaceActivated(quint64 workspaceId, bool focused
     auto it = m_idToRow.constFind(workspaceId);
     if (it == m_idToRow.constEnd())
         return;
-    const QString targetOutput = m_workspaces.at(*it).output;
+    const auto targetOutput = m_workspaces.at(*it).output;
 
     // Update isActive: on the target output, exactly one workspace is active.
     // If `focused`, also update isFocused so the model reflects focus state.
@@ -133,7 +133,8 @@ void NiriWorkspacesModel::onWorkspaceActivated(quint64 workspaceId, bool focused
     }
 }
 
-void NiriWorkspacesModel::onWorkspaceActiveWindowChanged(quint64 workspaceId, quint64 windowId)
+void NiriWorkspacesModel::onWorkspaceActiveWindowChanged(quint64 workspaceId,
+                                                         std::optional<quint64> windowId)
 {
     auto it = m_idToRow.constFind(workspaceId);
     if (it == m_idToRow.constEnd())

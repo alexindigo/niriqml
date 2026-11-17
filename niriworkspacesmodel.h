@@ -36,7 +36,7 @@ protected:
 private slots:
     void onWorkspacesChanged(const QVariantList &workspaces);
     void onWorkspaceActivated(quint64 workspaceId, bool focused);
-    void onWorkspaceActiveWindowChanged(quint64 workspaceId, quint64 windowId);
+    void onWorkspaceActiveWindowChanged(quint64 workspaceId, std::optional<quint64> windowId);
 
 private:
     QList<NiriWorkspace> m_workspaces;

@@ -46,3 +46,27 @@ in the guest, then extract twice and review the complete schema diff. Check
 the named records/enums and variant inventory rather than a magic `$defs`
 count. Retain older schemas needed as compatibility inputs. Do not add Rust
 or network fetching to the ordinary CMake build.
+
+## Serde reference vectors
+
+`--vectors` constructs released Rust records and every supporting enum/union
+alternative directly, then serializes them with niri-ipc's own serde. It does
+not use the Python generator or schema to construct expected JSON. The fixture
+includes absent/present options, signed bounds, u64 max, 2^53+1 and escaping.
+
+Run maintenance only in the assigned DigitalOcean guest/container through the
+project's guest helper (cwd `/w/src`, TMPDIR `/w/tmp`):
+
+```sh
+export CARGO_TARGET_DIR=/w/build/ipc-schema-dump
+cargo fmt --check --manifest-path tools/ipc-schema-dump/Cargo.toml
+cargo test --locked --manifest-path tools/ipc-schema-dump/Cargo.toml
+cargo run --locked --manifest-path tools/ipc-schema-dump/Cargo.toml -- --vectors > /w/build/serde-vectors.json
+cmp /w/build/serde-vectors.json tests/fixtures/serde-v26.04/vectors.json
+```
+
+When intentionally updating the pin, replace the tracked fixture from this
+output and run `test_generator` and `test_codec`. They require complete released
+type/alternative coverage and null/present examples for each optional record
+field. Hand-written unknown/future variants are tested separately; they cannot
+be serialized by the pinned Rust enum. Ordinary CMake builds do not need Rust.

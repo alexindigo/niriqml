@@ -70,6 +70,7 @@ signals:
     void streamReset(quint64 epoch, const QString &reason);
     void subscriptionAccepted(quint64 epoch);
     void eventFrame(const NiriWire::Document &document, quint64 epoch);
+    void eventPublication(const NiriWire::Document &document, quint64 epoch);
     void eventReceived(const QString &name, const QVariantMap &payload, quint64 producingEpoch);
 
 private:

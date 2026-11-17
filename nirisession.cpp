@@ -494,11 +494,12 @@ void NiriSession::applyEvent(const NiriWire::Document &document, quint64 token)
     if (token != m_epoch || m_status != Streaming)
         return;
     const auto &event = document.root.objectValue()->first();
-    // Temporary compatibility projection for the pre-generated dispatch only.
-    // Authoritative parsed data stays in eventFrame, never reparsed here.
-    const auto value = NiriWire::toQJsonValueLossy(event.second);
-    emit eventReceived(event.first, value ? value->toObject().toVariantMap() : QVariantMap{},
-                       token);
+    // Keep the legacy facade's observer ordering without sending its projection
+    // back through a typed decoder. Both native handoffs share the parsed tree.
+    emit eventReceived(event.first, NiriWire::toQmlProjection(event.second).toMap(), token);
+    if (token != m_epoch || m_status != Streaming)
+        return;
+    emit eventPublication(document, token);
     // No work follows publication without returning to the drain's epoch check.
 }
 

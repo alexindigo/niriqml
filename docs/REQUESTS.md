@@ -77,9 +77,11 @@ The defaults are 5000 ms. Sequence entries start their deadlines when activated,
 not while waiting behind another entry. Raw interactive picks should pass
 `{timeoutMs: -1}`; generated pick helpers will select that default.
 
-The seven existing named queries reject a wrong Response discriminator or outer
-payload type with Decode, preserving the envelope. Their existing gadget
-conversion remains transitional until generated field/range codecs replace it.
+The seven existing named queries decode records directly from the exact wire
+tree using generated field/range codecs. Invalid records fail with Decode and a
+JSON `fieldPath`, preserving the full envelope. QML IDs and other u64/usize
+fields are decimal strings; optional fields are null rather than zero/empty
+sentinels. C++ records retain exact integers and std::optional values.
 
 ## Explicit sequences
 

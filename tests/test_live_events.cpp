@@ -57,7 +57,8 @@ void TestLiveEvents::gadgetShape_workspace()
     QVERIFY(!wss.isEmpty());
     NiriWorkspace ws = wss.first().value<NiriWorkspace>();
     QVERIFY(ws.id != 0);
-    QVERIFY(!ws.output.isEmpty());
+    QVERIFY(ws.output.has_value());
+    QVERIFY(!ws.output->isEmpty());
 }
 
 void TestLiveEvents::keyboardLayoutsPopulated()

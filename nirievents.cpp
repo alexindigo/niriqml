@@ -8,7 +8,7 @@
 #include <optional>
 
 #include "niriconnection.h"
-#include "niriutils.h"
+#include "generated/niriipccodec_generated.h"
 #include "nirilogging.h"
 
 NiriEvents *NiriEvents::create(QQmlEngine *engine, QJSEngine *jsEngine)
@@ -56,15 +56,20 @@ NiriEvents::NiriEvents(QObject *parent, NiriEvents *source) : QObject(parent), m
         FORWARD(overviewOpenedOrClosed);
         FORWARD(configLoaded);
         FORWARD(castsChanged);
+        FORWARD(castStartedOrChanged);
         FORWARD(windowFocusTimestampChanged);
         FORWARD(rawEvent);
+        FORWARD(decodeError);
 #undef FORWARD
         return;
     }
     NiriConnection::instance();
-    connect(NiriSession::instance(), &NiriSession::eventReceived, this,
-            [this](const QString &name, const QVariantMap &payload, quint64 producingEpoch) {
-                dispatchEvent(name, payload, producingEpoch);
+    connect(NiriSession::instance(), &NiriSession::eventPublication, this,
+            [this](const NiriWire::Document &document, quint64 producingEpoch) {
+                const auto *object = document.root.objectValue();
+                if (object && object->size() == 1)
+                    dispatchWireEvent(object->first().first, object->first().second,
+                                      producingEpoch);
             });
 }
 
@@ -92,10 +97,10 @@ bool NiriEvents::lastOverviewOpen() const
         return false;
     return m_source ? m_source->lastOverviewOpen() : m_lastOverviewOpen;
 }
-quint64 NiriEvents::lastFocusedWindowId() const
+std::optional<quint64> NiriEvents::lastFocusedWindowId() const
 {
     if (!NiriSession::checkThread(this))
-        return 0;
+        return std::nullopt;
     return m_source ? m_source->lastFocusedWindowId() : m_lastFocusedWindowId;
 }
 
@@ -110,29 +115,69 @@ void NiriEvents::dispatchEvent(const QString &name, const QVariantMap &payload)
 
 void NiriEvents::dispatchEvent(const QString &name, const QVariantMap &payload, quint64 token)
 {
+    const auto wire = NiriWire::fromQVariantLossy(payload);
+    if (wire)
+        dispatchWireEvent(name, *wire, token);
+}
+
+namespace {
+template <typename T>
+bool eventField(const NiriWire::WireValue &payload, const QString &key, T &value,
+                NiriIpc::DecodeError &error, const QString &path)
+{
+    const auto *wire = payload.lookup(key);
+    if (!wire)
+        return NiriIpc::fail(error, NiriIpc::childPath(path, key), QStringLiteral("missing field"));
+    return NiriIpc::decode(*wire, value, &error, NiriIpc::childPath(path, key));
+}
+template <typename T>
+bool eventField(const NiriWire::WireValue &payload, const QString &key, std::optional<T> &value,
+                NiriIpc::DecodeError &error, const QString &path)
+{
+    const auto *wire = payload.lookup(key);
+    if (!wire) {
+        value.reset();
+        return true;
+    }
+    return NiriIpc::decode(*wire, value, &error, NiriIpc::childPath(path, key));
+}
+} // namespace
+
+void NiriEvents::dispatchWireEvent(const QString &name, const NiriWire::WireValue &payload,
+                                   quint64 token)
+{
     if (!NiriSession::checkThread(this))
         return;
     if (token != NiriSession::instance()->epoch())
         return;
     if (m_source) {
-        m_source->dispatchEvent(name, payload, token);
+        m_source->dispatchWireEvent(name, payload, token);
         return;
     }
     qCDebug(niriEventsLog) << "Event" << name;
-    QJsonObject obj = QJsonObject::fromVariantMap(payload);
-
-#define NIRI_ARR(K) obj.value(QStringLiteral(K)).toArray()
-#define NIRI_INT(K) obj.value(QStringLiteral(K)).toInteger()
-#define NIRI_BOOL(K) obj.value(QStringLiteral(K)).toBool()
-#define NIRI_GADGET(K, T) fromNiriJson<T>(obj.value(QStringLiteral(K)).toObject())
-#define NIRI_LIST(K, T) \
-    jsonArrayToGadgets(obj.value(QStringLiteral(K)).toArray(), QMetaType::fromType<T>())
+    const auto raw = NiriWire::toQmlProjection(payload).toMap();
+    const auto path = NiriIpc::childPath(QStringLiteral("$"), name);
+    NiriIpc::DecodeError detail;
+    auto reject = [&] {
+        emit decodeError(detail.path, detail.message, raw);
+        if (NiriSession::instance()->epoch() == token)
+            emit rawEvent(name, raw);
+    };
+#define FIELD(T, V, K)                                              \
+    T V{};                                                          \
+    if (!eventField(payload, QStringLiteral(K), V, detail, path)) { \
+        reject();                                                   \
+        return;                                                     \
+    }
 
     if (name == QStringLiteral("WorkspacesChanged")) {
-        m_lastWorkspaces = NIRI_LIST("workspaces", NiriWorkspace);
+        FIELD(QList<NiriWorkspace>, records, "workspaces");
+        m_lastWorkspaces = NiriIpc::qmlValue(records).toList();
         emit workspacesChanged(m_lastWorkspaces);
     } else if (name == QStringLiteral("WindowsChanged")) {
-        m_lastWindows = NIRI_LIST("windows", NiriWindow);
+        FIELD(QList<NiriWindow>, records, "windows");
+        m_lastWindows = NiriIpc::qmlValue(records).toList();
+        m_lastFocusedWindowId.reset();
         // Update focus tracking from snapshot
         for (const QVariant &v : m_lastWindows) {
             NiriWindow w = v.value<NiriWindow>();
@@ -143,7 +188,7 @@ void NiriEvents::dispatchEvent(const QString &name, const QVariantMap &payload, 
         }
         emit windowsChanged(m_lastWindows);
     } else if (name == QStringLiteral("WindowOpenedOrChanged")) {
-        NiriWindow w = NIRI_GADGET("window", NiriWindow);
+        FIELD(NiriWindow, w, "window");
         if (w.isFocused)
             m_lastFocusedWindowId = w.id;
         // Also update the cached snapshot
@@ -159,7 +204,7 @@ void NiriEvents::dispatchEvent(const QString &name, const QVariantMap &payload, 
             m_lastWindows.append(QVariant::fromValue(w));
         emit windowOpenedOrChanged(w);
     } else if (name == QStringLiteral("WindowClosed")) {
-        quint64 id = NIRI_INT("id");
+        FIELD(quint64, id, "id");
         for (int i = 0; i < m_lastWindows.size(); ++i) {
             if (m_lastWindows[i].value<NiriWindow>().id == id) {
                 m_lastWindows.removeAt(i);
@@ -167,46 +212,56 @@ void NiriEvents::dispatchEvent(const QString &name, const QVariantMap &payload, 
             }
         }
         if (m_lastFocusedWindowId == id)
-            m_lastFocusedWindowId = 0;
-        emit windowClosed(id);
+            m_lastFocusedWindowId.reset();
+        emit m_native.windowClosed(id);
+        if (NiriSession::instance()->epoch() == token)
+            emit windowClosed(QString::number(id));
     } else if (name == QStringLiteral("WindowFocusChanged")) {
-        // id is Option<u64>: null becomes 0 here and means "nothing is
-        // focused anymore" (e.g. switched to an empty workspace). Don't
-        // drop it — consumers must clear their focused state, otherwise the
-        // last focused window looks focused forever.
-        quint64 id = NIRI_INT("id");
+        FIELD(std::optional<quint64>, id, "id");
         m_lastFocusedWindowId = id;
         // Update isFocused flag in cached snapshot so late subscribers
         // that bootstrap from lastWindowsSnapshot() see accurate focus state.
         for (int i = 0; i < m_lastWindows.size(); ++i) {
             NiriWindow w = m_lastWindows[i].value<NiriWindow>();
-            bool nowFocused = (id != 0 && w.id == id);
+            bool nowFocused = id && w.id == *id;
             if (w.isFocused != nowFocused) {
                 w.isFocused = nowFocused;
                 m_lastWindows[i] = QVariant::fromValue(w);
             }
         }
-        emit windowFocusChanged(id);
+        emit m_native.windowFocusChanged(id);
+        if (NiriSession::instance()->epoch() == token)
+            emit windowFocusChanged(NiriIpc::qmlValue(id));
     } else if (name == QStringLiteral("KeyboardLayoutsChanged")) {
-        m_lastKeyboardLayouts = NIRI_GADGET("keyboard_layouts", NiriKeyboardLayouts);
+        FIELD(NiriKeyboardLayouts, layouts, "keyboard_layouts");
+        m_lastKeyboardLayouts = layouts;
         emit keyboardLayoutsChanged(m_lastKeyboardLayouts);
     } else if (name == QStringLiteral("KeyboardLayoutSwitched")) {
-        int idx = int(NIRI_INT("idx"));
+        FIELD(quint8, idx, "idx");
         m_lastKeyboardLayouts.currentIdx = idx;
         emit keyboardLayoutSwitched(idx);
     } else if (name == QStringLiteral("OverviewOpenedOrClosed")) {
-        m_lastOverviewOpen = NIRI_BOOL("is_open");
+        FIELD(bool, isOpen, "is_open");
+        m_lastOverviewOpen = isOpen;
         emit overviewOpenedOrClosed(m_lastOverviewOpen);
     } else if (name == QStringLiteral("ConfigLoaded")) {
-        emit configLoaded(NIRI_BOOL("failed"));
+        FIELD(bool, failed, "failed");
+        emit configLoaded(failed);
     } else if (name == QStringLiteral("CastsChanged")) {
-        emit castsChanged(NIRI_ARR("casts").toVariantList());
+        FIELD(QList<NiriCast>, casts, "casts");
+        emit castsChanged(NiriIpc::qmlValue(casts).toList());
+    } else if (name == QStringLiteral("CastStartedOrChanged")) {
+        FIELD(NiriCast, cast, "cast");
+        emit castStartedOrChanged(cast);
     } else if (name == QStringLiteral("WindowFocusTimestampChanged")) {
-        emit windowFocusTimestampChanged(NIRI_INT("id"),
-                                         NIRI_GADGET("focus_timestamp", NiriTimestamp));
+        FIELD(quint64, id, "id");
+        FIELD(std::optional<NiriTimestamp>, timestamp, "focus_timestamp");
+        emit m_native.windowFocusTimestampChanged(id, timestamp);
+        if (NiriSession::instance()->epoch() == token)
+            emit windowFocusTimestampChanged(QString::number(id), NiriIpc::qmlValue(timestamp));
     } else if (name == QStringLiteral("WorkspaceActivated")) {
-        const quint64 id = NIRI_INT("id");
-        const bool focused = NIRI_BOOL("focused");
+        FIELD(quint64, id, "id");
+        FIELD(bool, focused, "focused");
         std::optional<QString> output;
         for (const auto &value : m_lastWorkspaces) {
             const auto workspace = value.value<NiriWorkspace>();
@@ -225,10 +280,12 @@ void NiriEvents::dispatchEvent(const QString &name, const QVariantMap &payload, 
                 value = QVariant::fromValue(workspace);
             }
         }
-        emit workspaceActivated(id, focused);
+        emit m_native.workspaceActivated(id, focused);
+        if (NiriSession::instance()->epoch() == token)
+            emit workspaceActivated(QString::number(id), focused);
     } else if (name == QStringLiteral("WorkspaceActiveWindowChanged")) {
-        const quint64 workspaceId = NIRI_INT("workspace_id");
-        const quint64 windowId = NIRI_INT("active_window_id");
+        FIELD(quint64, workspaceId, "workspace_id");
+        FIELD(std::optional<quint64>, windowId, "active_window_id");
         for (auto &value : m_lastWorkspaces) {
             auto workspace = value.value<NiriWorkspace>();
             if (workspace.id == workspaceId) {
@@ -237,11 +294,16 @@ void NiriEvents::dispatchEvent(const QString &name, const QVariantMap &payload, 
                 break;
             }
         }
-        emit workspaceActiveWindowChanged(workspaceId, windowId);
+        emit m_native.workspaceActiveWindowChanged(workspaceId, windowId);
+        if (NiriSession::instance()->epoch() == token)
+            emit workspaceActiveWindowChanged(QString::number(workspaceId),
+                                              NiriIpc::qmlValue(windowId));
     } else if (name == QStringLiteral("WindowLayoutsChanged")) {
-        emit windowLayoutsChanged(NIRI_ARR("changes").toVariantList());
+        FIELD(QList<NiriWindowLayoutChange>, changes, "changes");
+        emit windowLayoutsChanged(NiriIpc::qmlValue(changes).toList());
     }
 
     if (NiriSession::instance()->epoch() == token)
-        emit rawEvent(name, payload);
+        emit rawEvent(name, raw);
+#undef FIELD
 }
