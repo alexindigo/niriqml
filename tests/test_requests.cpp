@@ -718,7 +718,7 @@ private slots:
         else if (method == "closeWindow")
             raw = actions->closeWindow(id);
         else if (method == "moveWindowToWorkspace")
-            raw = actions->moveWindowToWorkspace(id, QString("main"));
+            raw = actions->moveWindowToWorkspace(id, QString("main"), true);
         else if (method == "moveWindowToMonitor")
             raw = actions->moveWindowToMonitor(id, "DP-2");
         else if (method == "setWindowWidth")

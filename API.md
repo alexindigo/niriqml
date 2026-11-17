@@ -95,21 +95,39 @@ Derived globals computed from event snapshots.
 
 ### NiriActions
 
-Write path. Every action returns a `NiriPendingReply`. Wire formats verified
-against niri 26.04.
+All 141 released actions have generated methods with every wire field. See the
+[checked method/wire reference](docs/generated/IPC-API.md#actions). Each returns
+a retainable `NiriPendingReply`; success requires the released `Handled` reply.
+Local argument failures complete asynchronously as Configuration/NotSent and
+never open a request socket. Raw `sendAction(action)` remains unrestricted.
 
-| Method | Description |
-|---|---|
-| `spawn(command)` | `stringlist` — launch a command |
-| `focusWindow(windowId)` | `quint64` — focus the given window |
-| `closeWindow(windowId)` | `quint64` — close the given window |
-| `moveWindowToWorkspace(windowId, reference, followFocus)` | `quint64`, `var`, `bool=true` |
-| `moveWindowToMonitor(windowId, output, followFocus)` | `quint64`, `string`, `bool=true` |
-| `setWindowWidth(windowId, change)` | `quint64`, `var` — `SetFixed` or `SetProportion` |
-| `setWindowHeight(windowId, change)` | `quint64`, `var` — `SetFixed` or `SetProportion` |
-| `moveColumnToIndex(index)` | `int` |
-| `toggleWindowFloating(windowId)` | `quint64` |
-| `sendAction(action)` | `var` — raw action object for untyped dispatch |
+| # | Existing helper | QML argument contract |
+|---|---|---|
+| 1 | `spawn(command)` | String array |
+| 2 | `focusWindow(windowId)` | Required decimal ID string (exact number also accepted) |
+| 3 | `closeWindow(windowId)` | Decimal ID or null/omitted for focused window |
+| 4 | `moveWindowToWorkspace(windowId, reference, focus)` | ID or explicit null, WorkspaceReferenceArg, required bool |
+| 5 | `moveWindowToMonitor(windowId, output)` | ID or explicit null, output string; no monitor focus flag |
+| 6 | `setWindowWidth(windowId, change)` | ID or explicit null, SizeChange |
+| 7 | `setWindowHeight(windowId, change)` | ID or explicit null, SizeChange |
+| 8 | `moveColumnToIndex(index)` | Decimal usize string (exact number accepted) |
+| 9 | `toggleWindowFloating(windowId)` | Decimal ID or null/omitted for focused window |
+
+Argument order is preserved. QML now uses explicit tagged values instead of
+guessing a workspace name/index or fixed/proportional size from a scalar.
+WorkspaceReferenceArg accepts `{Id: "456"}`, `{Index: 2}`, `{Name: "chat"}`
+or the matching `NiriArgs.workspaceReferenceArgId/Index/Name(...)` value.
+SizeChange supports all four alternatives: `{SetFixed: 800}`,
+`{SetProportion: 50.0}`, `{AdjustFixed: -10}`, `{AdjustProportion: -12.5}`,
+or `NiriArgs.sizeChangeSetFixed/SetProportion/AdjustFixed/AdjustProportion(...)`.
+Unknown fields/variants and invalid types/ranges are rejected by typed methods;
+use raw sending deliberately for future protocol extensions.
+
+The workspace move's `focus` bool is no longer defaulted. Optional ID slots
+before required arguments must be filled with null to target the focused item.
+Native C++ overloads use quint64/std::optional and generated argument values;
+the old QVariant workspace/size convenience adapters remain native-only and
+require an explicit workspace-move focus bool.
 
 ### NiriRequests
 

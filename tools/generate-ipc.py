@@ -51,7 +51,7 @@ class Compiler:
     def __init__(self, schema, bindings):
         self.schema = schema
         self.bindings = bindings
-        if set(bindings) - {"formatVersion", "types", "tuples"} or bindings.get("formatVersion") != 1:
+        if set(bindings) - {"formatVersion", "types", "tuples", "actions"} or bindings.get("formatVersion") != 1:
             raise SchemaError("unsupported binding manifest")
         self.defs = schema.get("$defs", {})
         self.ir = {}
@@ -212,6 +212,27 @@ class Compiler:
         return result
 
     def validate_bindings(self):
+        variants = {v["tag"]: v for v in self.ir["Action"]["variants"]}
+        methods = set()
+        for tag, variant in variants.items():
+            binding = self.bindings.get("actions", {}).get(tag, {})
+            if set(binding) - {"name", "arguments", "aliases"}:
+                raise SchemaError(f"{tag}: action binding contains more than names/order")
+            fields = variant["payload"]["fields"]
+            keys = {f["wire"] for f in fields}
+            args = binding.get("arguments", [f["wire"] for f in fields])
+            if len(args) != len(keys) or set(args) != keys or set(binding.get("aliases", {})) - keys:
+                raise SchemaError(f"{tag}: action argument binding is not a field permutation")
+            method = binding.get("name", tag[:1].lower() + tag[1:])
+            identifier(method, tag)
+            aliases = [binding.get("aliases", {}).get(f["wire"], f["name"]) for f in fields]
+            for alias in aliases:
+                identifier(alias, tag)
+            if method in methods or len(aliases) != len(set(aliases)):
+                raise SchemaError(f"{tag}: colliding action name")
+            methods.add(method)
+        if set(self.bindings.get("actions", {})) - set(variants):
+            raise SchemaError("action binding names unknown variant")
         for name, binding in self.bindings["types"].items():
             if name not in self.ir or set(binding) - {"cppName", "qmlName", "variants", "fields"}:
                 raise SchemaError(f"invalid type binding: {name}")
@@ -258,7 +279,7 @@ class Compiler:
 
 
 class CppEmitter:
-    """Supporting value types only. Callable roots are deliberately left to E6b."""
+    """Supporting value types. Callable wrappers are emitted separately."""
 
     def __init__(self, compiler, hashes):
         self.c = compiler
@@ -824,9 +845,11 @@ bool qmlInput(const QJSValue &input, WireValue &wire, DecodeError &error, const 
     if (depth > 128) return fail(error, path, QStringLiteral("input nesting exceeds 128"));
     // A typed gadget bypasses JS property enumeration, but still goes through
     // the constructor's versioned outbound decode contract.
+    QVariant native;
     if (input.isObject()) {
+        native = input.toVariant(QJSValue::RetainJSObjects);
         DecodeError detail;
-        if (const auto typed = encodeVariant(input.toVariant(QJSValue::RetainJSObjects), &detail)) {
+        if (const auto typed = encodeVariant(native, &detail)) {
             wire = *typed;
             return true;
         }
@@ -839,7 +862,9 @@ bool qmlInput(const QJSValue &input, WireValue &wire, DecodeError &error, const 
     if (input.isBool()) { wire = WireValue(input.toBool()); return true; }
     if (input.isString()) { wire = WireValue(input.toString()); return true; }
     if (input.isNumber()) return qmlNumber(input.toNumber(), wire, error, path);
-    if (input.isArray()) {
+    // Qt-backed QML sequences are array-like but QJSValue::isArray() is false.
+    // Recognize the actual native sequence type, never guess from a length key.
+    if (input.isArray() || native.typeId() == QMetaType::QVariantList || native.typeId() == QMetaType::QStringList) {
         WireValue::Array items;
         const auto length = input.property(QStringLiteral("length")).toUInt();
         for (quint32 i = 0; i < length; ++i) {
@@ -907,6 +932,90 @@ bool write(bool value, WireValue &wire, DecodeError &error, const QString &path)
 '''
 
 
+class ActionEmitter(CppEmitter):
+    """Schema-derived callable base; the consumer injects the existing request sink."""
+
+    def action_fields(self, variant):
+        tag = variant["tag"]
+        binding = self.c.bindings.get("actions", {}).get(tag, {})
+        fields = variant["payload"]["fields"]
+        order = binding.get("arguments", [f["wire"] for f in sorted(fields, key=lambda f: (not f["required"], f["wire"]))])
+        return [{**next(f for f in fields if f["wire"] == wire),
+                 "name": binding.get("aliases", {}).get(wire, camel(wire))} for wire in order]
+
+    def emit(self):
+        h = [self.header(), "#pragma once", "", '#include "niriipctypes_generated.h"', '#include "niripendingreply.h"', "#include <QJSValue>", "", "// clang-format off", "class NiriIpcActions : public QObject", "{", "    Q_OBJECT", "public:", "    using QObject::QObject;"]
+        cpp = [self.header(), '#include "niriipcactions_generated.h"', '#include "niriipccodec_generated.h"', "", "// clang-format off", "namespace {", "template <typename T>", "bool encodeOutbound(const T &value, NiriWire::WireValue &wire, NiriIpc::DecodeError &error, const QString &path)", "{", "    const auto encoded = NiriIpc::encode(value, &error, path);", "    if (!encoded) return false;", "    T checked{};", "    if (!NiriIpc::decode(*encoded, checked, &error, path, NiriIpc::DecodeMode::Outbound)) return false;", "    wire = *encoded;", "    return true;", "}", "} // namespace", ""]
+        manifest = []
+        docs = ["# Generated IPC API", "", self.header("<!--").replace("\n", " -->\n"), "## Actions", "", "All methods return a retainable NiriPendingReply through the shared request path.", "IDs/usize accept decimal strings or exact numbers; optional values accept null.", "Required booleans have no CLI-derived defaults. Optional slots before required", "arguments must be supplied explicitly as null. Union arguments accept NiriArgs", "values or plain objects using their wire tag and wire/camelCase field names.", "", "| # | QML call | Exact wire shape |", "|---|---|---|"]
+
+        def shape(ir):
+            if ir["kind"] == "ref": return ir["name"]
+            if ir["kind"] == "optional": return "null or " + shape(ir["item"])
+            if ir["kind"] == "integer": return ir["format"]
+            if ir["kind"] == "number": return ir["format"]
+            if ir["kind"] == "array": return "[" + shape(ir["item"]) + "]"
+            return ir["kind"]
+
+        def qml_shape(ir):
+            if ir["kind"] == "optional": return "null / " + qml_shape(ir["item"])
+            if ir["kind"] == "integer": return "string / exact number" if ir["format"] in {"uint", "uint64", "int", "int64"} else "number"
+            if ir["kind"] == "number": return "number"
+            if ir["kind"] == "boolean": return "bool"
+            if ir["kind"] == "array": return "list<" + qml_shape(ir["item"]) + ">"
+            if ir["kind"] == "ref": return self.c.name(ir["name"])[:1].lower() + self.c.name(ir["name"])[1:] + " / object"
+            return shape(ir)
+
+        for index, variant in enumerate(self.c.ir["Action"]["variants"], 1):
+            tag = variant["tag"]
+            method = self.c.bindings.get("actions", {}).get(tag, {}).get("name", tag[:1].lower() + tag[1:])
+            fields = self.action_fields(variant)
+            names = ", ".join(f["name"] for f in fields)
+            native = ", ".join(self.cpp(f["type"]) + " " + f["name"] for f in fields)
+            qml = []
+            for i, field in enumerate(fields):
+                # Permit the QML call to enter our checked boundary even when a
+                # required slot is missing. Undefined is rejected asynchronously;
+                # this is not a semantic default for a required wire field.
+                default = " = QJSValue()" if field["required"] else " = QJSValue(QJSValue::NullValue)"
+                qml.append("const QJSValue &" + field["name"] + default)
+            if fields:
+                h += [f"    Q_INVOKABLE NiriPendingReply *{method}({', '.join(qml)});", f"    NiriPendingReply *{method}({native});"]
+                optional_ids = {f["name"] for f in fields if f["type"] == {"kind": "optional", "item": {"kind": "integer", "format": "uint64", "minimum": 0}}}
+                if optional_ids:
+                    explicit_id_signature = ", ".join(("quint64" if f["name"] in optional_ids else self.cpp(f["type"])) + " " + f["name"] for f in fields)
+                    explicit_id_args = ", ".join("std::optional<quint64>(" + f["name"] + ")" if f["name"] in optional_ids else f["name"] for f in fields)
+                    h += [f"    NiriPendingReply *{method}({explicit_id_signature}) {{ return {method}({explicit_id_args}); }}"]
+                if len(fields) == 1 and self.cpp(fields[0]["type"]) == "QList<QString>":
+                    arg = fields[0]["name"]
+                    h += [f"    NiriPendingReply *{method}(std::initializer_list<QString> {arg}) {{ return {method}(QList<QString>({arg})); }}"]
+                cpp += [f"NiriPendingReply *NiriIpcActions::{method}({', '.join('const QJSValue &' + f['name'] for f in fields)})", "{", "    NiriIpc::DecodeError error;"]
+                for f in fields:
+                    arg, typ = f["name"], self.cpp(f["type"])
+                    path = "QStringLiteral(" + json.dumps("$.Action." + tag + "." + f["wire"]) + ")"
+                    cpp += [f"    {typ} typed_{arg}{{}};", "    {", "        NiriWire::WireValue wire;"]
+                    guard = f"!{arg}.isUndefined() && " if not f["required"] else ""
+                    cpp += [f"        if (({guard}!NiriIpc::qmlInput({arg}, wire, error, {path}))", f"            || !NiriIpc::decode(wire, typed_{arg}, &error, {path}, NiriIpc::DecodeMode::Outbound))", '            return submitAction({}, error.path + QStringLiteral(": ") + error.message);', "    }"]
+                cpp += [f"    return {method}({', '.join('typed_' + f['name'] for f in fields)});", "}", ""]
+            else:
+                h += [f"    Q_INVOKABLE NiriPendingReply *{method}();"]
+            cpp += [f"NiriPendingReply *NiriIpcActions::{method}({native})", "{"]
+            if fields:
+                cpp += ["    NiriIpc::DecodeError error;"]
+            cpp += ["    NiriWire::WireValue::Object members;"]
+            for f in fields:
+                path = "QStringLiteral(" + json.dumps("$.Action." + tag + "." + f["wire"]) + ")"
+                cpp += ["    {", "        NiriWire::WireValue wire;", f"        if (!encodeOutbound({f['name']}, wire, error, {path}))", '            return submitAction({}, error.path + QStringLiteral(": ") + error.message);', f"        members.append({{QStringLiteral({json.dumps(f['wire'])}), wire}});", "    }"]
+            cpp += [f"    const auto action = *NiriWire::WireValue::object({{{{QStringLiteral({json.dumps(tag)}), *NiriWire::WireValue::object(members)}}}});", "    return submitAction(action, {});", "}", ""]
+            manifest.append({"variant": tag, "method": method, "arguments": [{"wire": f["wire"], "name": f["name"], "type": f["type"]} for f in fields]})
+            signature = ", ".join(f["name"] + ": " + qml_shape(f["type"]) for f in fields)
+            wire_shape = '{"Action":{"' + tag + '":{' + ",".join(json.dumps(f["wire"]) + ":" + shape(f["type"]) for f in fields) + "}}}"
+            docs.append(f"| {index} | `NiriActions.{method}({signature}) -> NiriPendingReply` | `{wire_shape}` |")
+        h += ["protected:", "    virtual NiriPendingReply *submitAction(const NiriWire::WireValue &action, const QString &validationError) = 0;", "};", "// clang-format on", ""]
+        cpp += ["// clang-format on", ""]
+        return {"generated/niriipcactions_generated.h": "\n".join(h), "generated/niriipcactions_generated.cpp": "\n".join(cpp), "generated/ipc-actions.json": json.dumps(manifest, indent=2, sort_keys=True) + "\n", "docs/generated/IPC-API.md": "\n".join(docs) + "\n"}
+
+
 def outputs(root=ROOT):
     schema, bindings = load(root / SCHEMA), load(root / BINDINGS)
     compiler = Compiler(schema, bindings)
@@ -917,6 +1026,10 @@ def outputs(root=ROOT):
     inventory["generated"] = {"warning": "Generated by tools/generate-ipc.py; do not edit.", "sha256": hashes}
     result = {"schema/ipc-inventory.json": json.dumps(inventory, indent=2, sort_keys=True) + "\n"}
     result.update(CppEmitter(compiler, hashes).emit())
+    result.update(ActionEmitter(compiler, hashes).emit())
+    result["generated/ipc-generated.cmake"] = result["generated/ipc-generated.cmake"].replace(
+        "set(NIRIQML_GENERATED_SOURCES\n", "set(NIRIQML_GENERATED_SOURCES\n    generated/niriipcactions_generated.h\n    generated/niriipcactions_generated.cpp\n").replace(
+        "set(NIRIQML_GENERATED_HEADERS\n", "set(NIRIQML_GENERATED_HEADERS\n    generated/niriipcactions_generated.h\n")
     return result
 
 

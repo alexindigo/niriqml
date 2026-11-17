@@ -60,6 +60,15 @@ class GeneratorTest(unittest.TestCase):
         with self.assertRaisesRegex(GEN.SchemaError, "invalid type binding"):
             self.compiler()
 
+    def test_action_bindings_are_names_only(self):
+        self.bindings["actions"]["MoveWindowToMonitor"]["arguments"] = ["window_id", "output"]
+        with self.assertRaisesRegex(GEN.SchemaError, "field permutation"):
+            self.compiler()
+        self.bindings = GEN.load(ROOT / GEN.BINDINGS)
+        self.bindings["actions"]["FocusWindow"]["fields"] = {"id": "uint64"}
+        with self.assertRaisesRegex(GEN.SchemaError, "more than names/order"):
+            self.compiler()
+
     def test_reject_bad_ref_and_ambiguous_union(self):
         for ref in ("https://example.invalid/schema", "#/$defs/DoesNotExist"):
             with self.assertRaises(GEN.SchemaError):

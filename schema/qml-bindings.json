@@ -1,5 +1,14 @@
 {
   "formatVersion": 1,
+  "actions": {
+    "FocusWindow": {"aliases": {"id": "windowId"}},
+    "CloseWindow": {"aliases": {"id": "windowId"}},
+    "ToggleWindowFloating": {"aliases": {"id": "windowId"}},
+    "MoveWindowToWorkspace": {"arguments": ["window_id", "reference", "focus"]},
+    "MoveWindowToMonitor": {"arguments": ["id", "output"], "aliases": {"id": "windowId"}},
+    "SetWindowWidth": {"arguments": ["id", "change"], "aliases": {"id": "windowId"}},
+    "SetWindowHeight": {"arguments": ["id", "change"], "aliases": {"id": "windowId"}}
+  },
   "tuples": {
     "Event/WindowLayoutsChanged/changes/items": {
       "cppName": "NiriWindowLayoutChange",
