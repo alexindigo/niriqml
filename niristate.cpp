@@ -36,6 +36,8 @@ NiriState *NiriState::instance()
 
 NiriState::NiriState(QObject *parent) : QObject(parent)
 {
+    connect(NiriSession::instance(), &NiriSession::initialStateReceivedChanged, this,
+            &NiriState::initialStateReceivedChanged);
     NiriEvents *events = NiriEvents::instance();
     connect(events, &NiriEvents::windowsChanged, this, &NiriState::onWindowsChanged);
     connect(events, &NiriEvents::windowOpenedOrChanged, this, &NiriState::onWindowOpenedOrChanged);
@@ -55,6 +57,12 @@ NiriState::NiriState(QObject *parent) : QObject(parent)
     if (!workspaces.isEmpty())
         onWorkspacesChanged(workspaces);
     NiriSession::instance()->ensureStarted();
+}
+
+bool NiriState::initialStateReceived() const
+{
+    return NiriSession::checkThread(this)
+            && NiriSession::instance()->state().initialStateReceived();
 }
 
 std::optional<quint64> NiriState::focusedWindowId() const

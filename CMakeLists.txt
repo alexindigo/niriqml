@@ -29,6 +29,8 @@ set(NIRIQML_SOURCES
     niriconnection.h
     nirisession.cpp
     nirisession.h
+    nirieventstreamstate.cpp
+    nirieventstreamstate.h
     niripeerinfo.cpp
     niripeerinfo.h
     nirilogging.cpp
@@ -125,6 +127,7 @@ install(FILES
 install(FILES
     niriconnection.h
     nirisession.h
+    nirieventstreamstate.h
     niripeerinfo.h
     nirilogging.h
     nirievents.h
@@ -205,6 +208,7 @@ if(BUILD_TEST_MODE)
     add_niriqml_test(test_generated_actions)
     add_niriqml_test(test_generated_requests)
     add_niriqml_test(test_generated_events)
+    add_niriqml_test(test_state)
     add_niriqml_test(test_ipc_inventory)
     add_niriqml_test(test_types)
     add_niriqml_test(test_converter)

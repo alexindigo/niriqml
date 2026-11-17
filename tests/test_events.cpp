@@ -26,6 +26,7 @@
 #include "niritypes.h"
 #include "niriworkspacereactive.h"
 #include "ipcfixtures.h"
+#include "streamfixture.h"
 
 class TestEvents : public QObject
 {
@@ -37,6 +38,7 @@ private slots:
         QVERIFY(NiriEvents::instance());
         QVERIFY(NiriConnection::instance());
     }
+    void cleanup() { m_stream.reset(); }
 
     void windowsChangedDispatches()
     {
@@ -77,6 +79,9 @@ private slots:
 
     void workspaceActivatedDispatches()
     {
+        auto workspace = workspaceFixture();
+        workspace["id"] = 3;
+        emitEvent("WorkspacesChanged", {{"workspaces", QJsonArray{workspace}.toVariantList()}});
         QSignalSpy spy(NiriEvents::instance(), &NiriEvents::workspaceActivated);
 
         emitEvent("WorkspaceActivated", {{"id", 3}, {"focused", true}});
@@ -122,7 +127,8 @@ private slots:
 
         QCOMPARE(spy.count(), 1);
         QStringList expected = {QStringLiteral("us"), QStringLiteral("fr")};
-        QCOMPARE(NiriEvents::instance()->lastKeyboardLayouts().names, expected);
+        QVERIFY(NiriEvents::instance()->lastKeyboardLayouts());
+        QCOMPARE(NiriEvents::instance()->lastKeyboardLayouts()->names, expected);
     }
 
     void overviewOpenedOrClosed()
@@ -248,11 +254,14 @@ private slots:
         QVERIFY(server.listen(socketDir.filePath(QStringLiteral("socket"))));
         auto *connection = NiriConnection::instance();
         const auto oldLimit = connection->maxFrameBytes();
+        const auto oldPolicy = connection->autoReconnect();
         const auto restore = qScopeGuard([&]() {
             connection->disconnect();
             connection->setMaxFrameBytes(oldLimit);
+            connection->setAutoReconnect(oldPolicy);
         });
         connection->disconnect();
+        connection->setAutoReconnect(true);
         connection->setMaxFrameBytes(32);
         QSignalSpy retry(connection, &NiriConnection::reconnectScheduled);
         QSignalSpy events(connection, &NiriConnection::eventReceived);
@@ -322,9 +331,9 @@ private slots:
         peer->flush();
         QTRY_VERIFY_WITH_TIMEOUT(connection->subscribed(), 500);
         QSignalSpy events(connection, &NiriConnection::eventReceived);
-        QSignalSpy closed(NiriEvents::instance(), &NiriEvents::windowClosed);
+        QSignalSpy focused(NiriEvents::instance(), &NiriEvents::windowFocusChanged);
         const QByteArray complete =
-                "{\"WindowClosed\":{\"id\":1}}\n{\"WindowClosed\":{\"id\":2}}\n";
+                "{\"WindowFocusChanged\":{\"id\":1}}\n{\"WindowFocusChanged\":{\"id\":2}}\n";
         const QByteArray oversized(33, 'x');
         if (combined) {
             // One write/flush with no event-loop turn between the valid prefix and tail.
@@ -342,12 +351,12 @@ private slots:
         QVERIFY(!connection->isConnected());
         QTRY_COMPARE_WITH_TIMEOUT(peer->state(), QLocalSocket::UnconnectedState, 500);
         QCOMPARE(events.count(), 2);
-        QCOMPARE(closed.count(), 2);
+        QCOMPARE(focused.count(), 2);
         for (int i = 0; i < 2; ++i) {
-            QCOMPARE(events.at(i).at(0).toString(), QStringLiteral("WindowClosed"));
+            QCOMPARE(events.at(i).at(0).toString(), QStringLiteral("WindowFocusChanged"));
             QCOMPARE(events.at(i).at(1).toMap().value("id").toULongLong(), quint64(i + 1));
-            QCOMPARE(closed.at(i).at(0).metaType(), QMetaType::fromType<QString>());
-            QCOMPARE(closed.at(i).at(0).toString(), QString::number(i + 1));
+            QCOMPARE(focused.at(i).at(0).metaType(), QMetaType::fromType<QString>());
+            QCOMPARE(focused.at(i).at(0).toString(), QString::number(i + 1));
         }
     }
 
@@ -532,9 +541,20 @@ private slots:
     }
 
 private:
+    std::unique_ptr<StateStreamFixture> m_stream;
     void emitEvent(const QString &name, const QVariantMap &payload)
     {
-        NiriEvents::instance()->dispatchEvent(name, payload, NiriSession::instance()->epoch());
+        if (!m_stream || !NiriSession::instance()->subscribed()
+            || NiriSession::instance()->currentEndpoint().path
+                    != m_stream->server.fullServerName()) {
+            m_stream = std::make_unique<StateStreamFixture>();
+            QVERIFY(m_stream->start());
+        }
+        QSignalSpy raw(NiriEvents::instance(), &NiriEvents::rawEvent);
+        const auto value = NiriWire::fromQVariantLossy(payload);
+        QVERIFY(value);
+        m_stream->send(*NiriWire::encode(*NiriWire::WireValue::object({{name, *value}})));
+        QTRY_COMPARE(raw.size(), 1);
     }
 };
 

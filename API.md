@@ -46,21 +46,29 @@ Wire protocol lifecycle. Connects to niri's Unix socket at `$NIRI_SOCKET`.
 
 All 19 released events have generated native C++ signals and QML projections.
 See the [complete signal and wire reference](docs/generated/IPC-API.md#events).
-The coordinator decodes the exact parsed event once, updates its existing
-snapshots, then publishes that same typed value. Native C++ observes
+The session decodes the exact parsed event once, applies its canonical reducer,
+then publishes that same typed value. Native C++ observes
 `NiriEvents::nativeEvents()` with quint64/std::optional and typed records/lists.
 QML observes string IDs, real nulls and typed gadgets. The native accessor is not
 invokable from QML. A stop/endpoint change suppresses stale continuation.
 
-**Cached snapshots** (bootstrap late subscribers)
+**Current snapshots** (bootstrap late subscribers without a query)
 
-| Getter | Returns |
-|---|---|
-| `lastWindowsSnapshot()` | `list<niriWindow>` |
-| `lastWorkspacesSnapshot()` | `list<niriWorkspace>` |
-| `lastKeyboardLayouts()` | `niriKeyboardLayouts` |
-| `lastOverviewOpen()` | `bool` |
-| `lastFocusedWindowId()` | native `std::optional<quint64>` |
+| # | Getter | Returns |
+|---|---|---|
+| 1 | `lastWindowsSnapshot()` | QML/native typed record list, numeric ID order |
+| 2 | `lastWorkspacesSnapshot()` | QML/native typed record list, numeric ID order |
+| 3 | `lastCastsSnapshot()` | QML/native typed record list, stream ID order |
+| 4 | `lastKeyboardLayouts()` | Native `std::optional<NiriKeyboardLayouts>` |
+| 5 | `qmlLastKeyboardLayouts()` | QML record or null |
+| 6 | `lastOverviewOpen()`, `lastConfigFailed()` | QML/native bool |
+| 7 | `lastFocusedWindowId()` | Native `std::optional<quint64>` |
+| 8 | `qmlLastFocusedWindowId()` | QML string or null |
+
+These aliases read current reducer values after every delta, not saved full
+payloads. They return value copies and do not fabricate global events. Empty
+replacements clear lists; absent layouts and null focus remain absent. Casts
+are keyed by stream ID, so stopping one stream preserves session siblings.
 
 All existing QML signal names remain. The complete surface adds
 workspaceUrgencyChanged, windowUrgencyChanged, screenshotCaptured and castStopped.
@@ -77,8 +85,12 @@ whose fields are all optional. Diagnostic payloads are now QVariant/var instead
 of QVariantMap: ordinary bodies remain objects; scalar/array/null bodies are not
 discarded, and future unit variants retain their original string. Native
 callbacks that explicitly required QVariantMap must accept QVariant instead.
-The event log preserves the same raw value. Full canonical state/replay/readiness
-is the reducer/projection layer's separate contract, not an event-bus cache.
+The event log preserves the same raw value. A decoded impossible sequence
+(missing same-part target, or layout switch before layouts) instead reports one
+session ProtocolError and resets state, reconnecting only per connection policy.
+Urgency/timestamp events for unknown IDs remain no-ops. Cross-part dangling IDs
+are allowed. Synthetic C++ dispatch methods publish only; they do not write the
+session's state.
 
 ### NiriState
 
@@ -93,6 +105,18 @@ Derived globals computed from event snapshots.
 | `activeOutput` | `string` | `stateChanged` |
 | `windowCount` | `int` | `stateChanged` |
 | `workspaceCount` | `int` | `stateChanged` |
+| `initialStateReceived` | `bool` | `initialStateReceivedChanged` |
+
+`initialStateReceived` is false until the first accepted `CastsChanged` has been
+applied, even if its list is empty. It is already true inside that event's
+handlers. Later casts replacements do not retrigger it. Disconnect, endpoint
+replacement and subscription failure clear readiness together with canonical
+state. A late-created NiriState reads the same readiness immediately.
+
+This rule follows niri v26.04's initial burst: workspaces, windows, optional
+keyboard layouts, overview, config, casts. Recheck upstream `state.rs` and
+`server.rs` when updating the supported release. Query replies never write
+stream state; before readiness, snapshot values may be partial/defaults.
 
 **Signal:** `stateChanged()`
 

@@ -147,22 +147,12 @@ void NiriMock::handleEventStreamSubscribe(QLocalSocket *socket)
     // First reply: {"Ok":"Handled"}
     sendLine(socket, QJsonObject{{"Ok", QStringLiteral("Handled")}});
 
-    // Then send initial state as bare events {"EventName":{...}}
-    for (const auto &w : m_windows) {
-        QJsonObject event;
-        event["WindowOpenedOrChanged"] = QJsonObject{{"window", w.toObject()}};
-        sendLine(socket, event);
-    }
-    if (!m_windows.isEmpty()) {
-        QJsonObject event;
-        event["WindowsChanged"] = QJsonObject{{"windows", m_windows}};
-        sendLine(socket, event);
-    }
-    if (!m_workspaces.isEmpty()) {
-        QJsonObject event;
-        event["WorkspacesChanged"] = QJsonObject{{"workspaces", m_workspaces}};
-        sendLine(socket, event);
-    }
+    // v26.04 EventStreamState::replicate order. Layouts are legitimately absent.
+    sendLine(socket, {{"WorkspacesChanged", QJsonObject{{"workspaces", m_workspaces}}}});
+    sendLine(socket, {{"WindowsChanged", QJsonObject{{"windows", m_windows}}}});
+    sendLine(socket, {{"OverviewOpenedOrClosed", QJsonObject{{"is_open", false}}}});
+    sendLine(socket, {{"ConfigLoaded", QJsonObject{{"failed", false}}}});
+    sendLine(socket, {{"CastsChanged", QJsonObject{{"casts", QJsonArray{}}}}});
 
     emit connected();
 }

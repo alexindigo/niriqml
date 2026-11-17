@@ -3,6 +3,7 @@
 #include "nirilinebuffer.h"
 #include "niritypes.h"
 #include "niriwire.h"
+#include "nirieventstreamstate.h"
 
 #include <QObject>
 #include <QTimer>
@@ -40,6 +41,13 @@ public:
     QVariantMap error() const;
     QString errorString() const;
     PeerInfo peerInfo() const;
+    const NiriEventStreamState &state() const
+    {
+        if (checkThread(this))
+            return m_state;
+        static const NiriEventStreamState empty;
+        return empty;
+    }
 
     void ensureStarted();
     void connectToSocket(const QString &path = {});
@@ -66,6 +74,11 @@ signals:
     void errorChanged();
     void peerInfoChanged();
     void reconnectScheduled(int delayMs, int attempt);
+    void initialStateReceivedChanged();
+    void stateUpdated(const NiriEventStreamState::Changes &changes);
+    void decodedEventPublication(const NiriWire::Document &document, const NiriEvent &event,
+                                 const QString &errorPath, const QString &errorMessage,
+                                 quint64 epoch);
     // E7 integration points: reset/apply canonical state here, before public
     // event publication. Each carries the epoch; consumers must reject stale work.
     void streamReset(quint64 epoch, const QString &reason);
@@ -108,6 +121,8 @@ private:
     std::shared_ptr<Attempt> m_attempt;
     std::unique_ptr<Snapshot> m_announced;
     bool m_publishing = false;
+    bool m_deliveringEvent = false;
+    NiriEventStreamState m_state;
     QTimer *m_retry;
     int m_reconnectAttempt = 0;
     quint64 m_retrySerial = 0;

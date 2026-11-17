@@ -18,6 +18,7 @@
 #include "nirisession.h"
 #include "nirirequests.h"
 #include "niripendingreply.h"
+#include "streamfixture.h"
 
 using namespace NiriWire;
 using namespace NiriIpc;
@@ -670,16 +671,20 @@ private slots:
         QFETCH(QByteArray, json);
         auto *events = NiriEvents::instance();
         NiriSession::instance()->stop();
+        StateStreamFixture stream;
+        QVERIFY(stream.start());
         const auto epoch = NiriSession::instance()->epoch();
         auto window = replaced(fixture("window-present"), "is_focused", WireValue(true));
-        events->dispatchWireEvent(
-                "WindowsChanged",
-                *WireValue::object({{"windows", WireValue(WireValue::Array{window})}}), epoch);
-        events->dispatchWireEvent(
-                "WorkspacesChanged",
-                *WireValue::object({{"workspaces",
-                                     WireValue(WireValue::Array{fixture("workspace-present")})}}),
-                epoch);
+        stream.send(*NiriWire::encode(*WireValue::object(
+                {{"WindowsChanged",
+                  *WireValue::object({{"windows", WireValue(WireValue::Array{window})}})}})));
+        stream.send(*NiriWire::encode(*WireValue::object(
+                {{"WorkspacesChanged",
+                  *WireValue::object(
+                          {{"workspaces",
+                            WireValue(WireValue::Array{fixture("workspace-present")})}})}})));
+        QTRY_COMPARE(events->lastWindowsSnapshot().size(), 1);
+        QTRY_COMPARE(events->lastWorkspacesSnapshot().size(), 1);
         const auto windows = events->lastWindowsSnapshot();
         const auto workspaces = events->lastWorkspacesSnapshot();
         const auto focus = events->lastFocusedWindowId();

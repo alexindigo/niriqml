@@ -20,6 +20,8 @@ class NiriState : public QObject
     Q_PROPERTY(QVariant activeOutput READ qmlActiveOutput NOTIFY stateChanged)
     Q_PROPERTY(int windowCount READ windowCount NOTIFY stateChanged)
     Q_PROPERTY(int workspaceCount READ workspaceCount NOTIFY stateChanged)
+    Q_PROPERTY(
+            bool initialStateReceived READ initialStateReceived NOTIFY initialStateReceivedChanged)
 
 public:
     static NiriState *create(QQmlEngine *qmlEngine, QJSEngine *jsEngine);
@@ -37,9 +39,11 @@ public:
     QVariant qmlActiveOutput() const { return NiriIpc::qmlValue(activeOutput()); }
     int windowCount() const;
     int workspaceCount() const;
+    bool initialStateReceived() const;
 
 signals:
     void stateChanged();
+    void initialStateReceivedChanged();
 
 private slots:
     void onWindowsChanged(const QVariantList &windows);

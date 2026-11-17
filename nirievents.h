@@ -29,13 +29,16 @@ public:
         return m_source ? m_source->nativeEvents() : NiriIpcEvents::nativeEvents();
     }
 
-    // Snapshot getters: last-known state from initial event burst.
-    // Consumers instantiated AFTER events fired can bootstrap from these.
-    QVariantList lastWindowsSnapshot() const;
-    QVariantList lastWorkspacesSnapshot() const;
-    NiriKeyboardLayouts lastKeyboardLayouts() const;
-    bool lastOverviewOpen() const;
+    // Compatibility aliases over CURRENT reducer state, not last full events.
+    Q_INVOKABLE QVariantList lastWindowsSnapshot() const;
+    Q_INVOKABLE QVariantList lastWorkspacesSnapshot() const;
+    std::optional<NiriKeyboardLayouts> lastKeyboardLayouts() const;
+    Q_INVOKABLE QVariant qmlLastKeyboardLayouts() const;
+    Q_INVOKABLE bool lastOverviewOpen() const;
     std::optional<quint64> lastFocusedWindowId() const;
+    Q_INVOKABLE QVariant qmlLastFocusedWindowId() const;
+    Q_INVOKABLE QVariantList lastCastsSnapshot() const;
+    Q_INVOKABLE bool lastConfigFailed() const;
 
 signals:
     void rawEvent(const QString &name, const QVariant &payload);
@@ -44,12 +47,7 @@ signals:
 
 private:
     explicit NiriEvents(QObject *parent = nullptr, NiriEvents *source = nullptr);
-    void applyExistingState(const NiriEvent &event);
+    void publishDecoded(const NiriWire::Document &document, const NiriEvent &event,
+                        const QString &errorPath, const QString &errorMessage, quint64 token);
     NiriEvents *m_source = nullptr;
-
-    QVariantList m_lastWindows;
-    QVariantList m_lastWorkspaces;
-    NiriKeyboardLayouts m_lastKeyboardLayouts;
-    bool m_lastOverviewOpen = false;
-    std::optional<quint64> m_lastFocusedWindowId;
 };

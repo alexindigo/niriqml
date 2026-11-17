@@ -32,6 +32,21 @@ house style.
 
 ## Wire protocol
 
+`NiriSession` constructs its native `NiriEventStreamState` before subscribing.
+One generated decode feeds a complete validated event transaction before any
+typed/raw publication. The six retained parts follow niri v26.04 `state.rs`:
+workspaces, windows, optional keyboard layouts, overview, config and casts.
+Immutable keyed entries and per-transaction before/after field changes support
+projections without cloning every record for every delta. Snapshots are current
+copies in numeric ID order, not retained full-event payloads. Query replies
+never seed this reducer.
+
+Epoch replacement clears all parts and readiness. The first accepted
+`CastsChanged`, last in v26.04's replication order, sets readiness before
+notification. Strict same-part preconditions are validated for the entire event
+before mutation; failures use the session's protocol-error/reset/retry path.
+Cross-part dangling references remain valid and are never repaired or inferred.
+
 - Unix socket at `$NIRI_SOCKET`
 - JSON line-oriented: send one `Request` object, receive one `Reply` per line
 - `EventStream` keeps the socket open and streams `Event` JSON objects forever

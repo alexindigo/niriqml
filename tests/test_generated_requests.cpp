@@ -237,6 +237,7 @@ private slots:
         if (tagOf(request) == "EventStream") {
             QVERIFY(NiriSession::instance()->subscribed());
             QSignalSpy event(NiriEvents::instance(), &NiriEvents::windowClosed);
+            server.peers.first()->write(*NiriWire::encode(fixture("event-WindowsChanged")) + '\n');
             server.peers.first()->write("{\"WindowClosed\":{\"id\":18446744073709551615}}\n");
             QTRY_COMPARE(event.size(), 1);
             QCOMPARE(event.first().first().toString(), "18446744073709551615");

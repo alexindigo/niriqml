@@ -1,0 +1,99 @@
+#pragma once
+
+#include "generated/niriipctypes_generated.h"
+#include <QMap>
+#include <memory>
+
+// Native session-owned port of niri v26.04 niri-ipc/src/state.rs.
+// Immutable entries and touched before-images support Qt row transitions without
+// cloning the entire state on each delta. No observer runs inside apply/reset.
+class NiriEventStreamState
+{
+public:
+    template <typename T>
+    using Entry = std::shared_ptr<const T>;
+    template <typename T>
+    struct RecordChange
+    {
+        Entry<T> before, after;
+        quint64 fields = 0;
+    };
+    enum WindowField : quint64 {
+        AppId = 1 << 0,
+        FocusTimestamp = 1 << 1,
+        Floating = 1 << 2,
+        WindowFocused = 1 << 3,
+        WindowUrgent = 1 << 4,
+        Layout = 1 << 5,
+        WindowPid = 1 << 6,
+        Title = 1 << 7,
+        WorkspaceId = 1 << 8,
+        WindowExtensions = 1 << 9,
+        AllWindowFields = (1 << 10) - 1
+    };
+    enum WorkspaceField : quint64 {
+        ActiveWindowId = 1 << 0,
+        Index = 1 << 1,
+        Active = 1 << 2,
+        WorkspaceFocused = 1 << 3,
+        WorkspaceUrgent = 1 << 4,
+        Name = 1 << 5,
+        Output = 1 << 6,
+        WorkspaceExtensions = 1 << 7,
+        AllWorkspaceFields = (1 << 8) - 1
+    };
+    enum CastField : quint64 {
+        CastActive = 1 << 0,
+        DynamicTarget = 1 << 1,
+        Kind = 1 << 2,
+        CastPid = 1 << 3,
+        NodeId = 1 << 4,
+        SessionId = 1 << 5,
+        Target = 1 << 6,
+        CastExtensions = 1 << 7,
+        AllCastFields = (1 << 8) - 1
+    };
+    struct Changes
+    {
+        quint64 epoch = 0, revision = 0;
+        QMap<quint64, RecordChange<NiriWindow>> windows;
+        QMap<quint64, RecordChange<NiriWorkspace>> workspaces;
+        QMap<quint64, RecordChange<NiriCast>> casts;
+        bool keyboardLayouts = false, overview = false, config = false, readiness = false;
+        bool reset = false;
+        QString reason;
+        bool changed() const;
+    };
+    struct ApplyResult
+    {
+        enum Status { Applied, StaleEpoch, ProtocolError } status = Applied;
+        QString error;
+        Changes changes;
+    };
+
+    ApplyResult apply(const NiriEvent &event, quint64 epoch);
+    Changes reset(quint64 epoch, const QString &reason);
+    QList<NiriEvent> replicate() const;
+    quint64 epoch() const { return m_epoch; }
+    quint64 revision() const { return m_revision; }
+    bool initialStateReceived() const { return m_ready; }
+    Entry<NiriWindow> window(quint64 id) const { return m_windows.value(id); }
+    Entry<NiriWorkspace> workspace(quint64 id) const { return m_workspaces.value(id); }
+    Entry<NiriCast> cast(quint64 streamId) const { return m_casts.value(streamId); }
+    QList<NiriWindow> windowsSnapshot() const;
+    QList<NiriWorkspace> workspacesSnapshot() const;
+    QList<NiriCast> castsSnapshot() const;
+    const std::optional<NiriKeyboardLayouts> &keyboardLayouts() const { return m_layouts; }
+    bool overviewOpen() const { return m_overview; }
+    bool configFailed() const { return m_config; }
+    std::optional<quint64> focusedWindowId() const;
+    std::optional<quint64> focusedWorkspaceId() const;
+
+private:
+    QMap<quint64, Entry<NiriWindow>> m_windows;
+    QMap<quint64, Entry<NiriWorkspace>> m_workspaces;
+    QMap<quint64, Entry<NiriCast>> m_casts;
+    std::optional<NiriKeyboardLayouts> m_layouts;
+    bool m_overview = false, m_config = false, m_ready = false;
+    quint64 m_epoch = 0, m_revision = 0;
+};
