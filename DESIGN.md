@@ -55,6 +55,9 @@ projection before public property and typed/raw event notifications. Consumers
 created during publication attach at the committed revision and skip that diff.
 A reset requested inside a row bracket invalidates the epoch immediately but
 waits for projection publication to unwind before clearing records and rows.
+Reset and event delivery share one session guard through all deferred resets
+and their projections. Nested event loops leave replacement frames buffered;
+the outermost delivery queues an identity-checked drain after the guard releases.
 
 Name/focus indexes belong to the reducer. One selector resolver gives nonempty
 workspace names precedence over optional IDs, including zero. Trackers retain

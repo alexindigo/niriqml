@@ -7,6 +7,7 @@
 #include "generated/niriipccodec_generated.h"
 #include "streamfixture.h"
 #include <QAbstractItemModelTester>
+#include <QEventLoop>
 #include <QMetaProperty>
 #include <QSignalSpy>
 #include <memory>
@@ -59,6 +60,144 @@ class TestProjectionReset : public QObject
 private slots:
     void init() { NiriSession::instance()->stop(); }
     void cleanup() { NiriSession::instance()->stop(); }
+    void nestedResetBurst_data()
+    {
+        QTest::addColumn<QString>("cause");
+        QTest::addColumn<bool>("summary");
+        for (const auto &cause :
+             QStringList{"Connecting", "EndpointChanged", "Stopped", "ProtocolError", "event"}) {
+            QTest::newRow(qPrintable(cause + "-rows")) << cause << false;
+            QTest::newRow(qPrintable(cause + "-summary")) << cause << true;
+        }
+    }
+    void nestedResetBurst()
+    {
+        QFETCH(QString, cause);
+        QFETCH(bool, summary);
+        StateStreamFixture stream;
+        QVERIFY(stream.start());
+        QVERIFY(populate(stream));
+        auto *session = NiriSession::instance();
+        auto *state = NiriState::instance();
+        NiriWindowsModel windows;
+        NiriWorkspacesModel workspaces;
+        QAbstractItemModelTester wt(&windows,
+                                    QAbstractItemModelTester::FailureReportingMode::QtTest);
+        QAbstractItemModelTester wst(&workspaces,
+                                     QAbstractItemModelTester::FailureReportingMode::QtTest);
+        NiriWindowReactive window;
+        window.setWindowId(17);
+        NiriWorkspaceReactive workspace;
+        workspace.setWorkspaceId(18);
+
+        NiriWindow record;
+        record.id = 17;
+        record.title = "new";
+        record.isFocused = true;
+        NiriWorkspace wr;
+        wr.id = 18;
+        wr.name = "new-workspace";
+        wr.isActive = wr.isFocused = true;
+        const QList<NiriEvent> burst{NiriEvent::fromWorkspacesChanged({{wr}, {}}),
+                                     NiriEvent::fromWindowsChanged({{record}, {}}),
+                                     NiriEvent::fromWindowUrgencyChanged({17, true, {}}),
+                                     NiriEvent::fromKeyboardLayoutsChanged({{0, {"de"}, {}}, {}}),
+                                     NiriEvent::fromOverviewOpenedOrClosed({true, {}}),
+                                     NiriEvent::fromConfigLoaded({true, {}}),
+                                     NiriEvent::fromCastsChanged({{}, {}})};
+        QList<QByteArray> expected;
+        QByteArray bytes = "{\"Ok\":\"Handled\"}\n";
+        for (const auto &event : burst) {
+            expected.append(*NiriWire::encode(*NiriIpc::encode(event)));
+            bytes += expected.last() + '\n';
+        }
+        QLocalServer replacement;
+        QVERIFY(replacement.listen(stream.directory.filePath("replacement")));
+        bool burstSent = false;
+        connect(&replacement, &QLocalServer::newConnection, &replacement, [&] {
+            auto *peer = replacement.nextPendingConnection();
+            connect(peer, &QLocalSocket::readyRead, &replacement, [&, peer] {
+                if (peer->canReadLine() && peer->readLine() == "\"EventStream\"\n") {
+                    peer->write(bytes);
+                    peer->flush();
+                    burstSent = true;
+                }
+            });
+        });
+        QList<QByteArray> received;
+        bool inProjection = false;
+        const auto publication = connect(session, &NiriSession::eventFrame, &replacement,
+                                         [&](const auto &document, quint64 epoch) {
+                                             QVERIFY(!inProjection);
+                                             QCOMPARE(epoch, session->state().epoch());
+                                             received.append(document.bytes);
+                                             QCOMPARE(state->initialStateReceived(),
+                                                      received.size() == burst.size());
+                                         });
+        bool entered = false;
+        const auto observer =
+                connect(session, summary ? &NiriSession::stateUpdated : &NiriSession::stateProject,
+                        &replacement, [&](const NiriEventStreamState::Changes &changes) {
+                            if (entered || (cause == "event" ? changes.reset : !changes.reset))
+                                return;
+                            if (cause != "event" && changes.reason != cause)
+                                return;
+                            entered = true;
+                            inProjection = true;
+                            session->connectToSocket(replacement.fullServerName());
+                            QEventLoop nested;
+                            QTimer poll;
+                            poll.setInterval(1);
+                            connect(&poll, &QTimer::timeout, &nested, [&] {
+                                if (burstSent) {
+                                    poll.stop();
+                                    QTimer::singleShot(30, &nested, &QEventLoop::quit);
+                                }
+                            });
+                            QTimer::singleShot(2000, &nested, &QEventLoop::quit);
+                            poll.start();
+                            nested.exec();
+                            QVERIFY(burstSent);
+                            QVERIFY(received.isEmpty());
+                            inProjection = false;
+                        });
+        if (cause == "Connecting") {
+            session->stop();
+            session->start();
+        } else if (cause == "EndpointChanged") {
+            session->selectEndpoint(stream.directory.filePath("unused"));
+        } else if (cause == "Stopped") {
+            session->stop();
+        } else if (cause == "ProtocolError") {
+            stream.send("{\"WindowClosed\":{\"id\":999}}");
+        } else {
+            stream.send("{\"OverviewOpenedOrClosed\":{\"is_open\":false}}");
+        }
+        QTRY_VERIFY(entered);
+        QTRY_COMPARE(received, expected);
+        disconnect(observer);
+        disconnect(publication);
+        QCOMPARE(session->state().epoch(), session->epoch());
+        QVERIFY(state->initialStateReceived());
+        QCOMPARE(state->windowCount(), 1);
+        QCOMPARE(state->workspaceCount(), 1);
+        QCOMPARE(windows.rowCount(), 1);
+        QCOMPARE(workspaces.rowCount(), 1);
+        record.isUrgent = true;
+        QCOMPARE(window.window(), std::optional<NiriWindow>(record));
+        QCOMPARE(workspace.workspace(), std::optional<NiriWorkspace>(wr));
+        QCOMPARE(state->nativeWindow(17), window.window());
+        QCOMPARE(state->nativeWorkspace(18), workspace.workspace());
+        QCOMPARE(
+                windows.data(windows.index(0, 0), NiriWindowsModel::WindowRole).value<NiriWindow>(),
+                record);
+        QCOMPARE(workspaces.data(workspaces.index(0, 0), NiriWorkspacesModel::WorkspaceRole)
+                         .value<NiriWorkspace>(),
+                 wr);
+        QVERIFY(state->overviewOpen() && state->configFailed());
+        QCOMPARE(state->keyboardLayouts()->names, QStringList{"de"});
+        QCOMPARE(state->castCount(), 0);
+    }
     void reset_data()
     {
         QTest::addColumn<QString>("cause");
