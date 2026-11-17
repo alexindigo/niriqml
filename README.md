@@ -149,9 +149,11 @@ Text {
 
 ### Actions (write path)
 
-Every action is a `Q_INVOKABLE` on `NiriActions`, returning a `NiriPendingReply`.
-Use the `finished` signal for async handling — the reply carries `isError`, `error`,
-and `value`.
+Every action returns a retainable `NiriPendingReply`. Completion is queued,
+including validation and immediate connection failures. Keep the reply in a QML
+property while waiting: dropping its last JS reference can cancel local waiting.
+Inspect `completed` for late observers; `cancel()` does not undo compositor work.
+See [request contracts](docs/REQUESTS.md) for ownership, deadlines and sequences.
 
 ```qml
 Button {

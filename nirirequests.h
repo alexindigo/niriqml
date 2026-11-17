@@ -1,60 +1,45 @@
 #pragma once
 
-#include <QByteArray>
+#include "nirirequestoperation.h"
+#include "nirirequestsequence.h"
 #include <QJsonObject>
-#include <QJsonValue>
-#include <QLocalSocket>
-#include <QObject>
 #include <QQmlEngine>
-#include <QTimer>
-#include <QtQml/qqmlregistration.h>
-#include <functional>
-
-#include "niripendingreply.h"
-#include "nirilinebuffer.h"
-#include "nirisession.h"
 
 class NiriRequests : public QObject
 {
     Q_OBJECT
     QML_SINGLETON
     QML_NAMED_ELEMENT(NiriRequests)
-
 public:
-    using Callback = std::function<void(bool ok, const QJsonObject &result)>;
-
+    using Callback = std::function<void(bool, const QJsonObject &)>;
     static NiriRequests *create(QQmlEngine *qmlEngine, QJSEngine *jsEngine);
     static NiriRequests *instance();
-
-    // Low-level primitive: send a JSON value (object or bare string) with a
-    // C++ callback. Used internally by higher-level wrappers.
+    // Compatibility callbacks are lossy object projections. New C++ callers
+    // should use sendWire() and inspect reply->wireDocument().
     void send(const QJsonObject &request, Callback callback);
     void sendJson(const QJsonValue &request, Callback callback);
-
-    // Generic escape hatch: send an arbitrary bare-string query (e.g. "Version",
-    // "OverviewState", or any future IPC name) and receive the raw result as
-    // a QVariantMap. Use when you need to talk to niri IPC surfaces that
-    // haven't been wrapped as typed methods yet.
-    Q_INVOKABLE NiriPendingReply *sendRaw(const QString &query);
-    Q_INVOKABLE NiriPendingReply *sendRaw(const QJsonObject &request);
-
-    // Typed query wrappers. Each returns a NiriPendingReply.
-    // On success, .value is a QVariantMap or gadget as documented per method.
-    Q_INVOKABLE NiriPendingReply *windows(); // value: QVariantList of NiriWindow
-    Q_INVOKABLE NiriPendingReply *workspaces(); // value: QVariantList of NiriWorkspace
-    Q_INVOKABLE NiriPendingReply *outputs(); // value: QVariantMap<name, NiriOutput>
-    Q_INVOKABLE NiriPendingReply *focusedWindow(); // value: NiriWindow (wrapped in QVariant)
-    Q_INVOKABLE NiriPendingReply *focusedOutput(); // value: NiriOutput (wrapped in QVariant)
-    Q_INVOKABLE NiriPendingReply *keyboardLayouts(); // value: NiriKeyboardLayouts (wrapped)
-    Q_INVOKABLE NiriPendingReply *version(); // value: QString
-
+    Q_INVOKABLE NiriPendingReply *sendRaw(const QVariant &request, const QVariantMap &options = {});
+    NiriPendingReply *sendRaw(const QJsonObject &request);
+    Q_INVOKABLE NiriPendingReply *sendRawJson(const QString &json, const QVariantMap &options = {});
+    NiriPendingReply *sendWire(const NiriWire::WireValue &request,
+                               NiriRequestOperation::Options options, QObject *owner);
+    Q_INVOKABLE NiriRequestSequence *sequence();
+    // Exact-number builder for structured raw input, including unknown fields.
+    // Invalid text returns undefined; sending it produces a queued error.
+    Q_INVOKABLE QVariant number(const QString &text);
+    Q_INVOKABLE NiriPendingReply *windows();
+    Q_INVOKABLE NiriPendingReply *workspaces();
+    Q_INVOKABLE NiriPendingReply *outputs();
+    Q_INVOKABLE NiriPendingReply *focusedWindow();
+    Q_INVOKABLE NiriPendingReply *focusedOutput();
+    Q_INVOKABLE NiriPendingReply *keyboardLayouts();
+    Q_INVOKABLE NiriPendingReply *version();
     void setRequestTimeoutMs(int ms)
     {
         if (NiriSession::checkThread(this))
             m_requestTimeoutMs = ms;
     }
     int requestTimeoutMs() const { return NiriSession::checkThread(this) ? m_requestTimeoutMs : 0; }
-    // Captured separately for each new request.
     void setMaxFrameBytes(qsizetype bytes)
     {
         if (NiriSession::checkThread(this))
@@ -62,24 +47,23 @@ public:
     }
     qsizetype maxFrameBytes() const { return NiriSession::checkThread(this) ? m_maxFrameBytes : 0; }
 
+    // Shared entry point for actions, sequences and generated adapters. The
+    // scope cancels work on engine/facade teardown but never parents JS replies.
+    static NiriPendingReply *
+    dispatch(const NiriWire::WireValue &request, QObject *scope,
+             NiriRequestOperation::Options options, QObject *owner = nullptr,
+             NiriRequestOperation::Decoder decoder = {}, const QString &validationError = {},
+             NiriRequestOperation::Channel channel = {}, bool persistent = false, bool start = true,
+             NiriRequestOperation **operationOut = nullptr);
+    static std::optional<NiriWire::WireValue> wireValue(const QVariant &value, QString &error,
+                                                        int depth = 0);
+    static bool parseOptions(const QVariantMap &input, NiriRequestOperation::Options &options,
+                             QString &error);
+
 private:
     explicit NiriRequests(QObject *parent = nullptr);
-
-    struct PendingRequest : QObject
-    {
-        explicit PendingRequest(QObject *owner) : QObject(owner) { }
-        ~PendingRequest() override;
-        QLocalSocket *socket = nullptr;
-        QTimer *timeout = nullptr;
-        QByteArray sendBuffer;
-        NiriLineBuffer recvBuffer;
-        Callback callback;
-        bool finished = false;
-    };
-
-    QString socketPath() const;
-    void completeRequest(PendingRequest *pr, bool ok, const QJsonObject &result);
-
+    NiriRequestOperation::Options options() const;
+    NiriPendingReply *query(const QString &kind);
     int m_requestTimeoutMs = 5000;
     qsizetype m_maxFrameBytes = NiriLineBuffer::DefaultMaxFrameBytes;
 };

@@ -39,6 +39,10 @@ set(NIRIQML_SOURCES
     niriactions.h
     nirirequests.cpp
     nirirequests.h
+    nirirequestoperation.cpp
+    nirirequestoperation.h
+    nirirequestsequence.cpp
+    nirirequestsequence.h
     niriwindowsmodel.cpp
     niriwindowsmodel.h
     niriworkspacesmodel.cpp
@@ -123,6 +127,8 @@ install(FILES
     nirievents.h
     niriactions.h
     nirirequests.h
+    nirirequestoperation.h
+    nirirequestsequence.h
     niriwindowsmodel.h
     niriworkspacesmodel.h
     niriwindowreactive.h
@@ -183,6 +189,7 @@ if(BUILD_TEST_MODE)
     add_niriqml_test(test_wire)
     add_niriqml_test(test_session)
     add_niriqml_test(test_session_review)
+    add_niriqml_test(test_requests)
     add_niriqml_test(test_types)
     add_niriqml_test(test_converter)
     add_niriqml_test(test_events)

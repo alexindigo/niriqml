@@ -66,14 +66,19 @@ private slots:
         auto engine = std::make_unique<QQmlEngine>();
         auto *actions = NiriActions::create(engine.get(), engine.get());
         QPointer<NiriPendingReply> reply = actions->spawn({"true"});
+        std::unique_ptr<NiriPendingReply> retained(reply);
         QTRY_VERIFY(server.hasPendingConnections());
         auto *peer = server.nextPendingConnection();
         QTRY_VERIFY(peer->canReadLine());
         engine.reset();
-        QVERIFY(reply.isNull());
-        if (replyArrives)
+        // E5 replies are unparented and retainable. Engine teardown cancels
+        // their operation instead of deleting a caller-held reply.
+        QVERIFY(reply);
+        if (replyArrives && peer->state() == QLocalSocket::ConnectedState)
             peer->write("{\"Ok\":\"Handled\"}\n");
         QTest::qWait(150);
+        QVERIFY(reply->completed());
+        QCOMPARE(reply->error().category, QString("Cancelled"));
         QTRY_COMPARE(peer->state(), QLocalSocket::UnconnectedState);
         requests->setRequestTimeoutMs(5000);
     }

@@ -5,7 +5,6 @@
 #include <QJsonObject>
 #include <QJsonValue>
 #include <QCoreApplication>
-#include <QPointer>
 #include "nirisession.h"
 
 #include "nirierror.h"
@@ -45,25 +44,28 @@ NiriPendingReply *NiriActions::sendAction(const QJsonObject &action)
 {
     if (!NiriSession::checkThread(this))
         return nullptr;
-    auto *reply = new NiriPendingReply(this);
-    QJsonObject request;
-    request["Action"] = action;
+    return sendWireAction(*NiriWire::fromQJsonValueLossy(action));
+}
 
-    NiriRequests::instance()->send(
-            request,
-            [reply = QPointer<NiriPendingReply>(reply)](bool ok, const QJsonObject &result) {
-                if (!reply)
-                    return;
-                if (ok) {
-                    reply->setFinished(QVariant::fromValue(result.toVariantMap()));
-                } else {
-                    NiriError err;
-                    err.code = -1;
-                    err.message = result.value("error").toString();
-                    reply->setError(err);
-                }
-            });
-    return reply;
+static NiriWire::WireValue object(NiriWire::WireValue::Object members)
+{
+    return *NiriWire::WireValue::object(std::move(members));
+}
+
+static NiriWire::WireValue id(quint64 value)
+{
+    return NiriWire::WireValue(NiriWire::NumberToken::fromUInt64(value));
+}
+
+NiriPendingReply *NiriActions::sendWireAction(const NiriWire::WireValue &action)
+{
+    if (!NiriSession::checkThread(this))
+        return nullptr;
+    auto *requests = NiriRequests::instance();
+    NiriRequestOperation::Options options;
+    options.timeoutMs = requests->requestTimeoutMs();
+    options.maxFrameBytes = requests->maxFrameBytes();
+    return NiriRequests::dispatch(object({{"Action", action}}), this, options);
 }
 
 // Convert QVariant reference (string or int) to niri WorkspaceReferenceArg JSON.
@@ -101,44 +103,46 @@ NiriPendingReply *NiriActions::spawn(const QStringList &command)
 
 NiriPendingReply *NiriActions::focusWindow(quint64 windowId)
 {
-    return sendAction(QJsonObject{{"FocusWindow", QJsonObject{{"id", qint64(windowId)}}}});
+    return sendWireAction(object({{"FocusWindow", object({{"id", id(windowId)}})}}));
 }
 
 NiriPendingReply *NiriActions::closeWindow(quint64 windowId)
 {
-    return sendAction(QJsonObject{{"CloseWindow", QJsonObject{{"id", qint64(windowId)}}}});
+    return sendWireAction(object({{"CloseWindow", object({{"id", id(windowId)}})}}));
 }
 
 NiriPendingReply *NiriActions::moveWindowToWorkspace(quint64 windowId, const QVariant &reference,
                                                      bool followFocus)
 {
-    return sendAction(QJsonObject{{"MoveWindowToWorkspace",
-                                   QJsonObject{{"window_id", qint64(windowId)},
-                                               {"reference", workspaceReferenceJson(reference)},
-                                               {"focus", followFocus}}}});
+    return sendWireAction(
+            object({{"MoveWindowToWorkspace",
+                     object({{"window_id", id(windowId)},
+                             {"reference",
+                              *NiriWire::fromQJsonValueLossy(workspaceReferenceJson(reference))},
+                             {"focus", NiriWire::WireValue(followFocus)}})}}));
 }
 
-NiriPendingReply *NiriActions::moveWindowToMonitor(quint64 windowId, const QString &output,
-                                                   bool followFocus)
+NiriPendingReply *NiriActions::moveWindowToMonitor(quint64 windowId, const QString &output)
 {
-    return sendAction(QJsonObject{{"MoveWindowToMonitor",
-                                   QJsonObject{{"window_id", qint64(windowId)},
-                                               {"output", output},
-                                               {"focus", followFocus}}}});
+    return sendWireAction(
+            object({{"MoveWindowToMonitor",
+                     object({{"id", id(windowId)}, {"output", NiriWire::WireValue(output)}})}}));
 }
 
 NiriPendingReply *NiriActions::setWindowWidth(quint64 windowId, const QVariant &change)
 {
-    return sendAction(QJsonObject{
-            {"SetWindowWidth",
-             QJsonObject{{"window_id", qint64(windowId)}, {"change", sizeChangeJson(change)}}}});
+    return sendWireAction(object(
+            {{"SetWindowWidth",
+              object({{"id", id(windowId)},
+                      {"change", *NiriWire::fromQJsonValueLossy(sizeChangeJson(change))}})}}));
 }
 
 NiriPendingReply *NiriActions::setWindowHeight(quint64 windowId, const QVariant &change)
 {
-    return sendAction(QJsonObject{
-            {"SetWindowHeight",
-             QJsonObject{{"window_id", qint64(windowId)}, {"change", sizeChangeJson(change)}}}});
+    return sendWireAction(object(
+            {{"SetWindowHeight",
+              object({{"id", id(windowId)},
+                      {"change", *NiriWire::fromQJsonValueLossy(sizeChangeJson(change))}})}}));
 }
 
 NiriPendingReply *NiriActions::moveColumnToIndex(int index)
@@ -148,5 +152,5 @@ NiriPendingReply *NiriActions::moveColumnToIndex(int index)
 
 NiriPendingReply *NiriActions::toggleWindowFloating(quint64 windowId)
 {
-    return sendAction(QJsonObject{{"ToggleWindowFloating", QJsonObject{{"id", qint64(windowId)}}}});
+    return sendWireAction(object({{"ToggleWindowFloating", object({{"id", id(windowId)}})}}));
 }

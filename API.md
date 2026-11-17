@@ -331,7 +331,8 @@ properties. Decoded by `NiriUtils::jsonToGadget()` using Q_PROPERTY reflection
 ### NiriPendingReply
 
 Returned by `NiriActions` and `NiriRequests` methods.
-`QML_UNCREATABLE("Use NiriActions methods instead")`.
+Exported by name, uncreatable, retainable and cancellable. See
+[request contracts](docs/REQUESTS.md) for the full shared API and migration notes.
 
 | Property | Type | Notify |
 |---|---|---|

@@ -17,6 +17,7 @@
 #include <QPointer>
 #include <QScopeGuard>
 #include <QTemporaryDir>
+#include <memory>
 
 #include "niriconnection.h"
 #include "nirievents.h"
@@ -200,6 +201,7 @@ private slots:
         QElapsedTimer elapsed;
         elapsed.start();
         NiriPendingReply *reply = requests->version();
+        const std::unique_ptr<NiriPendingReply> retained(reply);
         int completions = 0;
         bool failed = false;
         QString error;
@@ -369,6 +371,7 @@ private slots:
         connection->selectEndpoint(server.fullServerName());
         requests->setMaxFrameBytes(32);
         auto *reply = requests->sendRaw(QStringLiteral("Version"));
+        const std::unique_ptr<NiriPendingReply> retained(reply);
         int completions = 0;
         bool failed = true;
         QVariant value;
@@ -423,6 +426,7 @@ private slots:
         requests->setMaxFrameBytes(32);
         requests->setRequestTimeoutMs(2000);
         auto *reply = requests->version();
+        const std::unique_ptr<NiriPendingReply> retained(reply);
         int completions = 0;
         bool failed = false;
         QString error;
@@ -446,20 +450,17 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(peer->state(), QLocalSocket::UnconnectedState, 500);
     }
 
-    void pendingReplyDeletedAfterFinished()
+    void pendingReplyRetainedAfterFinished()
     {
-        NiriPendingReply *reply = new NiriPendingReply(NiriRequests::instance());
+        NiriSession::instance()->selectEndpoint(QString());
+        NiriPendingReply *reply = NiriRequests::instance()->version();
         QPointer<NiriPendingReply> guard(reply);
         QVERIFY(!guard.isNull());
-
-        reply->setFinished(QVariant(42));
-
-        // guard still valid immediately after synchronous finished() emission
-        QVERIFY(!guard.isNull());
-
-        // Pump event loop — deleteLater fires via QTest::qWait
+        QTRY_VERIFY(reply->completed());
         QTest::qWait(50);
-
+        QVERIFY(!guard.isNull());
+        QVERIFY(reply->isError());
+        delete reply;
         QVERIFY(guard.isNull());
     }
 

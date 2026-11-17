@@ -8,6 +8,7 @@
 #include <QtQml/qqmlregistration.h>
 
 #include "niripendingreply.h"
+#include "niriwire.h"
 
 class NiriActions : public QObject
 {
@@ -28,8 +29,7 @@ public:
     Q_INVOKABLE NiriPendingReply *closeWindow(quint64 windowId);
     Q_INVOKABLE NiriPendingReply *moveWindowToWorkspace(quint64 windowId, const QVariant &reference,
                                                         bool followFocus = true);
-    Q_INVOKABLE NiriPendingReply *moveWindowToMonitor(quint64 windowId, const QString &output,
-                                                      bool followFocus = true);
+    Q_INVOKABLE NiriPendingReply *moveWindowToMonitor(quint64 windowId, const QString &output);
     Q_INVOKABLE NiriPendingReply *setWindowWidth(quint64 windowId, const QVariant &change);
     Q_INVOKABLE NiriPendingReply *setWindowHeight(quint64 windowId, const QVariant &change);
     Q_INVOKABLE NiriPendingReply *moveColumnToIndex(int index);
@@ -37,4 +37,5 @@ public:
 
 private:
     explicit NiriActions(QObject *parent = nullptr);
+    NiriPendingReply *sendWireAction(const NiriWire::WireValue &action);
 };
