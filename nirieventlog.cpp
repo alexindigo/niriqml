@@ -1,19 +1,26 @@
 #include "nirieventlog.h"
 
 #include "nirievents.h"
+#include "nirisession.h"
 
 NiriEventLog::NiriEventLog(QObject *parent) : QAbstractListModel(parent)
 {
-    connect(NiriEvents::instance(), &NiriEvents::rawEvent, this, &NiriEventLog::appendEvent);
+    auto *events = NiriEvents::instance();
+    if (!events)
+        return;
+    connect(events, &NiriEvents::rawEvent, this, &NiriEventLog::appendEvent);
+    NiriSession::instance()->ensureStarted();
 }
 
 int NiriEventLog::capacity() const
 {
-    return m_capacity;
+    return NiriSession::checkThread(this) ? m_capacity : 0;
 }
 
 void NiriEventLog::setCapacity(int capacity)
 {
+    if (!NiriSession::checkThread(this))
+        return;
     if (m_capacity == capacity)
         return;
     m_capacity = capacity;
@@ -24,6 +31,8 @@ void NiriEventLog::setCapacity(int capacity)
 
 int NiriEventLog::rowCount(const QModelIndex &parent) const
 {
+    if (!NiriSession::checkThread(this))
+        return 0;
     if (parent.isValid())
         return 0;
     return m_events.size();
@@ -31,6 +40,8 @@ int NiriEventLog::rowCount(const QModelIndex &parent) const
 
 QVariant NiriEventLog::data(const QModelIndex &index, int role) const
 {
+    if (!NiriSession::checkThread(this))
+        return {};
     if (!index.isValid() || index.row() < 0 || index.row() >= m_events.size())
         return {};
 
@@ -55,6 +66,8 @@ QHash<int, QByteArray> NiriEventLog::roleNames() const
 
 void NiriEventLog::appendEvent(const QString &name, const QVariantMap &payload)
 {
+    if (!NiriSession::checkThread(this))
+        return;
     if (m_events.size() >= m_capacity)
         m_events.removeFirst();
 

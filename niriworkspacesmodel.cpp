@@ -1,10 +1,13 @@
 #include "niriworkspacesmodel.h"
 
 #include "nirievents.h"
+#include "nirisession.h"
 
 NiriWorkspacesModel::NiriWorkspacesModel(QObject *parent) : QAbstractListModel(parent)
 {
     NiriEvents *events = NiriEvents::instance();
+    if (!events)
+        return;
     connect(events, &NiriEvents::workspacesChanged, this,
             &NiriWorkspacesModel::onWorkspacesChanged);
     connect(events, &NiriEvents::workspaceActivated, this,
@@ -16,10 +19,13 @@ NiriWorkspacesModel::NiriWorkspacesModel(QObject *parent) : QAbstractListModel(p
     QVariantList snapshot = events->lastWorkspacesSnapshot();
     if (!snapshot.isEmpty())
         onWorkspacesChanged(snapshot);
+    NiriSession::instance()->ensureStarted();
 }
 
 int NiriWorkspacesModel::rowCount(const QModelIndex &parent) const
 {
+    if (!NiriSession::checkThread(this))
+        return 0;
     if (parent.isValid())
         return 0;
     return m_workspaces.size();
@@ -27,6 +33,8 @@ int NiriWorkspacesModel::rowCount(const QModelIndex &parent) const
 
 QVariant NiriWorkspacesModel::data(const QModelIndex &index, int role) const
 {
+    if (!NiriSession::checkThread(this))
+        return {};
     if (!index.isValid() || index.row() < 0 || index.row() >= m_workspaces.size())
         return {};
 

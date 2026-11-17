@@ -27,6 +27,12 @@ message(STATUS "Niri QML installation: ${_niriqml_qml_install}")
 set(NIRIQML_SOURCES
     niriconnection.cpp
     niriconnection.h
+    nirisession.cpp
+    nirisession.h
+    niripeerinfo.cpp
+    niripeerinfo.h
+    nirilogging.cpp
+    nirilogging.h
     nirievents.cpp
     nirievents.h
     niriactions.cpp
@@ -111,6 +117,9 @@ install(FILES
 
 install(FILES
     niriconnection.h
+    nirisession.h
+    niripeerinfo.h
+    nirilogging.h
     nirievents.h
     niriactions.h
     nirirequests.h
@@ -172,6 +181,7 @@ if(BUILD_TEST_MODE)
     add_niriqml_test(test_framing)
     add_niriqml_test(test_linebuffer)
     add_niriqml_test(test_wire)
+    add_niriqml_test(test_session)
     add_niriqml_test(test_types)
     add_niriqml_test(test_converter)
     add_niriqml_test(test_events)

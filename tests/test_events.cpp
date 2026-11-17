@@ -1,6 +1,6 @@
 // Headless mock tests for NiriEvents typed dispatch.
 //
-// Injects synthetic events via NiriConnection::eventReceived and verifies
+// Injects synthetic events via NiriSession::eventReceived and verifies
 // that NiriEvents dispatches the correct typed signals and updates its
 // cached snapshots. No live niri socket needed.
 
@@ -188,10 +188,13 @@ private slots:
                 qputenv("NIRI_SOCKET", oldSock);
             else
                 qunsetenv("NIRI_SOCKET");
+            NiriConnection::instance()->useEnvironmentEndpoint();
         });
         qputenv("NIRI_SOCKET", hangServer.fullServerName().toUtf8());
-        // Disconnect so the socket path is read from env next time
+        // Disconnect preserves endpoint selection now. Refresh Environment
+        // deliberately; a request must never infer selection from liveness.
         NiriConnection::instance()->disconnect();
+        NiriConnection::instance()->useEnvironmentEndpoint();
 
         requests->setRequestTimeoutMs(100);
         QElapsedTimer elapsed;
@@ -279,6 +282,118 @@ private slots:
         QCOMPARE(events.at(0).at(0).toString(), QStringLiteral("Recovered"));
     }
 
+    void completeEventsPrecedeFramingFailure_data()
+    {
+        QTest::addColumn<bool>("combined");
+        QTest::newRow("one-read") << true;
+        QTest::newRow("separate-reads") << false;
+    }
+
+    void completeEventsPrecedeFramingFailure()
+    {
+        QFETCH(bool, combined);
+        QTemporaryDir socketDir;
+        QVERIFY(socketDir.isValid());
+        QLocalServer server;
+        QVERIFY(server.listen(socketDir.filePath(QStringLiteral("socket"))));
+        auto *connection = NiriConnection::instance();
+        const auto oldLimit = connection->maxFrameBytes();
+        const auto oldPolicy = connection->autoReconnect();
+        const auto restore = qScopeGuard([&]() {
+            connection->stop();
+            connection->setMaxFrameBytes(oldLimit);
+            connection->setAutoReconnect(oldPolicy);
+        });
+        connection->stop();
+        connection->setMaxFrameBytes(32);
+        connection->setAutoReconnect(false);
+        connection->connectToSocket(server.fullServerName());
+        QTRY_VERIFY_WITH_TIMEOUT(server.hasPendingConnections(), 500);
+        auto *peer = server.nextPendingConnection();
+        QVERIFY(peer);
+        QTRY_VERIFY_WITH_TIMEOUT(peer->canReadLine(), 500);
+        QCOMPARE(peer->readLine(), QByteArray("\"EventStream\"\n"));
+        peer->write("{\"Ok\":\"Handled\"}\n");
+        peer->flush();
+        QTRY_VERIFY_WITH_TIMEOUT(connection->subscribed(), 500);
+        QSignalSpy events(connection, &NiriConnection::eventReceived);
+        QSignalSpy closed(NiriEvents::instance(), &NiriEvents::windowClosed);
+        const QByteArray complete =
+                "{\"WindowClosed\":{\"id\":1}}\n{\"WindowClosed\":{\"id\":2}}\n";
+        const QByteArray oversized(33, 'x');
+        if (combined) {
+            // One write/flush with no event-loop turn between the valid prefix and tail.
+            peer->write(complete + oversized);
+        } else {
+            peer->write(complete);
+            peer->flush();
+            QTRY_COMPARE_WITH_TIMEOUT(events.count(), 2, 500);
+            peer->write(oversized);
+        }
+        peer->flush();
+        QTRY_COMPARE_WITH_TIMEOUT(connection->status(), NiriConnection::Failed, 500);
+        QCOMPARE(connection->error().value("code").toString(), QStringLiteral("FrameTooLarge"));
+        QVERIFY(connection->errorString().contains(QStringLiteral("Framing error")));
+        QVERIFY(!connection->isConnected());
+        QTRY_COMPARE_WITH_TIMEOUT(peer->state(), QLocalSocket::UnconnectedState, 500);
+        QCOMPARE(events.count(), 2);
+        QCOMPARE(closed.count(), 2);
+        for (int i = 0; i < 2; ++i) {
+            QCOMPARE(events.at(i).at(0).toString(), QStringLiteral("WindowClosed"));
+            QCOMPARE(events.at(i).at(1).toMap().value("id").toULongLong(), quint64(i + 1));
+            QCOMPARE(closed.at(i).at(0).toULongLong(), quint64(i + 1));
+        }
+    }
+
+    void completeReplyPrecedesFramingFailure_data() { oversizedStreamReconnects_data(); }
+
+    void completeReplyPrecedesFramingFailure()
+    {
+        QFETCH(bool, terminated);
+        QTemporaryDir socketDir;
+        QVERIFY(socketDir.isValid());
+        QLocalServer server;
+        QVERIFY(server.listen(socketDir.filePath(QStringLiteral("socket"))));
+        auto *requests = NiriRequests::instance();
+        auto *connection = NiriConnection::instance();
+        const auto oldEndpoint = NiriSession::instance()->currentEndpoint();
+        const auto oldLimit = requests->maxFrameBytes();
+        const auto restore = qScopeGuard([&]() {
+            requests->setMaxFrameBytes(oldLimit);
+            if (oldEndpoint.source == NiriSession::Environment)
+                connection->useEnvironmentEndpoint();
+            else
+                connection->selectEndpoint(oldEndpoint.path);
+        });
+        connection->stop();
+        connection->selectEndpoint(server.fullServerName());
+        requests->setMaxFrameBytes(32);
+        auto *reply = requests->sendRaw(QStringLiteral("Version"));
+        int completions = 0;
+        bool failed = true;
+        QVariant value;
+        QString error;
+        QObject observer;
+        connect(reply, &NiriPendingReply::finished, &observer, [&]() {
+            ++completions;
+            failed = reply->isError();
+            value = reply->value();
+            error = reply->error().message;
+        });
+        QTRY_VERIFY_WITH_TIMEOUT(server.hasPendingConnections(), 500);
+        auto *peer = server.nextPendingConnection();
+        QVERIFY(peer);
+        QTRY_VERIFY_WITH_TIMEOUT(peer->canReadLine(), 500);
+        QCOMPARE(peer->readLine(), QByteArray("\"Version\"\n"));
+        peer->write("{\"Ok\":{}}\n" + QByteArray(33, 'x') + (terminated ? "\n" : ""));
+        peer->flush();
+        QTRY_COMPARE_WITH_TIMEOUT(completions, 1, 500);
+        QVERIFY2(!failed, qPrintable(error));
+        QCOMPARE(value.metaType(), QMetaType::fromType<QVariantMap>());
+        QVERIFY(value.toMap().isEmpty());
+        QTRY_COMPARE_WITH_TIMEOUT(peer->state(), QLocalSocket::UnconnectedState, 500);
+    }
+
     void oversizedReplyFails_data() { oversizedStreamReconnects_data(); }
 
     void oversizedReplyFails()
@@ -300,9 +415,11 @@ private slots:
                 qputenv("NIRI_SOCKET", oldSocket);
             else
                 qunsetenv("NIRI_SOCKET");
+            NiriConnection::instance()->useEnvironmentEndpoint();
         });
         NiriConnection::instance()->disconnect();
         qputenv("NIRI_SOCKET", server.fullServerName().toUtf8());
+        NiriConnection::instance()->useEnvironmentEndpoint();
         requests->setMaxFrameBytes(32);
         requests->setRequestTimeoutMs(2000);
         auto *reply = requests->version();
@@ -411,7 +528,7 @@ private slots:
 private:
     void emitEvent(const QString &name, const QVariantMap &payload)
     {
-        QMetaObject::invokeMethod(NiriConnection::instance(), "eventReceived", Qt::DirectConnection,
+        QMetaObject::invokeMethod(NiriSession::instance(), "eventReceived", Qt::DirectConnection,
                                   Q_ARG(QString, name), Q_ARG(QVariantMap, payload));
     }
 };

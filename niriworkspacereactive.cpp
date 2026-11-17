@@ -3,24 +3,30 @@
 #include <optional>
 
 #include "nirievents.h"
+#include "nirisession.h"
 
 NiriWorkspaceReactive::NiriWorkspaceReactive(QObject *parent) : QObject(parent)
 {
     NiriEvents *events = NiriEvents::instance();
+    if (!events)
+        return;
     connect(events, &NiriEvents::workspacesChanged, this,
             &NiriWorkspaceReactive::onWorkspacesChanged);
     connect(events, &NiriEvents::workspaceActivated, this,
             &NiriWorkspaceReactive::onWorkspaceActivated);
     connect(events, &NiriEvents::workspaceActiveWindowChanged, this,
             &NiriWorkspaceReactive::onWorkspaceActiveWindowChanged);
+    NiriSession::instance()->ensureStarted();
 }
 
 QString NiriWorkspaceReactive::workspaceName() const
 {
-    return m_selectorName;
+    return NiriSession::checkThread(this) ? m_selectorName : QString{};
 }
 void NiriWorkspaceReactive::setWorkspaceName(const QString &name)
 {
+    if (!NiriSession::checkThread(this))
+        return;
     if (m_selectorName == name)
         return;
     m_selectorName = name;
@@ -42,10 +48,12 @@ void NiriWorkspaceReactive::setWorkspaceName(const QString &name)
 
 quint64 NiriWorkspaceReactive::workspaceId() const
 {
-    return m_selectorId;
+    return NiriSession::checkThread(this) ? m_selectorId : 0;
 }
 void NiriWorkspaceReactive::setWorkspaceId(quint64 id)
 {
+    if (!NiriSession::checkThread(this))
+        return;
     if (m_selectorId == id)
         return;
     m_selectorId = id;
@@ -67,23 +75,23 @@ void NiriWorkspaceReactive::setWorkspaceId(quint64 id)
 
 bool NiriWorkspaceReactive::valid() const
 {
-    return m_valid;
+    return NiriSession::checkThread(this) && m_valid;
 }
 quint64 NiriWorkspaceReactive::id() const
 {
-    return m_data.id;
+    return NiriSession::checkThread(this) ? m_data.id : 0;
 }
 int NiriWorkspaceReactive::idx() const
 {
-    return m_data.idx;
+    return NiriSession::checkThread(this) ? m_data.idx : 0;
 }
 QString NiriWorkspaceReactive::name() const
 {
-    return m_data.name;
+    return NiriSession::checkThread(this) ? m_data.name : QString{};
 }
 QString NiriWorkspaceReactive::output() const
 {
-    return m_data.output;
+    return NiriSession::checkThread(this) ? m_data.output : QString{};
 }
 bool NiriWorkspaceReactive::isUrgent() const
 {
@@ -91,15 +99,15 @@ bool NiriWorkspaceReactive::isUrgent() const
 }
 bool NiriWorkspaceReactive::isActive() const
 {
-    return m_data.isActive;
+    return NiriSession::checkThread(this) && m_data.isActive;
 }
 bool NiriWorkspaceReactive::isFocused() const
 {
-    return m_data.isFocused;
+    return NiriSession::checkThread(this) && m_data.isFocused;
 }
 quint64 NiriWorkspaceReactive::activeWindowId() const
 {
-    return m_data.activeWindowId;
+    return NiriSession::checkThread(this) ? m_data.activeWindowId : 0;
 }
 
 bool NiriWorkspaceReactive::matches(const NiriWorkspace &w) const

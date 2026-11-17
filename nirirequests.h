@@ -12,6 +12,7 @@
 
 #include "niripendingreply.h"
 #include "nirilinebuffer.h"
+#include "nirisession.h"
 
 class NiriRequests : public QObject
 {
@@ -47,11 +48,19 @@ public:
     Q_INVOKABLE NiriPendingReply *keyboardLayouts(); // value: NiriKeyboardLayouts (wrapped)
     Q_INVOKABLE NiriPendingReply *version(); // value: QString
 
-    void setRequestTimeoutMs(int ms) { m_requestTimeoutMs = ms; }
-    int requestTimeoutMs() const { return m_requestTimeoutMs; }
+    void setRequestTimeoutMs(int ms)
+    {
+        if (NiriSession::checkThread(this))
+            m_requestTimeoutMs = ms;
+    }
+    int requestTimeoutMs() const { return NiriSession::checkThread(this) ? m_requestTimeoutMs : 0; }
     // Captured separately for each new request.
-    void setMaxFrameBytes(qsizetype bytes) { m_maxFrameBytes = qMax<qsizetype>(0, bytes); }
-    qsizetype maxFrameBytes() const { return m_maxFrameBytes; }
+    void setMaxFrameBytes(qsizetype bytes)
+    {
+        if (NiriSession::checkThread(this))
+            m_maxFrameBytes = qMax<qsizetype>(0, bytes);
+    }
+    qsizetype maxFrameBytes() const { return NiriSession::checkThread(this) ? m_maxFrameBytes : 0; }
 
 private:
     explicit NiriRequests(QObject *parent = nullptr);

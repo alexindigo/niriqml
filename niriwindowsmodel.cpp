@@ -1,10 +1,13 @@
 #include "niriwindowsmodel.h"
 
 #include "nirievents.h"
+#include "nirisession.h"
 
 NiriWindowsModel::NiriWindowsModel(QObject *parent) : QAbstractListModel(parent)
 {
     NiriEvents *events = NiriEvents::instance();
+    if (!events)
+        return;
     connect(events, &NiriEvents::windowsChanged, this, &NiriWindowsModel::onWindowsChanged);
     connect(events, &NiriEvents::windowOpenedOrChanged, this,
             &NiriWindowsModel::onWindowOpenedOrChanged);
@@ -15,10 +18,13 @@ NiriWindowsModel::NiriWindowsModel(QObject *parent) : QAbstractListModel(parent)
     QVariantList snapshot = events->lastWindowsSnapshot();
     if (!snapshot.isEmpty())
         onWindowsChanged(snapshot);
+    NiriSession::instance()->ensureStarted();
 }
 
 int NiriWindowsModel::rowCount(const QModelIndex &parent) const
 {
+    if (!NiriSession::checkThread(this))
+        return 0;
     if (parent.isValid())
         return 0;
     return m_windows.size();
@@ -26,6 +32,8 @@ int NiriWindowsModel::rowCount(const QModelIndex &parent) const
 
 QVariant NiriWindowsModel::data(const QModelIndex &index, int role) const
 {
+    if (!NiriSession::checkThread(this))
+        return {};
     if (!index.isValid() || index.row() < 0 || index.row() >= m_windows.size())
         return {};
 

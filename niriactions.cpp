@@ -4,28 +4,46 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonValue>
+#include <QCoreApplication>
+#include "nirisession.h"
 
 #include "nirierror.h"
 #include "nirirequests.h"
 
-NiriActions *NiriActions::create(QQmlEngine *, QJSEngine *jsEngine)
+NiriActions *NiriActions::create(QQmlEngine *engine, QJSEngine *jsEngine)
 {
-    NiriActions *self = instance();
-    if (jsEngine)
-        QJSEngine::setObjectOwnership(self, QJSEngine::CppOwnership);
+    if (!NiriSession::checkThread(engine ? engine : jsEngine))
+        return nullptr;
+    QObject *owner = engine ? static_cast<QObject *>(engine) : static_cast<QObject *>(jsEngine);
+    if (!owner)
+        return instance();
+    auto *self = new NiriActions(owner);
+    QJSEngine::setObjectOwnership(self, QJSEngine::CppOwnership);
+    NiriSession::instance()->ensureStarted();
     return self;
 }
 
 NiriActions *NiriActions::instance()
 {
-    static NiriActions s;
-    return &s;
+    if (!NiriSession::checkThread())
+        return nullptr;
+    auto *app = QCoreApplication::instance();
+    auto *self = app->findChild<NiriActions *>(QStringLiteral("niriqml.actions"),
+                                               Qt::FindDirectChildrenOnly);
+    if (!self) {
+        self = new NiriActions(app);
+        self->setObjectName(QStringLiteral("niriqml.actions"));
+    }
+    NiriSession::instance()->ensureStarted();
+    return self;
 }
 
 NiriActions::NiriActions(QObject *parent) : QObject(parent) { }
 
 NiriPendingReply *NiriActions::sendAction(const QJsonObject &action)
 {
+    if (!NiriSession::checkThread(this))
+        return nullptr;
     auto *reply = new NiriPendingReply(this);
     QJsonObject request;
     request["Action"] = action;

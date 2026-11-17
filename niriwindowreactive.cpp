@@ -1,25 +1,31 @@
 #include "niriwindowreactive.h"
 
 #include "nirievents.h"
+#include "nirisession.h"
 
 NiriWindowReactive::NiriWindowReactive(QObject *parent) : QObject(parent)
 {
     NiriEvents *events = NiriEvents::instance();
+    if (!events)
+        return;
     connect(events, &NiriEvents::windowOpenedOrChanged, this,
             &NiriWindowReactive::onWindowOpenedOrChanged);
     connect(events, &NiriEvents::windowClosed, this, &NiriWindowReactive::onWindowClosed);
     connect(events, &NiriEvents::windowsChanged, this, &NiriWindowReactive::onWindowsChanged);
     connect(events, &NiriEvents::windowFocusChanged, this,
             &NiriWindowReactive::onWindowFocusChanged);
+    NiriSession::instance()->ensureStarted();
 }
 
 quint64 NiriWindowReactive::windowId() const
 {
-    return m_windowId;
+    return NiriSession::checkThread(this) ? m_windowId : 0;
 }
 
 void NiriWindowReactive::setWindowId(quint64 id)
 {
+    if (!NiriSession::checkThread(this))
+        return;
     if (m_windowId == id)
         return;
     m_windowId = id;
@@ -42,47 +48,47 @@ void NiriWindowReactive::setWindowId(quint64 id)
 
 bool NiriWindowReactive::valid() const
 {
-    return m_valid;
+    return NiriSession::checkThread(this) && m_valid;
 }
 quint64 NiriWindowReactive::id() const
 {
-    return m_data.id;
+    return NiriSession::checkThread(this) ? m_data.id : 0;
 }
 QString NiriWindowReactive::title() const
 {
-    return m_data.title;
+    return NiriSession::checkThread(this) ? m_data.title : QString{};
 }
 QString NiriWindowReactive::appId() const
 {
-    return m_data.appId;
+    return NiriSession::checkThread(this) ? m_data.appId : QString{};
 }
 quint32 NiriWindowReactive::pid() const
 {
-    return m_data.pid;
+    return NiriSession::checkThread(this) ? m_data.pid : 0;
 }
 quint64 NiriWindowReactive::workspaceId() const
 {
-    return m_data.workspaceId;
+    return NiriSession::checkThread(this) ? m_data.workspaceId : 0;
 }
 bool NiriWindowReactive::isFocused() const
 {
-    return m_data.isFocused;
+    return NiriSession::checkThread(this) && m_data.isFocused;
 }
 bool NiriWindowReactive::isFloating() const
 {
-    return m_data.isFloating;
+    return NiriSession::checkThread(this) && m_data.isFloating;
 }
 bool NiriWindowReactive::isUrgent() const
 {
-    return m_data.isUrgent;
+    return NiriSession::checkThread(this) && m_data.isUrgent;
 }
 NiriWindowLayout NiriWindowReactive::layout() const
 {
-    return m_data.layout;
+    return NiriSession::checkThread(this) ? m_data.layout : NiriWindowLayout{};
 }
 NiriTimestamp NiriWindowReactive::focusTimestamp() const
 {
-    return m_data.focusTimestamp;
+    return NiriSession::checkThread(this) ? m_data.focusTimestamp : NiriTimestamp{};
 }
 
 void NiriWindowReactive::updateFrom(const NiriWindow &w)

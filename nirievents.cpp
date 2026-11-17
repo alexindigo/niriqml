@@ -4,57 +4,107 @@
 #include <QJsonObject>
 
 #include <QJSEngine>
+#include <QCoreApplication>
 
 #include "niriconnection.h"
 #include "niriutils.h"
+#include "nirilogging.h"
 
-NiriEvents *NiriEvents::create(QQmlEngine *, QJSEngine *jsEngine)
+NiriEvents *NiriEvents::create(QQmlEngine *engine, QJSEngine *jsEngine)
 {
-    NiriEvents *self = instance();
-    if (jsEngine)
-        QJSEngine::setObjectOwnership(self, QJSEngine::CppOwnership);
-    NiriConnection *conn = NiriConnection::instance();
-    if (!conn->isConnected() && conn->socketPath().isEmpty())
-        conn->connectToSocket();
+    if (!NiriSession::checkThread(engine ? engine : jsEngine))
+        return nullptr;
+    QObject *owner = engine ? static_cast<QObject *>(engine) : static_cast<QObject *>(jsEngine);
+    if (!owner)
+        return instance();
+    auto *self = new NiriEvents(owner, instance());
+    QJSEngine::setObjectOwnership(self, QJSEngine::CppOwnership);
+    NiriSession::instance()->ensureStarted();
     return self;
 }
 
 NiriEvents *NiriEvents::instance()
 {
-    static NiriEvents s;
-    return &s;
+    if (!NiriSession::checkThread())
+        return nullptr;
+    auto *app = QCoreApplication::instance();
+    auto *self = app->findChild<NiriEvents *>(QStringLiteral("niriqml.events"),
+                                              Qt::FindDirectChildrenOnly);
+    if (!self) {
+        self = new NiriEvents(app);
+        self->setObjectName(QStringLiteral("niriqml.events"));
+    }
+    NiriSession::instance()->ensureStarted();
+    return self;
 }
 
-NiriEvents::NiriEvents(QObject *parent) : QObject(parent)
+NiriEvents::NiriEvents(QObject *parent, NiriEvents *source) : QObject(parent), m_source(source)
 {
+    if (source) {
+#define FORWARD(name) connect(source, &NiriEvents::name, this, &NiriEvents::name)
+        FORWARD(workspacesChanged);
+        FORWARD(workspaceActivated);
+        FORWARD(workspaceActiveWindowChanged);
+        FORWARD(windowsChanged);
+        FORWARD(windowOpenedOrChanged);
+        FORWARD(windowClosed);
+        FORWARD(windowFocusChanged);
+        FORWARD(windowLayoutsChanged);
+        FORWARD(keyboardLayoutsChanged);
+        FORWARD(keyboardLayoutSwitched);
+        FORWARD(overviewOpenedOrClosed);
+        FORWARD(configLoaded);
+        FORWARD(castsChanged);
+        FORWARD(windowFocusTimestampChanged);
+        FORWARD(rawEvent);
+#undef FORWARD
+        return;
+    }
     connect(NiriConnection::instance(), &NiriConnection::eventReceived, this,
             &NiriEvents::dispatchEvent);
 }
 
 QVariantList NiriEvents::lastWindowsSnapshot() const
 {
-    return m_lastWindows;
+    if (!NiriSession::checkThread(this))
+        return {};
+    return m_source ? m_source->lastWindowsSnapshot() : m_lastWindows;
 }
 QVariantList NiriEvents::lastWorkspacesSnapshot() const
 {
-    return m_lastWorkspaces;
+    if (!NiriSession::checkThread(this))
+        return {};
+    return m_source ? m_source->lastWorkspacesSnapshot() : m_lastWorkspaces;
 }
 NiriKeyboardLayouts NiriEvents::lastKeyboardLayouts() const
 {
-    return m_lastKeyboardLayouts;
+    if (!NiriSession::checkThread(this))
+        return {};
+    return m_source ? m_source->lastKeyboardLayouts() : m_lastKeyboardLayouts;
 }
 bool NiriEvents::lastOverviewOpen() const
 {
-    return m_lastOverviewOpen;
+    if (!NiriSession::checkThread(this))
+        return false;
+    return m_source ? m_source->lastOverviewOpen() : m_lastOverviewOpen;
 }
 quint64 NiriEvents::lastFocusedWindowId() const
 {
-    return m_lastFocusedWindowId;
+    if (!NiriSession::checkThread(this))
+        return 0;
+    return m_source ? m_source->lastFocusedWindowId() : m_lastFocusedWindowId;
 }
 
 void NiriEvents::dispatchEvent(const QString &name, const QVariantMap &payload)
 {
-    qDebug() << "NiriEvents:" << name << "(payload keys:" << payload.keys() << ")";
+    if (!NiriSession::checkThread(this))
+        return;
+    if (m_source) {
+        m_source->dispatchEvent(name, payload);
+        return;
+    }
+    const auto token = NiriSession::instance()->epoch();
+    qCDebug(niriEventsLog) << "Event" << name;
     QJsonObject obj = QJsonObject::fromVariantMap(payload);
 
 #define NIRI_ARR(K) obj.value(QStringLiteral(K)).toArray()
@@ -148,5 +198,6 @@ void NiriEvents::dispatchEvent(const QString &name, const QVariantMap &payload)
         emit windowLayoutsChanged(NIRI_ARR("changes").toVariantList());
     }
 
-    emit rawEvent(name, payload);
+    if (NiriSession::instance()->epoch() == token)
+        emit rawEvent(name, payload);
 }

@@ -48,7 +48,8 @@ signals:
     void rawEvent(const QString &name, const QVariantMap &payload);
 
 private:
-    explicit NiriEvents(QObject *parent = nullptr);
+    explicit NiriEvents(QObject *parent = nullptr, NiriEvents *source = nullptr);
+    NiriEvents *m_source = nullptr;
 
     QVariantList m_lastWindows;
     QVariantList m_lastWorkspaces;

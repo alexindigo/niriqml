@@ -5,34 +5,48 @@
 #include <QJsonDocument>
 #include <QJsonParseError>
 #include <QDebug>
+#include <QCoreApplication>
 
 #include "niriconnection.h"
 #include "nirierror.h"
 #include "niritypes.h"
 #include "niriutils.h"
 
-NiriRequests *NiriRequests::create(QQmlEngine *, QJSEngine *jsEngine)
+NiriRequests *NiriRequests::create(QQmlEngine *engine, QJSEngine *jsEngine)
 {
-    NiriRequests *self = instance();
-    if (jsEngine)
-        QJSEngine::setObjectOwnership(self, QJSEngine::CppOwnership);
+    if (!NiriSession::checkThread(engine ? engine : jsEngine))
+        return nullptr;
+    QObject *owner = engine ? static_cast<QObject *>(engine) : static_cast<QObject *>(jsEngine);
+    if (!owner)
+        return instance();
+    auto *self = new NiriRequests(owner);
+    QJSEngine::setObjectOwnership(self, QJSEngine::CppOwnership);
+    NiriSession::instance()->ensureStarted();
     return self;
 }
 
 NiriRequests *NiriRequests::instance()
 {
-    static NiriRequests s;
-    return &s;
+    if (!NiriSession::checkThread())
+        return nullptr;
+    auto *app = QCoreApplication::instance();
+    auto *self = app->findChild<NiriRequests *>(QStringLiteral("niriqml.requests"),
+                                                Qt::FindDirectChildrenOnly);
+    if (!self) {
+        self = new NiriRequests(app);
+        self->setObjectName(QStringLiteral("niriqml.requests"));
+    }
+    NiriSession::instance()->ensureStarted();
+    return self;
 }
 
 NiriRequests::NiriRequests(QObject *parent) : QObject(parent) { }
 
 QString NiriRequests::socketPath() const
 {
-    // Use NiriConnection's path if connected (works both with mock and real niri)
-    if (NiriConnection::instance()->isConnected())
-        return NiriConnection::instance()->socketPath();
-    return QString::fromUtf8(qgetenv("NIRI_SOCKET"));
+    if (!NiriSession::checkThread(this))
+        return {};
+    return NiriSession::instance()->currentEndpoint().path;
 }
 
 void NiriRequests::completeRequest(PendingRequest *pr, bool ok, const QJsonObject &result)
@@ -70,6 +84,9 @@ void NiriRequests::send(const QJsonObject &request, Callback callback)
 
 void NiriRequests::sendJson(const QJsonValue &request, Callback callback)
 {
+    if (!NiriSession::checkThread(this))
+        return;
+    NiriSession::instance()->ensureStarted();
     auto *pr = new PendingRequest;
     pr->recvBuffer = NiriLineBuffer(m_maxFrameBytes);
     pr->socket = new QLocalSocket(this);
@@ -106,16 +123,19 @@ void NiriRequests::sendJson(const QJsonValue &request, Callback callback)
 
     connect(pr->socket, &QLocalSocket::readyRead, this, [this, pr]() {
         pr->recvBuffer.feed(pr->socket->readAll());
-        if (pr->recvBuffer.error().code != NiriLineBuffer::ErrorCode::None) {
-            const auto error = QStringLiteral("Framing error: frame exceeds %1 bytes")
-                                       .arg(pr->recvBuffer.error().allowedBytes);
-            completeRequest(pr, false, QJsonObject{{"error", error}});
+        const auto lines = pr->recvBuffer.takeCompleteLines();
+        if (lines.isEmpty()) {
+            if (pr->recvBuffer.error().code != NiriLineBuffer::ErrorCode::None) {
+                const auto error = QStringLiteral("Framing error: frame exceeds %1 bytes")
+                                           .arg(pr->recvBuffer.error().allowedBytes);
+                completeRequest(pr, false, QJsonObject{{"error", error}});
+            }
             return;
         }
-        const auto lines = pr->recvBuffer.takeCompleteLines();
-        if (lines.isEmpty())
-            return;
 
+        // A one-shot operation ends at its first complete reply. A framing
+        // failure in a later line cannot invalidate that already-received reply,
+        // regardless of how the socket groups those bytes into readyRead calls.
         const QByteArray &line = lines.first();
 
         QJsonParseError err;
@@ -161,6 +181,8 @@ static void wireRawReply(NiriPendingReply *reply, bool ok, const QJsonObject &re
 
 NiriPendingReply *NiriRequests::sendRaw(const QString &query)
 {
+    if (!NiriSession::checkThread(this))
+        return nullptr;
     auto *reply = new NiriPendingReply(this);
     sendJson(QJsonValue(query),
              [reply](bool ok, const QJsonObject &result) { wireRawReply(reply, ok, result); });
@@ -169,6 +191,8 @@ NiriPendingReply *NiriRequests::sendRaw(const QString &query)
 
 NiriPendingReply *NiriRequests::sendRaw(const QJsonObject &request)
 {
+    if (!NiriSession::checkThread(this))
+        return nullptr;
     auto *reply = new NiriPendingReply(this);
     sendJson(QJsonValue(request),
              [reply](bool ok, const QJsonObject &result) { wireRawReply(reply, ok, result); });
@@ -179,6 +203,8 @@ NiriPendingReply *NiriRequests::sendRaw(const QJsonObject &request)
 
 NiriPendingReply *NiriRequests::windows()
 {
+    if (!NiriSession::checkThread(this))
+        return nullptr;
     auto *reply = new NiriPendingReply(this);
     sendJson(QJsonValue(QStringLiteral("Windows")), [reply](bool ok, const QJsonObject &result) {
         if (!ok) {
@@ -200,6 +226,8 @@ NiriPendingReply *NiriRequests::windows()
 
 NiriPendingReply *NiriRequests::workspaces()
 {
+    if (!NiriSession::checkThread(this))
+        return nullptr;
     auto *reply = new NiriPendingReply(this);
     sendJson(QJsonValue(QStringLiteral("Workspaces")), [reply](bool ok, const QJsonObject &result) {
         if (!ok) {
@@ -221,6 +249,8 @@ NiriPendingReply *NiriRequests::workspaces()
 
 NiriPendingReply *NiriRequests::outputs()
 {
+    if (!NiriSession::checkThread(this))
+        return nullptr;
     auto *reply = new NiriPendingReply(this);
     sendJson(QJsonValue(QStringLiteral("Outputs")), [reply](bool ok, const QJsonObject &result) {
         if (!ok) {
@@ -244,6 +274,8 @@ NiriPendingReply *NiriRequests::outputs()
 
 NiriPendingReply *NiriRequests::focusedWindow()
 {
+    if (!NiriSession::checkThread(this))
+        return nullptr;
     auto *reply = new NiriPendingReply(this);
     sendJson(QJsonValue(QStringLiteral("FocusedWindow")),
              [reply](bool ok, const QJsonObject &result) {
@@ -267,6 +299,8 @@ NiriPendingReply *NiriRequests::focusedWindow()
 
 NiriPendingReply *NiriRequests::focusedOutput()
 {
+    if (!NiriSession::checkThread(this))
+        return nullptr;
     auto *reply = new NiriPendingReply(this);
     sendJson(QJsonValue(QStringLiteral("FocusedOutput")),
              [reply](bool ok, const QJsonObject &result) {
@@ -290,6 +324,8 @@ NiriPendingReply *NiriRequests::focusedOutput()
 
 NiriPendingReply *NiriRequests::keyboardLayouts()
 {
+    if (!NiriSession::checkThread(this))
+        return nullptr;
     auto *reply = new NiriPendingReply(this);
     sendJson(QJsonValue(QStringLiteral("KeyboardLayouts")),
              [reply](bool ok, const QJsonObject &result) {
@@ -308,6 +344,8 @@ NiriPendingReply *NiriRequests::keyboardLayouts()
 
 NiriPendingReply *NiriRequests::version()
 {
+    if (!NiriSession::checkThread(this))
+        return nullptr;
     auto *reply = new NiriPendingReply(this);
     sendJson(QJsonValue(QStringLiteral("Version")), [reply](bool ok, const QJsonObject &result) {
         if (!ok) {

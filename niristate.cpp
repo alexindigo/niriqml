@@ -1,21 +1,37 @@
 #include "niristate.h"
 
 #include <QJSEngine>
+#include <QCoreApplication>
+#include "nirisession.h"
 
 #include "nirievents.h"
 
-NiriState *NiriState::create(QQmlEngine *, QJSEngine *jsEngine)
+NiriState *NiriState::create(QQmlEngine *engine, QJSEngine *jsEngine)
 {
-    NiriState *self = instance();
-    if (jsEngine)
-        QJSEngine::setObjectOwnership(self, QJSEngine::CppOwnership);
+    if (!NiriSession::checkThread(engine ? engine : jsEngine))
+        return nullptr;
+    QObject *owner = engine ? static_cast<QObject *>(engine) : static_cast<QObject *>(jsEngine);
+    if (!owner)
+        return instance();
+    auto *self = new NiriState(owner);
+    QJSEngine::setObjectOwnership(self, QJSEngine::CppOwnership);
+    NiriSession::instance()->ensureStarted();
     return self;
 }
 
 NiriState *NiriState::instance()
 {
-    static NiriState s;
-    return &s;
+    if (!NiriSession::checkThread())
+        return nullptr;
+    auto *app = QCoreApplication::instance();
+    auto *self = app->findChild<NiriState *>(QStringLiteral("niriqml.state"),
+                                             Qt::FindDirectChildrenOnly);
+    if (!self) {
+        self = new NiriState(app);
+        self->setObjectName(QStringLiteral("niriqml.state"));
+    }
+    NiriSession::instance()->ensureStarted();
+    return self;
 }
 
 NiriState::NiriState(QObject *parent) : QObject(parent)
@@ -35,35 +51,36 @@ NiriState::NiriState(QObject *parent) : QObject(parent)
     QVariantList workspaces = events->lastWorkspacesSnapshot();
     if (!workspaces.isEmpty())
         onWorkspacesChanged(workspaces);
+    NiriSession::instance()->ensureStarted();
 }
 
 quint64 NiriState::focusedWindowId() const
 {
-    return m_focusedWindowId;
+    return NiriSession::checkThread(this) ? m_focusedWindowId : 0;
 }
 QString NiriState::focusedWindowAppId() const
 {
-    return m_focusedWindowAppId;
+    return NiriSession::checkThread(this) ? m_focusedWindowAppId : QString{};
 }
 QString NiriState::focusedWindowTitle() const
 {
-    return m_focusedWindowTitle;
+    return NiriSession::checkThread(this) ? m_focusedWindowTitle : QString{};
 }
 quint64 NiriState::focusedWorkspaceId() const
 {
-    return m_focusedWorkspaceId;
+    return NiriSession::checkThread(this) ? m_focusedWorkspaceId : 0;
 }
 QString NiriState::activeOutput() const
 {
-    return m_activeOutput;
+    return NiriSession::checkThread(this) ? m_activeOutput : QString{};
 }
 int NiriState::windowCount() const
 {
-    return m_windowCount;
+    return NiriSession::checkThread(this) ? m_windowCount : 0;
 }
 int NiriState::workspaceCount() const
 {
-    return m_workspaceCount;
+    return NiriSession::checkThread(this) ? m_workspaceCount : 0;
 }
 
 void NiriState::syncFocusedWindowInfo()

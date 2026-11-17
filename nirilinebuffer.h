@@ -9,7 +9,9 @@ class NiriLineBuffer
 {
 public:
     // A resource default, not a niri protocol maximum. Tune per deployment;
-    // calibration against large real snapshot fixtures remains integration work.
+    // Session tests deliver 10,000-record Windows/Workspaces/Casts fixtures
+    // (512-byte strings, largest 6,948,926 bytes) below this default. It is not
+    // a record-count limit; larger deployments can select a larger byte limit.
     static constexpr qsizetype DefaultMaxFrameBytes = 64 * 1024 * 1024;
     enum class ErrorCode { None, FrameTooLarge, TruncatedFrame };
     struct Error
