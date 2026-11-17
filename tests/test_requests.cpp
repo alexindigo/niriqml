@@ -2,6 +2,7 @@
 #include "nirirequests.h"
 #include "nirirequestsequence.h"
 #include <QDir>
+#include <QJsonDocument>
 #include <QLocalServer>
 #include <QPointer>
 #include <QProcess>
@@ -606,6 +607,143 @@ private slots:
                 NiriRequests::instance()->sendRaw(QVariant(input)));
         QTRY_VERIFY(wrapper->completed());
         QCOMPARE(server.arrivals.last(), QByteArray("{\"id\":18446744073709551615}"));
+    }
+
+    void conversionFailure_data()
+    {
+        QTest::addColumn<QString>("method");
+        for (auto method : {"action", "width", "height", "raw-variant", "raw-object", "raw-json",
+                            "sequence-request", "sequence-action"})
+            QTest::newRow(method) << QString::fromLatin1(method);
+    }
+
+    void conversionFailure()
+    {
+        QFETCH(QString, method);
+        RequestServer server;
+        QVERIFY(server.listen());
+        NiriSession::instance()->selectEndpoint(server.path());
+        QJsonValue nested(true);
+        for (int depth = 0; depth < 129; ++depth)
+            nested = QJsonObject{{"nested", nested}};
+        const auto object = nested.toObject();
+        const auto input = object.toVariantMap();
+        std::unique_ptr<NiriRequestSequence> sequence;
+        NiriPendingReply *raw = nullptr;
+        if (method == "action")
+            raw = NiriActions::instance()->sendAction(object);
+        else if (method == "width")
+            raw = NiriActions::instance()->setWindowWidth(42, input);
+        else if (method == "height")
+            raw = NiriActions::instance()->setWindowHeight(42, input);
+        else if (method == "raw-variant")
+            raw = NiriRequests::instance()->sendRaw(QVariant(input));
+        else if (method == "raw-object")
+            raw = NiriRequests::instance()->sendRaw(object);
+        else if (method == "raw-json")
+            raw = NiriRequests::instance()->sendRawJson(
+                    QString::fromUtf8(QJsonDocument(object).toJson(QJsonDocument::Compact)));
+        else {
+            sequence.reset(NiriRequests::instance()->sequence());
+            raw = method == "sequence-request" ? sequence->request(input) : sequence->action(input);
+        }
+        std::unique_ptr<NiriPendingReply> reply(raw);
+        QVERIFY(reply);
+        QSignalSpy finished(reply.get(), &NiriPendingReply::finished);
+        QVERIFY(!reply->completed());
+        QCOMPARE(finished.count(), 0);
+        QTRY_COMPARE(finished.count(), 1);
+        QCOMPARE(reply->error().category, QString("Configuration"));
+        QVERIFY(!reply->error().message.isEmpty());
+        QCOMPARE(reply->executionCertainty(), QString("NotSent"));
+        QCOMPARE(reply->endpoint(), server.path());
+        reply->cancel();
+        QTest::qWait(20);
+        QCOMPARE(finished.count(), 1);
+        QCOMPARE(server.connections, 0);
+        QVERIFY(server.arrivals.isEmpty());
+    }
+
+    void legacyConversionFailure()
+    {
+        RequestServer server;
+        QVERIFY(server.listen());
+        NiriSession::instance()->selectEndpoint(server.path());
+        QJsonValue nested(true);
+        for (int depth = 0; depth < 129; ++depth)
+            nested = QJsonObject{{"nested", nested}};
+        QObject observer;
+        int completions = 0;
+        bool succeeded = true;
+        QJsonObject result;
+        QPointer<QObject> guard(&observer);
+        NiriRequests::instance()->sendJson(
+                nested,
+                [guard, &completions, &succeeded, &result](bool ok, const QJsonObject &value) {
+                    if (!guard)
+                        return;
+                    ++completions;
+                    succeeded = ok;
+                    result = value;
+                });
+        QCOMPARE(completions, 0);
+        QTRY_COMPARE(completions, 1);
+        QVERIFY(!succeeded);
+        QVERIFY(!result.value("error").toString().isEmpty());
+        QTest::qWait(20);
+        QCOMPARE(completions, 1);
+        QCOMPARE(server.connections, 0);
+    }
+
+    void actionHelperIds_data()
+    {
+        QTest::addColumn<QString>("method");
+        for (auto method :
+             {"focusWindow", "closeWindow", "moveWindowToWorkspace", "moveWindowToMonitor",
+              "setWindowWidth", "setWindowHeight", "toggleWindowFloating"})
+            QTest::newRow(method) << QString::fromLatin1(method);
+    }
+
+    void actionHelperIds()
+    {
+        QFETCH(QString, method);
+        RequestServer server;
+        QVERIFY(server.listen());
+        NiriSession::instance()->selectEndpoint(server.path());
+        auto *actions = NiriActions::instance();
+        const auto id = std::numeric_limits<quint64>::max();
+        NiriPendingReply *raw = nullptr;
+        if (method == "focusWindow")
+            raw = actions->focusWindow(id);
+        else if (method == "closeWindow")
+            raw = actions->closeWindow(id);
+        else if (method == "moveWindowToWorkspace")
+            raw = actions->moveWindowToWorkspace(id, QString("main"));
+        else if (method == "moveWindowToMonitor")
+            raw = actions->moveWindowToMonitor(id, "DP-2");
+        else if (method == "setWindowWidth")
+            raw = actions->setWindowWidth(id, 800);
+        else if (method == "setWindowHeight")
+            raw = actions->setWindowHeight(id, QVariantMap{{"AdjustFixed", 20}});
+        else
+            raw = actions->toggleWindowFloating(id);
+        std::unique_ptr<NiriPendingReply> reply(raw);
+        QVERIFY(reply);
+        QVERIFY(!reply->completed());
+        QTRY_VERIFY(reply->completed());
+        QVERIFY2(!reply->isError(), qPrintable(reply->error().message));
+        QCOMPARE(server.arrivals.size(), 1);
+        const auto document = parse(server.arrivals.first());
+        QVERIFY(document);
+        QString kind = method;
+        kind[0] = kind[0].toUpper();
+        const auto *action = document->root.lookup("Action");
+        QVERIFY(action);
+        const auto *body = action->lookup(kind);
+        QVERIFY(body);
+        const auto *value = body->lookup(method == "moveWindowToWorkspace" ? "window_id" : "id");
+        QVERIFY(value && value->numberValue());
+        QCOMPARE(value->numberValue()->toUInt64(), std::optional<quint64>(id));
     }
 
     void correctedActionKeys()

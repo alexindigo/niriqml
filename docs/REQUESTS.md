@@ -14,10 +14,11 @@ themselves after `finished`. Keep a reference while waiting or displaying a resu
 ```qml
 property NiriPendingReply pending: null
 function refresh() {
-    pending = NiriRequests.version()
-    pending.finished.connect(function() {
-        if (pending.isError)
-            console.log(pending.error.category, pending.error.message)
+    const reply = NiriRequests.version()
+    pending = reply // retention only; each handler observes its own reply
+    reply.finished.connect(function() {
+        if (reply.isError)
+            console.log(reply.error.category, reply.error.message)
     })
 }
 ```

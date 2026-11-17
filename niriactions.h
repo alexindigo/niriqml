@@ -8,7 +8,6 @@
 #include <QtQml/qqmlregistration.h>
 
 #include "niripendingreply.h"
-#include "niriwire.h"
 
 class NiriActions : public QObject
 {
@@ -37,5 +36,5 @@ public:
 
 private:
     explicit NiriActions(QObject *parent = nullptr);
-    NiriPendingReply *sendWireAction(const NiriWire::WireValue &action);
+    NiriPendingReply *sendVariantAction(const QVariant &action);
 };

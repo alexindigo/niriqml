@@ -103,8 +103,13 @@ std::optional<WireValue> NiriRequests::wireValue(const QVariant &value, QString 
         return WireValue(NumberToken::fromInt64(value.toLongLong()));
     case QMetaType::Double:
     case QMetaType::Float:
-        if (std::isfinite(value.toDouble()))
-            return fromQJsonValueLossy(QJsonValue(value.toDouble()));
+        if (std::isfinite(value.toDouble())) {
+            Error conversionError;
+            const auto wire = fromQJsonValueLossy(QJsonValue(value.toDouble()), &conversionError);
+            if (!wire)
+                error = conversionError.reason;
+            return wire;
+        }
         break;
     case QMetaType::QVariantList:
     case QMetaType::QStringList: {
@@ -126,7 +131,11 @@ std::optional<WireValue> NiriRequests::wireValue(const QVariant &value, QString 
                 return {};
             items.append({it.key(), *wire});
         }
-        return WireValue::object(items);
+        Error conversionError;
+        const auto wire = WireValue::object(items, &conversionError);
+        if (!wire)
+            error = conversionError.reason;
+        return wire;
     }
     default:
         break;
