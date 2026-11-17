@@ -43,6 +43,7 @@
 build/
 Build/
 build-*/
+tools/ipc-schema-dump/target/
 
 # CMake generated files
 CMakeFiles/
