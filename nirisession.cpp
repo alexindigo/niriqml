@@ -71,8 +71,11 @@ NiriSession::NiriSession(QObject *parent) : QObject(parent), m_retry(new QTimer(
     m_announced = std::make_unique<Snapshot>(snapshot());
     m_retry->setSingleShot(true);
     connect(this, &NiriSession::streamReset, this, [this](quint64 token, const QString &reason) {
-        const auto changes = m_state.reset(token, reason);
-        emit stateUpdated(changes);
+        if (m_projectingState) {
+            m_pendingStateReset = qMakePair(token, reason);
+            return;
+        }
+        publishState(m_state.reset(token, reason));
     });
     connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, this, [this] {
         m_shuttingDown = true;
@@ -520,6 +523,10 @@ void NiriSession::applyEvent(const NiriWire::Document &document, quint64 token)
     });
     NiriEvent event;
     NiriIpc::DecodeError detail;
+    qCDebug(niriEventsLog) << "Event"
+                           << (document.root.stringValue()
+                                       ? *document.root.stringValue()
+                                       : document.root.objectValue()->first().first);
     const bool decoded = NiriIpc::decodeEvent(document.root, event, detail);
     if (decoded) {
         const auto applied = m_state.apply(event, token);
@@ -529,7 +536,7 @@ void NiriSession::applyEvent(const NiriWire::Document &document, quint64 token)
         }
         if (applied.status != NiriEventStreamState::ApplyResult::Applied)
             return;
-        emit stateUpdated(applied.changes);
+        publishState(applied.changes);
         if (token != m_epoch || !publish(token))
             return;
     }
@@ -557,6 +564,23 @@ void NiriSession::protocolError(quint64 token, const QString &message, const QBy
 {
     if (checkThread(this) && token == m_epoch)
         fail(QStringLiteral("Protocol"), QStringLiteral("ProtocolError"), message, raw);
+}
+
+void NiriSession::publishState(const NiriEventStreamState::Changes &changes)
+{
+    m_projectingState = true;
+    emit stateProject(changes);
+    // A nested reset during a reset's row stage cannot suppress the already
+    // committed clear: the following reset may be equal and have no summary.
+    if (!m_pendingStateReset || changes.reset)
+        emit stateUpdated(changes);
+    m_projectingState = false;
+    if (m_pendingStateReset) {
+        const auto pending = *m_pendingStateReset;
+        m_pendingStateReset.reset();
+        publishState(m_state.reset(pending.first, pending.second));
+        publish(m_epoch);
+    }
 }
 
 void NiriSession::fail(const QString &category, const QString &code, const QString &message,

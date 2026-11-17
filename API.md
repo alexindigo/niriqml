@@ -94,18 +94,38 @@ session's state.
 
 ### NiriState
 
-Derived globals computed from event snapshots.
+Read-only projection of the session reducer. No facade, model or reactive
+keeps its own record cache or applies IPC events. Late creation needs no query.
 
-| Property | Type | Notify |
+| # | Property | QML type | Notify |
+|---|---|---|---|
+| 1 | `focusedWindowId`, `focusedWorkspaceId` | decimal string or null | respective `...Changed` |
+| 2 | `focusedWindowAppId`, `focusedWindowTitle`, `activeOutput` | string or null | respective `...Changed` |
+| 3 | `focusedWindow`, `focusedWorkspace` | complete generated record or null | respective `...Changed` |
+| 4 | `windowCount`, `workspaceCount`, `castCount` | int | respective `...Changed` |
+| 5 | `initialStateReceived` | bool | `initialStateReceivedChanged` |
+| 6 | `windowsById`, `workspacesById`, `castsByStreamId` | maps of complete records, keyed by decimal ID strings | `windowsChanged`, `workspacesChanged`, `castsChanged` |
+| 7 | `keyboardLayouts` | complete generated record or null | `keyboardLayoutsChanged` |
+| 8 | `overview`, `overviewOpen` | niriOverview, bool | `overviewOpenChanged` |
+| 9 | `configFailed` | bool | `configFailedChanged` |
+
+All six stream parts are readable from QML and C++. Native keyed access uses
+`nativeWindow(quint64)`, `nativeWorkspace(quint64)`, `nativeWorkspaceByName(name)`
+and `nativeCast(quint64)`, returning optional records. Native snapshot lists use
+`nativeWindowsSnapshot()`, `nativeWorkspacesSnapshot()`, `nativeCastsSnapshot()`.
+Native focus IDs and strings remain std::optional; IDs remain quint64.
+
+| # | QML-invokable getter | Returns |
 |---|---|---|
-| `focusedWindowId` | `quint64` | `stateChanged` |
-| `focusedWindowAppId` | `string` | `stateChanged` |
-| `focusedWindowTitle` | `string` | `stateChanged` |
-| `focusedWorkspaceId` | `quint64` | `stateChanged` |
-| `activeOutput` | `string` | `stateChanged` |
-| `windowCount` | `int` | `stateChanged` |
-| `workspaceCount` | `int` | `stateChanged` |
-| `initialStateReceived` | `bool` | `initialStateReceivedChanged` |
+| 1 | `window(id)`, `workspace(id)`, `workspaceByName(name)`, `cast(streamId)` | complete generated record or null |
+| 2 | `windowsSnapshot()`, `workspacesSnapshot()`, `castsSnapshot()` | complete record lists in numeric ID order |
+| 3 | `snapshot()` | value map with all three keyed maps, keyboardLayouts, overview/overviewOpen, configFailed, initialStateReceived, focused IDs and activeOutput |
+
+Snapshots are frozen copies, not live objects. ID inputs accept exact numeric
+values or decimal strings; use strings for arbitrary u64 IDs. No output metadata
+map is invented: v26.04 provides that through queries, not stream events.
+`activeOutput` is the focused workspace's optional output name; null keyboard
+focus is never inferred from a workspace's active window.
 
 `initialStateReceived` is false until the first accepted `CastsChanged` has been
 applied, even if its list is empty. It is already true inside that event's
@@ -118,7 +138,14 @@ keyboard layouts, overview, config, casts. Recheck upstream `state.rs` and
 `server.rs` when updating the supported release. Query replies never write
 stream state; before readiness, snapshot values may be partial/defaults.
 
-**Signal:** `stateChanged()`
+Reset clears all six parts, focused properties and readiness together. Models
+remove their rows and reactives become invalid, with the appropriate NOTIFYs;
+the next accepted burst repopulates the same objects. A state-only application
+starts the shared subscription, just like model/reactive-only applications.
+
+Each property notifies only when its observable value changes. `stateChanged()`
+is one aggregate notification for an actual exposed state change, not for every
+event. An equal snapshot or transient ScreenshotCaptured event does not emit it.
 
 ### NiriActions
 
@@ -194,82 +221,105 @@ Creatable in QML via `QML_NAMED_ELEMENT`. Use directly in QML declarations.
 
 ### NiriWindows (`NiriWindowsModel`)
 
-`QAbstractListModel` tracking all windows.
+`QAbstractListModel` projecting all windows in numeric ID order. Rows contain
+only IDs; record access reads the reducer. Full snapshots use ID diffs, not
+resets: removals/insertions preserve surviving persistent indexes, and
+dataChanged contains the exact changed field roles plus WindowRole. Equal
+snapshots emit nothing. Reset removes all rows using the same row protocol.
 
 | Role | Type | QML access |
 |---|---|---|
 | `WindowRole` | `niriWindow` | `model.window` |
-| `IdRole` | `int` | `model.id` |
-| `TitleRole` | `string` | `model.title` |
-| `AppIdRole` | `string` | `model.appId` |
-| `PidRole` | `int` | `model.pid` |
-| `WorkspaceIdRole` | `int` | `model.workspaceId` |
+| `IdRole` | `string` | `model.id` |
+| `TitleRole` | `string or null` | `model.title` |
+| `AppIdRole` | `string or null` | `model.appId` |
+| `PidRole` | `signed int or null` | `model.pid` |
+| `WorkspaceIdRole` | `string or null` | `model.workspaceId` |
 | `IsFocusedRole` | `bool` | `model.isFocused` |
 | `IsFloatingRole` | `bool` | `model.isFloating` |
 | `IsUrgentRole` | `bool` | `model.isUrgent` |
+| `LayoutRole` | `niriWindowLayout` | `model.layout` |
+| `FocusTimestampRole` | `niriTimestamp or null` | `model.focusTimestamp` |
 
 ### NiriWorkspaces (`NiriWorkspacesModel`)
 
-`QAbstractListModel` tracking all workspaces.
+`QAbstractListModel` projecting all workspaces with the same ID ordering and
+exact row/role notification contract as NiriWindows.
 
 | Role | Type | QML access |
 |---|---|---|
 | `WorkspaceRole` | `niriWorkspace` | `model.workspace` |
-| `IdRole` | `int` | `model.id` |
+| `IdRole` | `string` | `model.id` |
 | `IdxRole` | `int` | `model.idx` |
-| `NameRole` | `string` | `model.name` |
-| `OutputRole` | `string` | `model.output` |
+| `NameRole` | `string or null` | `model.name` |
+| `OutputRole` | `string or null` | `model.output` |
 | `IsUrgentRole` | `bool` | `model.isUrgent` |
 | `IsActiveRole` | `bool` | `model.isActive` |
 | `IsFocusedRole` | `bool` | `model.isFocused` |
-| `ActiveWindowIdRole` | `int` | `model.activeWindowId` |
+| `ActiveWindowIdRole` | `string or null` | `model.activeWindowId` |
 
 ### NiriWindow (`NiriWindowReactive`)
 
-Reactive tracker for a single window, identified by `windowId`.
-Bootstraps from cached snapshot (no event needed).
+Reactive tracker for a single window, identified by optional `windowId`.
+Every getter resolves the current reducer; no event or bootstrap is needed.
+Null clears the selector, while ID zero selects record zero. Invalid input
+reports a warning without replacing the selector. `window` exposes the complete
+record or null; the convenience fields below read that same record.
 
 | Property | Type | Access | Notify |
 |---|---|---|---|
-| `windowId` | `quint64` | read/write | `windowIdChanged` |
-| `valid` | `bool` | read | `windowChanged` |
-| `id` | `quint64` | read | `windowChanged` |
-| `title` | `string` | read | `windowChanged` |
-| `appId` | `string` | read | `windowChanged` |
-| `pid` | `quint32` | read | `windowChanged` |
-| `workspaceId` | `quint64` | read | `windowChanged` |
-| `isFocused` | `bool` | read | `windowChanged` |
-| `isFloating` | `bool` | read | `windowChanged` |
-| `isUrgent` | `bool` | read | `windowChanged` |
-| `layout` | `niriWindowLayout` | read | `windowChanged` |
-| `focusTimestamp` | `niriTimestamp` | read | `windowChanged` |
+| `windowId` | `string or null` | read/write | `windowIdChanged` |
+| `valid` | `bool` | read | `validChanged` |
+| `id` | `string or null` | read | `idChanged` |
+| `title` | `string or null` | read | `titleChanged` |
+| `appId` | `string or null` | read | `appIdChanged` |
+| `pid` | `signed int or null` | read | `pidChanged` |
+| `workspaceId` | `string or null` | read | `workspaceIdChanged` |
+| `isFocused` | `bool` | read | `isFocusedChanged` |
+| `isFloating` | `bool` | read | `isFloatingChanged` |
+| `isUrgent` | `bool` | read | `isUrgentChanged` |
+| `layout` | `niriWindowLayout` | read | `layoutChanged` |
+| `focusTimestamp` | `niriTimestamp or null` | read | `focusTimestampChanged` |
+| `window` | `niriWindow or null` | read | `windowChanged` |
 
-**Signals:** `windowIdChanged()`, `windowChanged()`
+`windowChanged()` is an equality-suppressed aggregate record signal. A layout
+change does not notify title/appId. Selectors commit before any notification;
+reentrant selector changes cannot restore an obsolete selection.
 
 ### NiriWorkspace (`NiriWorkspaceReactive`)
 
-Reactive tracker for a single workspace, identified by `workspaceName`
-or `workspaceId`. Bootstraps from cached snapshot.
+Reactive tracker for a single workspace. Nonempty `workspaceName` always wins
+over `workspaceId`; an unmatched name is invalid, never an ID fallback. Clearing
+name immediately uses the retained ID. Clearing ID while name is set preserves
+the name selection. No selectors means invalid; zero is a valid ID. Duplicate
+names resolve deterministically to the lowest numeric ID. Construction, setters
+and live updates share the same resolver and coherent notification contract.
 
 | Property | Type | Access | Notify |
 |---|---|---|---|
 | `workspaceName` | `string` | read/write | `workspaceNameChanged` |
-| `workspaceId` | `quint64` | read/write | `workspaceIdChanged` |
-| `valid` | `bool` | read | `workspaceChanged` |
-| `id` | `quint64` | read | `workspaceChanged` |
-| `idx` | `int` | read | `workspaceChanged` |
-| `name` | `string` | read | `workspaceChanged` |
-| `output` | `string` | read | `workspaceChanged` |
-| `isUrgent` | `bool` | read | `workspaceChanged` |
-| `isActive` | `bool` | read | `workspaceChanged` |
-| `isFocused` | `bool` | read | `workspaceChanged` |
-| `activeWindowId` | `quint64` | read | `workspaceChanged` |
+| `workspaceId` | `string or null` | read/write | `workspaceIdChanged` |
+| `valid` | `bool` | read | `validChanged` |
+| `id` | `string or null` | read | `idChanged` |
+| `idx` | `int` | read | `idxChanged` |
+| `name` | `string or null` | read | `nameChanged` |
+| `output` | `string or null` | read | `outputChanged` |
+| `isUrgent` | `bool` | read | `isUrgentChanged` |
+| `isActive` | `bool` | read | `isActiveChanged` |
+| `isFocused` | `bool` | read | `isFocusedChanged` |
+| `activeWindowId` | `string or null` | read | `activeWindowIdChanged` |
+| `workspace` | `niriWorkspace or null` | read | `workspaceChanged` |
 
 **Signals:** `workspaceNameChanged()`, `workspaceIdChanged()`, `workspaceChanged()`
 
 ### NiriEventLog
 
 Ring-buffer event log, `QAbstractListModel`.
+Default capacity is 500. Negative capacities normalize to zero; zero clears
+retained rows and disables retention. Shrink and eviction announce every removed
+row before insertion. Reentrant capacity/append writes are serialized outside
+active row brackets. Retained history survives stream reset; reading snapshots
+does not append synthetic history.
 
 | Property | Type | Access | Notify |
 |---|---|---|---|

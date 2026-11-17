@@ -214,17 +214,16 @@ private slots:
         QCOMPARE(window.workspaceId, token->toUInt64());
         QCOMPARE(window.qmlId(), text);
         QCOMPARE(window.qmlWorkspaceId().toString(), text);
-        auto *events = NiriEvents::instance();
+        StateStreamFixture stream;
+        QVERIFY(stream.start());
         NiriWindowsModel model;
         NiriWindowReactive reactive;
         reactive.setWindowId(*token->toUInt64());
         auto *state = NiriState::instance();
-        NiriSession::instance()->stop();
-        events->dispatchWireEvent(
-                "WindowsChanged",
-                *WireValue::object({{"windows", WireValue(WireValue::Array{wire})}}),
-                NiriSession::instance()->epoch());
-        QCOMPARE(model.rowCount(), 1);
+        stream.send(*NiriWire::encode(*WireValue::object(
+                {{"WindowsChanged",
+                  *WireValue::object({{"windows", WireValue(WireValue::Array{wire})}})}})));
+        QTRY_COMPARE(model.rowCount(), 1);
         QCOMPARE(model.data(model.index(0, 0), NiriWindowsModel::IdRole).metaType(),
                  QMetaType::fromType<QString>());
         QCOMPARE(model.data(model.index(0, 0), NiriWindowsModel::IdRole).toString(), text);
@@ -256,17 +255,15 @@ private slots:
         auto cleared = replaced(wire, "title", WireValue());
         cleared = replaced(cleared, "workspace_id", WireValue());
         cleared = replaced(cleared, "pid", WireValue());
-        events->dispatchWireEvent("WindowOpenedOrChanged",
-                                  *WireValue::object({{"window", cleared}}),
-                                  NiriSession::instance()->epoch());
-        QVERIFY(!reactive.title());
+        stream.send(*NiriWire::encode(*WireValue::object(
+                {{"WindowOpenedOrChanged", *WireValue::object({{"window", cleared}})}})));
+        QTRY_VERIFY(!reactive.title());
         QVERIFY(!reactive.workspaceId());
         QCOMPARE(model.data(model.index(0, 0), NiriWindowsModel::TitleRole).metaType(),
                  QMetaType::fromType<std::nullptr_t>());
         QVERIFY(!state->focusedWindowTitle());
-        events->dispatchWireEvent("WindowFocusChanged", *WireValue::object({{"id", WireValue()}}),
-                                  NiriSession::instance()->epoch());
-        QVERIFY(!state->focusedWindowId());
+        stream.send("{\"WindowFocusChanged\":{\"id\":null}}");
+        QTRY_VERIFY(!state->focusedWindowId());
         QVERIFY(!reactive.isFocused());
     }
 

@@ -55,6 +55,9 @@ set(NIRIQML_SOURCES
     niriworkspacereactive.h
     niristate.cpp
     niristate.h
+    niristateprojection.h
+    niriselectors.h
+    niriselectors.cpp
     niritypes.cpp
     niritypes.h
     niripendingreply.cpp
@@ -128,6 +131,8 @@ install(FILES
     niriconnection.h
     nirisession.h
     nirieventstreamstate.h
+    niristateprojection.h
+    niriselectors.h
     niripeerinfo.h
     nirilogging.h
     nirievents.h
@@ -209,6 +214,9 @@ if(BUILD_TEST_MODE)
     add_niriqml_test(test_generated_requests)
     add_niriqml_test(test_generated_events)
     add_niriqml_test(test_state)
+    add_niriqml_test(test_state_projections)
+    add_niriqml_test(test_projection_reset)
+    add_niriqml_test(test_eventlog)
     add_niriqml_test(test_ipc_inventory)
     add_niriqml_test(test_types)
     add_niriqml_test(test_converter)

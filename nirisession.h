@@ -75,6 +75,7 @@ signals:
     void peerInfoChanged();
     void reconnectScheduled(int delayMs, int attempt);
     void initialStateReceivedChanged();
+    void stateProject(const NiriEventStreamState::Changes &changes);
     void stateUpdated(const NiriEventStreamState::Changes &changes);
     void decodedEventPublication(const NiriWire::Document &document, const NiriEvent &event,
                                  const QString &errorPath, const QString &errorMessage,
@@ -93,6 +94,7 @@ private:
     struct Snapshot;
     Snapshot snapshot() const;
     bool publish(quint64 token);
+    void publishState(const NiriEventStreamState::Changes &changes);
     bool current(const std::shared_ptr<Attempt> &attempt) const;
     void select(const QString &path, EndpointSource source);
     void queueAttempt();
@@ -122,6 +124,8 @@ private:
     std::unique_ptr<Snapshot> m_announced;
     bool m_publishing = false;
     bool m_deliveringEvent = false;
+    bool m_projectingState = false;
+    std::optional<QPair<quint64, QString>> m_pendingStateReset;
     NiriEventStreamState m_state;
     QTimer *m_retry;
     int m_reconnectAttempt = 0;

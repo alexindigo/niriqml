@@ -47,6 +47,24 @@ notification. Strict same-part preconditions are validated for the entire event
 before mutation; failures use the session's protocol-error/reset/retry path.
 Cross-part dangling references remain valid and are never repaired or inferred.
 
+NiriState, both models and both reactive trackers read this reducer only.
+Models retain ID rows, not records; sparse transaction before-images keep removed
+rows readable inside Qt's about-to-remove callbacks. ID diffs preserve surviving
+persistent indexes, including across full replacements. Models finish row/role
+projection before public property and typed/raw event notifications. Consumers
+created during publication attach at the committed revision and skip that diff.
+A reset requested inside a row bracket invalidates the epoch immediately but
+waits for projection publication to unwind before clearing records and rows.
+
+Name/focus indexes belong to the reducer. One selector resolver gives nonempty
+workspace names precedence over optional IDs, including zero. Trackers retain
+selectors only; a stack-owned notification reconciler compares current getters
+after every callback, so reentrant setters cannot restore stale record data.
+Field-specific NOTIFYs and exact model role sets suppress equal/irrelevant work.
+NiriState materializes complete keyed maps/snapshots only when requested; it
+exposes all six parts and readiness with string IDs and real null optionals.
+Reset notifications empty all projections and clear readiness together.
+
 - Unix socket at `$NIRI_SOCKET`
 - JSON line-oriented: send one `Request` object, receive one `Reply` per line
 - `EventStream` keeps the socket open and streams `Event` JSON objects forever

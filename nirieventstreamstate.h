@@ -2,6 +2,7 @@
 
 #include "generated/niriipctypes_generated.h"
 #include <QMap>
+#include <QSet>
 #include <memory>
 
 // Native session-owned port of niri v26.04 niri-ipc/src/state.rs.
@@ -61,6 +62,7 @@ public:
         QMap<quint64, RecordChange<NiriCast>> casts;
         bool keyboardLayouts = false, overview = false, config = false, readiness = false;
         bool reset = false;
+        std::optional<quint64> focusedWindowBefore, focusedWorkspaceBefore;
         QString reason;
         bool changed() const;
     };
@@ -88,6 +90,14 @@ public:
     bool configFailed() const { return m_config; }
     std::optional<quint64> focusedWindowId() const;
     std::optional<quint64> focusedWorkspaceId() const;
+    Entry<NiriWorkspace> workspaceByName(const QString &name,
+                                         const Changes *before = nullptr) const;
+    QList<quint64> windowIds() const { return m_windows.keys(); }
+    QList<quint64> workspaceIds() const { return m_workspaces.keys(); }
+    QList<quint64> castIds() const { return m_casts.keys(); }
+    int windowCount() const { return m_windows.size(); }
+    int workspaceCount() const { return m_workspaces.size(); }
+    int castCount() const { return m_casts.size(); }
 
 private:
     QMap<quint64, Entry<NiriWindow>> m_windows;
@@ -96,4 +106,7 @@ private:
     std::optional<NiriKeyboardLayouts> m_layouts;
     bool m_overview = false, m_config = false, m_ready = false;
     quint64 m_epoch = 0, m_revision = 0;
+    QSet<quint64> m_focusedWindows, m_focusedWorkspaces;
+    QMap<QString, QSet<quint64>> m_workspaceNames;
+    void updateIndexes(const Changes &changes);
 };
