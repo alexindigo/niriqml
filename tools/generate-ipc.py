@@ -51,7 +51,7 @@ class Compiler:
     def __init__(self, schema, bindings):
         self.schema = schema
         self.bindings = bindings
-        if set(bindings) - {"formatVersion", "types", "tuples", "actions"} or bindings.get("formatVersion") != 1:
+        if set(bindings) - {"formatVersion", "types", "tuples", "actions", "requests"} or bindings.get("formatVersion") != 1:
             raise SchemaError("unsupported binding manifest")
         self.defs = schema.get("$defs", {})
         self.ir = {}
@@ -212,6 +212,30 @@ class Compiler:
         return result
 
     def validate_bindings(self):
+        requests = self.bindings.get("requests", {})
+        request_tags = {v["tag"] for v in self.ir["Request"]["variants"]}
+        response_tags = {v["tag"] for v in self.ir["Response"]["variants"]} | {"Err"}
+        if set(requests) != request_tags:
+            raise SchemaError("request bindings must cover exactly the request inventory")
+        request_methods = set()
+        for variant in self.ir["Request"]["variants"]:
+            tag, payload = variant["tag"], variant["payload"]
+            binding = requests[tag]
+            if set(binding) - {"name", "arguments", "argument", "response", "source"} or binding.get("response") not in response_tags or not re.fullmatch(r"v26\.04:src/ipc/server\.rs:[0-9,\-]+", binding.get("source", "")):
+                raise SchemaError(f"{tag}: invalid request/response name or source binding")
+            name = identifier(binding.get("name", tag[:1].lower() + tag[1:]), tag)
+            if name in request_methods:
+                raise SchemaError(f"{tag}: colliding request method name")
+            request_methods.add(name)
+            if payload and payload["kind"] == "record":
+                fields = {f["wire"] for f in payload["fields"]}
+                order = binding.get("arguments", sorted(fields))
+                if len(order) != len(fields) or set(order) != fields or "argument" in binding:
+                    raise SchemaError(f"{tag}: request argument binding is not a field permutation")
+            elif "arguments" in binding or (not payload and "argument" in binding):
+                raise SchemaError(f"{tag}: request binding names nonexistent arguments")
+            elif payload:
+                identifier(binding.get("argument", "value"), tag)
         variants = {v["tag"]: v for v in self.ir["Action"]["variants"]}
         methods = set()
         for tag, variant in variants.items():
@@ -283,7 +307,7 @@ class CppEmitter:
 
     def __init__(self, compiler, hashes):
         self.c = compiler
-        self.types = {n: ir for n, ir in compiler.ir.items() if n not in ROOT_GROUPS and n != "Result_of_Response_or_string"}
+        self.types = {n: ir for n, ir in compiler.ir.items() if (n not in ROOT_GROUPS or n in {"Action", "OutputAction"}) and n != "Result_of_Response_or_string"}
         self.hashes = hashes
         self.ordered = []
         visiting = set()
@@ -944,10 +968,10 @@ class ActionEmitter(CppEmitter):
                  "name": binding.get("aliases", {}).get(wire, camel(wire))} for wire in order]
 
     def emit(self):
-        h = [self.header(), "#pragma once", "", '#include "niriipctypes_generated.h"', '#include "niripendingreply.h"', "#include <QJSValue>", "", "// clang-format off", "class NiriIpcActions : public QObject", "{", "    Q_OBJECT", "public:", "    using QObject::QObject;"]
+        h = [self.header(), "#pragma once", "", '#include "niriipctypes_generated.h"', '#include "niriipcreplies_generated.h"', "#include <QJSValue>", "", "// clang-format off", "class NiriIpcActions : public QObject", "{", "    Q_OBJECT", "public:", "    using QObject::QObject;"]
         cpp = [self.header(), '#include "niriipcactions_generated.h"', '#include "niriipccodec_generated.h"', "", "// clang-format off", "namespace {", "template <typename T>", "bool encodeOutbound(const T &value, NiriWire::WireValue &wire, NiriIpc::DecodeError &error, const QString &path)", "{", "    const auto encoded = NiriIpc::encode(value, &error, path);", "    if (!encoded) return false;", "    T checked{};", "    if (!NiriIpc::decode(*encoded, checked, &error, path, NiriIpc::DecodeMode::Outbound)) return false;", "    wire = *encoded;", "    return true;", "}", "} // namespace", ""]
         manifest = []
-        docs = ["# Generated IPC API", "", self.header("<!--").replace("\n", " -->\n"), "## Actions", "", "All methods return a retainable NiriPendingReply through the shared request path.", "IDs/usize accept decimal strings or exact numbers; optional values accept null.", "Required booleans have no CLI-derived defaults. Optional slots before required", "arguments must be supplied explicitly as null. Union arguments accept NiriArgs", "values or plain objects using their wire tag and wire/camelCase field names.", "", "| # | QML call | Exact wire shape |", "|---|---|---|"]
+        docs = ["# Generated IPC API", "", self.header("<!--").replace("\n", " -->\n"), "## Actions", "", "All methods return a retainable NiriHandledReply through the shared request path.", "IDs/usize accept decimal strings or exact numbers; optional values accept null.", "Required booleans have no CLI-derived defaults. Optional slots before required", "arguments must be supplied explicitly as null. Union arguments accept NiriArgs", "values or plain objects using their wire tag and wire/camelCase field names.", "", "| # | QML call | Exact wire shape |", "|---|---|---|"]
 
         def shape(ir):
             if ir["kind"] == "ref": return ir["name"]
@@ -980,26 +1004,26 @@ class ActionEmitter(CppEmitter):
                 default = " = QJSValue()" if field["required"] else " = QJSValue(QJSValue::NullValue)"
                 qml.append("const QJSValue &" + field["name"] + default)
             if fields:
-                h += [f"    Q_INVOKABLE NiriPendingReply *{method}({', '.join(qml)});", f"    NiriPendingReply *{method}({native});"]
+                h += [f"    Q_INVOKABLE NiriHandledReply *{method}({', '.join(qml)});", f"    NiriHandledReply *{method}({native});"]
                 optional_ids = {f["name"] for f in fields if f["type"] == {"kind": "optional", "item": {"kind": "integer", "format": "uint64", "minimum": 0}}}
                 if optional_ids:
                     explicit_id_signature = ", ".join(("quint64" if f["name"] in optional_ids else self.cpp(f["type"])) + " " + f["name"] for f in fields)
                     explicit_id_args = ", ".join("std::optional<quint64>(" + f["name"] + ")" if f["name"] in optional_ids else f["name"] for f in fields)
-                    h += [f"    NiriPendingReply *{method}({explicit_id_signature}) {{ return {method}({explicit_id_args}); }}"]
+                    h += [f"    NiriHandledReply *{method}({explicit_id_signature}) {{ return this->{method}({explicit_id_args}); }}"]
                 if len(fields) == 1 and self.cpp(fields[0]["type"]) == "QList<QString>":
                     arg = fields[0]["name"]
-                    h += [f"    NiriPendingReply *{method}(std::initializer_list<QString> {arg}) {{ return {method}(QList<QString>({arg})); }}"]
-                cpp += [f"NiriPendingReply *NiriIpcActions::{method}({', '.join('const QJSValue &' + f['name'] for f in fields)})", "{", "    NiriIpc::DecodeError error;"]
+                    h += [f"    NiriHandledReply *{method}(std::initializer_list<QString> {arg}) {{ return this->{method}(QList<QString>({arg})); }}"]
+                cpp += [f"NiriHandledReply *NiriIpcActions::{method}({', '.join('const QJSValue &' + f['name'] for f in fields)})", "{", "    NiriIpc::DecodeError error;"]
                 for f in fields:
                     arg, typ = f["name"], self.cpp(f["type"])
                     path = "QStringLiteral(" + json.dumps("$.Action." + tag + "." + f["wire"]) + ")"
                     cpp += [f"    {typ} typed_{arg}{{}};", "    {", "        NiriWire::WireValue wire;"]
                     guard = f"!{arg}.isUndefined() && " if not f["required"] else ""
                     cpp += [f"        if (({guard}!NiriIpc::qmlInput({arg}, wire, error, {path}))", f"            || !NiriIpc::decode(wire, typed_{arg}, &error, {path}, NiriIpc::DecodeMode::Outbound))", '            return submitAction({}, error.path + QStringLiteral(": ") + error.message);', "    }"]
-                cpp += [f"    return {method}({', '.join('typed_' + f['name'] for f in fields)});", "}", ""]
+                cpp += [f"    return this->{method}({', '.join('typed_' + f['name'] for f in fields)});", "}", ""]
             else:
-                h += [f"    Q_INVOKABLE NiriPendingReply *{method}();"]
-            cpp += [f"NiriPendingReply *NiriIpcActions::{method}({native})", "{"]
+                h += [f"    Q_INVOKABLE NiriHandledReply *{method}();"]
+            cpp += [f"NiriHandledReply *NiriIpcActions::{method}({native})", "{"]
             if fields:
                 cpp += ["    NiriIpc::DecodeError error;"]
             cpp += ["    NiriWire::WireValue::Object members;"]
@@ -1010,10 +1034,102 @@ class ActionEmitter(CppEmitter):
             manifest.append({"variant": tag, "method": method, "arguments": [{"wire": f["wire"], "name": f["name"], "type": f["type"]} for f in fields]})
             signature = ", ".join(f["name"] + ": " + qml_shape(f["type"]) for f in fields)
             wire_shape = '{"Action":{"' + tag + '":{' + ",".join(json.dumps(f["wire"]) + ":" + shape(f["type"]) for f in fields) + "}}}"
-            docs.append(f"| {index} | `NiriActions.{method}({signature}) -> NiriPendingReply` | `{wire_shape}` |")
-        h += ["protected:", "    virtual NiriPendingReply *submitAction(const NiriWire::WireValue &action, const QString &validationError) = 0;", "};", "// clang-format on", ""]
+            docs.append(f"| {index} | `NiriActions.{method}({signature}) -> NiriHandledReply` | `{wire_shape}` |")
+        h += ["protected:", "    virtual NiriHandledReply *submitAction(const NiriWire::WireValue &action, const QString &validationError) = 0;", "};", "// clang-format on", ""]
         cpp += ["// clang-format on", ""]
         return {"generated/niriipcactions_generated.h": "\n".join(h), "generated/niriipcactions_generated.cpp": "\n".join(cpp), "generated/ipc-actions.json": json.dumps(manifest, indent=2, sort_keys=True) + "\n", "docs/generated/IPC-API.md": "\n".join(docs) + "\n"}
+
+
+class ReplyEmitter(CppEmitter):
+    def emit(self):
+        h = [self.header(), "#pragma once", "", '#include "niriipctypes_generated.h"', '#include "niripendingreply.h"', "", "// clang-format off", "struct NiriHandled", "{", "    Q_GADGET", "    QML_VALUE_TYPE(niriHandled)", "    Q_PROPERTY(QString wireName READ wireName CONSTANT)", "public:", '    QString wireName() const { return QStringLiteral("Handled"); }', "    bool operator==(const NiriHandled &) const { return true; }", "};", "Q_DECLARE_METATYPE(NiriHandled)", ""]
+        cpp = [self.header(), '#include "niriipcreplies_generated.h"', '#include "niriipccodec_generated.h"', "", "// clang-format off", "namespace NiriIpc {", "NiriPendingReply *createReply(const QString &expected, QObject *parent)", "{"]
+        variants = self.c.ir["Response"]["variants"]
+        for variant in variants:
+            tag, payload = variant["tag"], variant["payload"]
+            name = "Niri" + tag + "Reply"
+            typ = self.cpp(payload) if payload else "NiriHandled"
+            prop = self.property_type(payload) if payload else "NiriHandled"
+            h += [f"class {name} : public NiriPendingReply", "{", "    Q_OBJECT", f"    QML_NAMED_ELEMENT({name})", '    QML_UNCREATABLE("Returned by NiriRequests or NiriActions")', f"    Q_PROPERTY({prop} result READ qmlResult NOTIFY finished)", "public:", "    using NiriPendingReply::NiriPendingReply;", f"    using Result = {typ};", "    Result result() const { return nativeValue().value<Result>(); }"]
+            projection = "NiriIpc::qmlValue(result())" if prop == "QVariant" else "result()"
+            h += [f"    {prop} qmlResult() const {{ return {projection}; }}", "    QVariant value() const override", "    {", "        if (!completed() || isError()) return NiriPendingReply::value();"]
+            h += ['        return QStringLiteral("Handled");' if payload is None else "        return NiriIpc::qmlValue(result());", "    }", "};", ""]
+            cpp += [f"    if (expected == QStringLiteral({json.dumps(tag)})) return new {name}(parent);"]
+        cpp += ["    return new NiriPendingReply(parent);", "}", "", "bool decodeResponse(const QString &expected, const NiriWire::WireValue &ok, QVariant &value, NiriError &error)", "{", '    const auto path = QStringLiteral("$.Ok");', '    if (expected == QStringLiteral("Handled")) {', '        if (!ok.stringValue() || *ok.stringValue() != QStringLiteral("Handled")) {', '            error.fieldPath = path; error.message = QStringLiteral("Expected Handled response"); return false;', "        }", "        value = QVariant::fromValue(NiriHandled{});", "        return true;", "    }", "    const auto *payload = ok.lookup(expected);", "    if (!ok.objectValue() || ok.objectValue()->size() != 1 || !payload) {", '        error.fieldPath = path + QLatin1Char(\'.\') + expected;', '        error.message = QStringLiteral("Expected %1 response").arg(expected);', "        return false;", "    }", "    DecodeError detail;"]
+        for variant in variants:
+            tag, payload = variant["tag"], variant["payload"]
+            if payload is None:
+                continue
+            cpp += [f"    if (expected == QStringLiteral({json.dumps(tag)})) {{", f"        {self.cpp(payload)} typed{{}};", '        if (!decode(*payload, typed, &detail, path + QLatin1Char(\'.\') + expected)) {', "            error.fieldPath = detail.path; error.message = detail.message; return false;", "        }", "        value = QVariant::fromValue(typed);", "        return true;", "    }"]
+        cpp += ['    error.fieldPath = path; error.message = QStringLiteral("Expected Err response");', "    return false;", "}", "} // namespace NiriIpc", "// clang-format on", ""]
+        h += ["namespace NiriIpc {", "NiriPendingReply *createReply(const QString &expected, QObject *parent);", "bool decodeResponse(const QString &expected, const NiriWire::WireValue &ok, QVariant &value, NiriError &error);", "} // namespace NiriIpc", "// clang-format on", ""]
+        return {"generated/niriipcreplies_generated.h": "\n".join(h), "generated/niriipcreplies_generated.cpp": "\n".join(cpp)}
+
+
+class RequestEmitter(CppEmitter):
+    def fields(self, variant):
+        payload = variant["payload"]
+        binding = self.c.bindings["requests"][variant["tag"]]
+        if payload is None:
+            return []
+        if payload["kind"] != "record":
+            return [{"name": binding.get("argument", "value"), "type": payload, "wire": None}]
+        order = binding.get("arguments", [f["wire"] for f in payload["fields"]])
+        return [next(f for f in payload["fields"] if f["wire"] == wire) for wire in order]
+
+    def emit(self):
+        h = [self.header(), "#pragma once", "", '#include "niriipcreplies_generated.h"', "#include <QJSValue>", "", "// clang-format off", "class NiriIpcRequests : public QObject", "{", "    Q_OBJECT", "public:", "    using QObject::QObject;"]
+        cpp = [self.header(), '#include "niriipcrequests_generated.h"', '#include "niriipccodec_generated.h"', "", "// clang-format off", "namespace {", "template <typename T>", "bool requestArgument(const T &value, NiriWire::WireValue &wire, NiriIpc::DecodeError &error, const QString &path)", "{", "    const auto encoded = NiriIpc::encode(value, &error, path);", "    if (!encoded) return false;", "    T checked{};", "    if (!NiriIpc::decode(*encoded, checked, &error, path, NiriIpc::DecodeMode::Outbound)) return false;", "    wire = *encoded; return true;", "}", "} // namespace", ""]
+        rows = []
+        docs = ["", "## Requests", "", "Methods accept a trailing options object with timeoutMs/connectTimeoutMs.", "Picks default to timeoutMs -1 (no response deadline). EventStream observes the", "session's real acknowledgement and leaves its stream open; it never opens a", "one-shot socket. ReturnError expects Err and reports it through the common", "error contract; an unexpected Ok is a Decode error.", "", "| # | QML call | Expected reply | Wire shape | Source |", "|---|---|---|---|---|"]
+        for index, variant in enumerate(self.c.ir["Request"]["variants"], 1):
+            tag, payload = variant["tag"], variant["payload"]
+            binding = self.c.bindings["requests"][tag]
+            expected = binding["response"]
+            method = binding.get("name", tag[:1].lower() + tag[1:])
+            typ = "NiriPendingReply" if expected == "Err" else "Niri" + expected + "Reply"
+            fields = self.fields(variant)
+            tail = 'const QVariantMap &options'
+            qml = ", ".join("const QJSValue &" + f["name"] + " = QJSValue()" for f in fields)
+            native = ", ".join(self.cpp(f["type"]) + " " + f["name"] for f in fields)
+            qml_decl = (qml + ", " if qml else "") + tail + " = {}"
+            native_decl = (native + ", " if native else "") + tail + " = {}"
+            h += [f"    Q_INVOKABLE {typ} *{method}({qml_decl});"]
+            flags = f"QStringLiteral({json.dumps(expected)}), options, {'true' if tag in {'PickWindow', 'PickColor'} else 'false'}, {'true' if tag == 'EventStream' else 'false'}"
+            error_result = f"static_cast<{typ} *>(submitRequest({{}}, {flags}, error.path + QStringLiteral(\": \") + error.message))"
+            if fields:
+                h += [f"    {typ} *{method}({native_decl});"]
+                cpp += [f"{typ} *NiriIpcRequests::{method}({', '.join('const QJSValue &' + f['name'] for f in fields)}, {tail})", "{", "    NiriIpc::DecodeError error;"]
+                for field in fields:
+                    arg, argtype = field["name"], self.cpp(field["type"])
+                    path = "QStringLiteral(" + json.dumps("$." + tag + ("." + field["wire"] if field["wire"] else "")) + ")"
+                    cpp += [f"    {argtype} typed_{arg}{{}};", "    {", "        NiriWire::WireValue wire;", f"        if (!NiriIpc::qmlInput({arg}, wire, error, {path}) || !NiriIpc::decode(wire, typed_{arg}, &error, {path}, NiriIpc::DecodeMode::Outbound))", f"            return {error_result};", "    }"]
+                cpp += [f"    return this->{method}({', '.join('typed_' + f['name'] for f in fields)}, options);", "}", ""]
+            cpp += [f"{typ} *NiriIpcRequests::{method}({(native + ', ') if native else ''}{tail})", "{"]
+            if fields:
+                cpp += ["    NiriIpc::DecodeError error;"]
+                if payload["kind"] == "record":
+                    cpp += ["    NiriWire::WireValue::Object members;"]
+                for field in fields:
+                    path = "QStringLiteral(" + json.dumps("$." + tag + ("." + field["wire"] if field["wire"] else "")) + ")"
+                    cpp += ["    NiriWire::WireValue wire_" + field["name"] + ";", f"    if (!requestArgument({field['name']}, wire_{field['name']}, error, {path})) return {error_result};"]
+                    if field["wire"]:
+                        cpp += [f"    members.append({{QStringLiteral({json.dumps(field['wire'])}), wire_{field['name']}}});"]
+                body = "*NiriWire::WireValue::object(members)" if payload["kind"] == "record" else "wire_" + fields[0]["name"]
+                wire = f"*NiriWire::WireValue::object({{{{QStringLiteral({json.dumps(tag)}), {body}}}}})"
+            else:
+                wire = f"NiriWire::WireValue(QStringLiteral({json.dumps(tag)}))"
+            cpp += [f"    return static_cast<{typ} *>(submitRequest({wire}, {flags}, {{}}));", "}", ""]
+            rows.append({"variant": tag, "method": method, "response": expected, "arguments": fields})
+            wire_shape = json.dumps(tag) if not fields else '{"' + tag + '":' + ("{" + ",".join(json.dumps(f["wire"]) + ":" + self.cpp(f["type"]) for f in fields) + "}" if payload["kind"] == "record" else self.cpp(payload)) + "}"
+            docs.append(f"| {index} | `NiriRequests.{method}({', '.join(f['name'] for f in fields)}{', ' if fields else ''}options = {{}})` | `{typ}` ({expected}) | `{wire_shape}` | `{binding['source']}` |")
+        h += ["protected:", "    virtual NiriPendingReply *submitRequest(const NiriWire::WireValue &request, const QString &expected, const QVariantMap &options, bool interactive, bool eventStream, const QString &validationError) = 0;", "};", "// clang-format on", ""]
+        cpp += ["// clang-format on", ""]
+        docs += ["", "## Typed replies", "", "All 14 response kinds have uncreatable named reply classes. The result property", "is typed; native result() uses the canonical C++ type. Optional results are null", "in QML. The inherited value remains the QML convenience projection (Handled is", "the string Handled); result on NiriHandledReply is a niriHandled unit value.", "Success requires the expected discriminator and complete validated payload.", "Errors retain the full raw envelope and fieldPath; replies remain retainable.", "", "| # | Reply | Native result | QML result | Wire response |", "|---|---|---|---|---|"]
+        for index, v in enumerate(self.c.ir["Response"]["variants"], 1):
+            payload = v["payload"]
+            docs.append(f"| {index} | `Niri{v['tag']}Reply` | `{self.cpp(payload) if payload else 'NiriHandled'}` | `{self.property_type(payload) if payload else 'niriHandled'}` | `{'{'+json.dumps(v['tag'])+':payload}' if payload else json.dumps(v['tag'])}` |")
+        return {"generated/niriipcrequests_generated.h": "\n".join(h), "generated/niriipcrequests_generated.cpp": "\n".join(cpp), "generated/ipc-requests.json": json.dumps(rows, indent=2, sort_keys=True) + "\n", "docs/generated/IPC-API.md": "\n".join(docs) + "\n"}
 
 
 def outputs(root=ROOT):
@@ -1027,9 +1143,16 @@ def outputs(root=ROOT):
     result = {"schema/ipc-inventory.json": json.dumps(inventory, indent=2, sort_keys=True) + "\n"}
     result.update(CppEmitter(compiler, hashes).emit())
     result.update(ActionEmitter(compiler, hashes).emit())
+    result.update(ReplyEmitter(compiler, hashes).emit())
+    request_outputs = RequestEmitter(compiler, hashes).emit()
+    result["docs/generated/IPC-API.md"] += request_outputs.pop("docs/generated/IPC-API.md")
+    result.update(request_outputs)
     result["generated/ipc-generated.cmake"] = result["generated/ipc-generated.cmake"].replace(
         "set(NIRIQML_GENERATED_SOURCES\n", "set(NIRIQML_GENERATED_SOURCES\n    generated/niriipcactions_generated.h\n    generated/niriipcactions_generated.cpp\n").replace(
         "set(NIRIQML_GENERATED_HEADERS\n", "set(NIRIQML_GENERATED_HEADERS\n    generated/niriipcactions_generated.h\n")
+    for group in ("requests", "replies"):
+        base = "generated/niriipc" + group + "_generated"
+        result["generated/ipc-generated.cmake"] = result["generated/ipc-generated.cmake"].replace("set(NIRIQML_GENERATED_SOURCES\n", f"set(NIRIQML_GENERATED_SOURCES\n    {base}.h\n    {base}.cpp\n").replace("set(NIRIQML_GENERATED_HEADERS\n", f"set(NIRIQML_GENERATED_HEADERS\n    {base}.h\n")
     return result
 
 

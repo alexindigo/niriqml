@@ -131,19 +131,26 @@ require an explicit workspace-move focus bool.
 
 ### NiriRequests
 
-Query API + raw escape hatch. Each method returns `NiriPendingReply`.
+All 16 requests have generated methods. The
+[generated reference](docs/generated/IPC-API.md#requests) lists their complete
+argument/wire shapes, expected response and source citation. Each successful
+response kind has a named uncreatable reply subclass, such as NiriWindowsReply,
+with a typed `result` property and native C++ `result()` getter. They inherit
+NiriPendingReply retention, cancellation, raw envelope, identity and errors.
+`value` remains the QML convenience projection; NiriHandledReply.result is an
+explicit niriHandled unit value while its value remains the string "Handled".
 
-**Typed queries**
+Methods accept trailing `{timeoutMs, connectTimeoutMs}` options. `pickWindow()`
+and `pickColor()` default to no response deadline; a caller can override it.
+`action(value)` accepts a generated NiriArgs Action value or a validated plain
+tagged object. `output(output, action)` accepts all nine released OutputAction
+variants as NiriArgs values or plain objects, with every field validated.
 
-| Method | Returns |
-|---|---|
-| `windows()` | `list<niriWindow>` |
-| `workspaces()` | `list<niriWorkspace>` |
-| `outputs()` | `map<string, niriOutput>` |
-| `focusedWindow()` | `niriWindow` (may be null) |
-| `focusedOutput()` | `niriOutput` (may be null) |
-| `keyboardLayouts()` | `niriKeyboardLayouts` |
-| `version()` | `string` |
+`eventStream()` observes the shared session's actual acknowledgement and leaves
+its event socket open. Already-subscribed calls retain that same acknowledgement,
+without a second subscription. Cancelling/timing out one observer does not stop
+the shared stream. `returnError()` expects a server Err, reported through the
+normal error contract; an unexpected Ok is a Decode error.
 
 **Raw escape hatch**
 

@@ -69,6 +69,22 @@ class GeneratorTest(unittest.TestCase):
         with self.assertRaisesRegex(GEN.SchemaError, "more than names/order"):
             self.compiler()
 
+    def test_request_pairings_and_argument_names(self):
+        compiler = self.compiler()
+        replies = {v["tag"] for v in compiler.ir["Response"]["variants"]}
+        self.assertEqual({v["response"] for v in self.bindings["requests"].values()} - {"Err"}, replies)
+        self.bindings["requests"]["Windows"]["response"] = "Typo"
+        with self.assertRaisesRegex(GEN.SchemaError, "invalid request/response"):
+            self.compiler()
+        self.bindings = GEN.load(ROOT / GEN.BINDINGS)
+        self.bindings["requests"]["Output"]["arguments"] = ["output", "typo"]
+        with self.assertRaisesRegex(GEN.SchemaError, "field permutation"):
+            self.compiler()
+        self.bindings = GEN.load(ROOT / GEN.BINDINGS)
+        del self.bindings["requests"]["EventStream"]
+        with self.assertRaisesRegex(GEN.SchemaError, "exactly the request inventory"):
+            self.compiler()
+
     def test_reject_bad_ref_and_ambiguous_union(self):
         for ref in ("https://example.invalid/schema", "#/$defs/DoesNotExist"):
             with self.assertRaises(GEN.SchemaError):

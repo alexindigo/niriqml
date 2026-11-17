@@ -24,6 +24,7 @@ struct NiriSession::Attempt : QObject
     QLocalSocket *socket;
     QTimer *deadline;
     NiriLineBuffer framer;
+    std::optional<NiriWire::Document> acknowledgement;
     bool draining = false;
     bool eof = false;
 };
@@ -105,6 +106,12 @@ bool NiriSession::isConnected() const
 bool NiriSession::subscribed() const
 {
     return checkThread(this) && m_status == Streaming;
+}
+std::optional<NiriWire::Document> NiriSession::subscriptionReply() const
+{
+    if (!subscribed() || !m_attempt)
+        return std::nullopt;
+    return m_attempt->acknowledgement;
 }
 bool NiriSession::autoReconnect() const
 {
@@ -468,6 +475,7 @@ void NiriSession::processFrame(const std::shared_ptr<Attempt> &attempt, const QB
                 protocolError(attempt->epoch, QStringLiteral("Expected exactly Ok/Handled"), frame);
             return;
         }
+        attempt->acknowledgement = *document;
         m_status = Streaming;
         m_reconnectAttempt = 0; // Not reset at socket acceptance.
         m_error.clear();

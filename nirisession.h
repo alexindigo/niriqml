@@ -35,6 +35,7 @@ public:
     Status status() const;
     bool isConnected() const;
     bool subscribed() const;
+    std::optional<NiriWire::Document> subscriptionReply() const;
     bool autoReconnect() const;
     QVariantMap error() const;
     QString errorString() const;

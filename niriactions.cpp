@@ -60,7 +60,7 @@ NiriPendingReply *NiriActions::sendVariantAction(const QVariant &action)
                                   {}, error);
 }
 
-NiriPendingReply *NiriActions::submitAction(const NiriWire::WireValue &action,
+NiriHandledReply *NiriActions::submitAction(const NiriWire::WireValue &action,
                                             const QString &validationError)
 {
     if (!NiriSession::checkThread(this))
@@ -69,17 +69,9 @@ NiriPendingReply *NiriActions::submitAction(const NiriWire::WireValue &action,
     NiriRequestOperation::Options options;
     options.timeoutMs = requests->requestTimeoutMs();
     options.maxFrameBytes = requests->maxFrameBytes();
-    const auto decoder = [](const NiriWire::WireValue &ok, QVariant &value, NiriError &error) {
-        if (!ok.stringValue() || *ok.stringValue() != QStringLiteral("Handled")) {
-            error.fieldPath = QStringLiteral("$.Ok");
-            error.message = QStringLiteral("Expected Handled response");
-            return false;
-        }
-        value = QStringLiteral("Handled");
-        return true;
-    };
     const auto request = *NiriWire::WireValue::object({{QStringLiteral("Action"), action}});
-    return NiriRequests::dispatch(request, this, options, nullptr, decoder, validationError);
+    return static_cast<NiriHandledReply *>(NiriRequests::dispatchTyped(
+            request, this, options, QStringLiteral("Handled"), validationError));
 }
 
 namespace {

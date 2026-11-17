@@ -1,7 +1,8 @@
 # Requests and replies
 
 `NiriRequests` and `NiriActions` share one operation path. Independent calls use
-separate sockets and have no cross-call ordering. Every completion is queued,
+separate sockets and have no cross-call ordering (EventStream observes the
+shared session instead). Every completion is queued,
 even an empty endpoint or invalid input. The same-turn pattern
 `let r = NiriRequests.version(); r.finished.connect(handler)` observes completion.
 If a nested event loop ran before attaching the handler, inspect `r.completed`.
@@ -44,6 +45,7 @@ including cancellation, use the application thread.
 | 5 | `responseKind` | String or single-key Response discriminator, including unknown names |
 | 6 | `endpoint`, `endpointRevision`, `requestId` | Captured call identity, with integer identities exposed as strings |
 | 7 | `executionCertainty` | NotSent, MayHaveExecuted or ReplyReceived |
+| 8 | Typed subclass `result` | Generated native result with a QML string/null/gadget/list projection; success requires the expected discriminator and full valid payload |
 
 Raw integer tokens project to decimal strings, including small integers. Decimal
 tokens expose a `niriJsonNumber` with exact `text` and explicit `toNumber()`.
@@ -75,13 +77,24 @@ disables the total response deadline, while connection establishment remains
 bounded. Other negative values, non-integers and unknown options fail visibly.
 The defaults are 5000 ms. Sequence entries start their deadlines when activated,
 not while waiting behind another entry. Raw interactive picks should pass
-`{timeoutMs: -1}`; generated pick helpers will select that default.
+`{timeoutMs: -1}`; generated pick helpers select that default automatically.
 
-The seven existing named queries decode records directly from the exact wire
-tree using generated field/range codecs. Invalid records fail with Decode and a
+All 16 generated request methods share the raw operation path and accept a
+trailing options object. Fourteen response-specific reply classes expose a
+typed `result`; `NiriHandledReply.result.wireName` is "Handled". See the
+[checked reference](generated/IPC-API.md#requests) for methods and pairings.
+They decode directly from the exact wire tree using generated field/range codecs.
+Wrong discriminators or invalid payloads fail with Decode and a
 JSON `fieldPath`, preserving the full envelope. QML IDs and other u64/usize
 fields are decimal strings; optional fields are null rather than zero/empty
 sentinels. C++ records retain exact integers and std::optional values.
+
+`eventStream()` delegates to the one NiriSession subscription. Its reply is
+completed from the actual accepted acknowledgement, including original raw text;
+late observers receive the same current acknowledgement. It opens no request
+socket and never consumes subsequent events as one-shot replies. Observer
+cancellation/deadlines do not stop the session; explicit session stop cancels
+pending observers. `returnError()` expects Err; an unexpected Ok fails Decode.
 
 ## Explicit sequences
 
@@ -109,4 +122,4 @@ convergence or animation-completion guarantee is implied by ordering or Handled.
 
 The monitor helper now emits `id` without the unsupported `focus` member and
 accepts only `(windowId, output)`. Width/height helpers emit `id` as well.
-Generated APIs will supply the remaining optional/focused argument forms.
+Generated APIs supply the optional/focused argument forms with explicit nulls.

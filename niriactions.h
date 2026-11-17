@@ -36,6 +36,6 @@ public:
 private:
     explicit NiriActions(QObject *parent = nullptr);
     NiriPendingReply *sendVariantAction(const QVariant &action);
-    NiriPendingReply *submitAction(const NiriWire::WireValue &action,
+    NiriHandledReply *submitAction(const NiriWire::WireValue &action,
                                    const QString &validationError) override;
 };
