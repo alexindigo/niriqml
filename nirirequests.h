@@ -11,6 +11,7 @@
 #include <functional>
 
 #include "niripendingreply.h"
+#include "nirilinebuffer.h"
 
 class NiriRequests : public QObject
 {
@@ -48,6 +49,9 @@ public:
 
     void setRequestTimeoutMs(int ms) { m_requestTimeoutMs = ms; }
     int requestTimeoutMs() const { return m_requestTimeoutMs; }
+    // Captured separately for each new request.
+    void setMaxFrameBytes(qsizetype bytes) { m_maxFrameBytes = qMax<qsizetype>(0, bytes); }
+    qsizetype maxFrameBytes() const { return m_maxFrameBytes; }
 
 private:
     explicit NiriRequests(QObject *parent = nullptr);
@@ -57,7 +61,7 @@ private:
         QLocalSocket *socket = nullptr;
         QTimer *timeout = nullptr;
         QByteArray sendBuffer;
-        QByteArray recvBuffer;
+        NiriLineBuffer recvBuffer;
         Callback callback;
         bool finished = false;
     };
@@ -66,4 +70,5 @@ private:
     void completeRequest(PendingRequest *pr, bool ok, const QJsonObject &result);
 
     int m_requestTimeoutMs = 5000;
+    qsizetype m_maxFrameBytes = NiriLineBuffer::DefaultMaxFrameBytes;
 };

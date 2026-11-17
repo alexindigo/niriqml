@@ -29,6 +29,7 @@ private slots:
     void invalidUtf8_data();
     void invalidUtf8();
     void constructedStrings();
+    void stringLiteral();
     void orderedValuesAndPresence();
     void nestingLimit();
     void projection();
@@ -37,6 +38,18 @@ private slots:
     void differentialStrings();
     void differentialSyntax();
 };
+
+void TestWire::stringLiteral()
+{
+    static_assert(!std::is_constructible_v<WireValue, int>);
+    static_assert(!std::is_constructible_v<WireValue, void *>);
+    const WireValue value("name");
+    QCOMPARE(value.type(), WireValue::Type::String);
+    QCOMPARE(*encode(value), QByteArray("\"name\""));
+    QCOMPARE(*encode(WireValue(true)), QByteArray("true"));
+    const bool disabled = false;
+    QCOMPARE(*encode(WireValue(disabled)), QByteArray("false"));
+}
 
 void TestWire::exactNumbers_data()
 {

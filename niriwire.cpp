@@ -436,7 +436,7 @@ struct WireValue::Data
 };
 
 WireValue::WireValue() : m_data(std::make_shared<const Data>()) { }
-WireValue::WireValue(bool value) : m_data(std::make_shared<const Data>(value)) { }
+WireValue::WireValue(bool value, BoolTag) : m_data(std::make_shared<const Data>(value)) { }
 WireValue::WireValue(QString value) : m_data(std::make_shared<const Data>(std::move(value))) { }
 WireValue::WireValue(NumberToken value) : m_data(std::make_shared<const Data>(std::move(value))) { }
 WireValue::WireValue(Array value) : m_data(std::make_shared<const Data>(std::move(value))) { }

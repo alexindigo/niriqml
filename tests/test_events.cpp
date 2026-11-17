@@ -164,8 +164,16 @@ private slots:
         QCOMPARE(snap.at(0).value<NiriWindow>().id, quint64(2));
     }
 
+    void socketTimeoutFailsAfterDelay_data()
+    {
+        QTest::addColumn<bool>("finishBeforeVerification");
+        QTest::newRow("ordinary") << false;
+        QTest::newRow("completed-during-verification") << true;
+    }
+
     void socketTimeoutFailsAfterDelay()
     {
+        QFETCH(bool, finishBeforeVerification);
         QTemporaryDir socketDir(QDir::tempPath() + QStringLiteral("/niriqml-hang-XXXXXX"));
         QVERIFY(socketDir.isValid());
         QLocalServer hangServer;
@@ -189,7 +197,20 @@ private slots:
         QElapsedTimer elapsed;
         elapsed.start();
         NiriPendingReply *reply = requests->version();
-        QSignalSpy spy(reply, &NiriPendingReply::finished);
+        int completions = 0;
+        bool failed = false;
+        QString error;
+        qint64 finishedAfterMs = -1;
+        QObject observer;
+        connect(reply, &NiriPendingReply::finished, &observer, [&]() {
+            ++completions;
+            finishedAfterMs = elapsed.elapsed();
+            failed = reply->isError();
+            error = reply->error().message;
+        });
+
+        if (finishBeforeVerification)
+            QTest::qWait(150);
 
         // Prove this is a connected peer withholding a reply, not a bad endpoint.
         QTRY_VERIFY_WITH_TIMEOUT(hangServer.hasPendingConnections(), 500);
@@ -197,13 +218,115 @@ private slots:
         QVERIFY(peer);
         QTRY_VERIFY_WITH_TIMEOUT(peer->canReadLine(), 500);
         QCOMPARE(peer->readLine(), QByteArray("\"Version\"\n"));
-        QCOMPARE(spy.count(), 0);
+        QTRY_COMPARE_WITH_TIMEOUT(completions, 1, 500);
+        QVERIFY(finishedAfterMs >= 90); // Qt's coarse timer may fire up to 5% early.
+        QVERIFY(failed);
+        QCOMPARE(error, QStringLiteral("Timeout"));
+    }
 
-        QVERIFY(spy.wait(500));
-        QCOMPARE(spy.count(), 1);
-        QVERIFY(elapsed.elapsed() >= 90); // Qt's coarse timer may fire up to 5% early.
-        QVERIFY(reply->isError());
-        QCOMPARE(reply->error().message, QStringLiteral("Timeout"));
+    void oversizedStreamReconnects_data()
+    {
+        QTest::addColumn<bool>("terminated");
+        QTest::newRow("complete-line") << true;
+        QTest::newRow("unterminated") << false;
+    }
+
+    void oversizedStreamReconnects()
+    {
+        QFETCH(bool, terminated);
+        QTemporaryDir socketDir(QDir::tempPath() + QStringLiteral("/niriqml-frame-XXXXXX"));
+        QVERIFY(socketDir.isValid());
+        QLocalServer server;
+        QVERIFY(server.listen(socketDir.filePath(QStringLiteral("socket"))));
+        auto *connection = NiriConnection::instance();
+        const auto oldLimit = connection->maxFrameBytes();
+        const auto restore = qScopeGuard([&]() {
+            connection->disconnect();
+            connection->setMaxFrameBytes(oldLimit);
+        });
+        connection->disconnect();
+        connection->setMaxFrameBytes(32);
+        QSignalSpy retry(connection, &NiriConnection::reconnectScheduled);
+        QSignalSpy events(connection, &NiriConnection::eventReceived);
+        QString observedError;
+        const auto capture = connect(connection, &NiriConnection::connectedChanged, this, [&]() {
+            if (!connection->isConnected())
+                observedError = connection->errorString();
+        });
+        const auto detach = qScopeGuard([&]() { QObject::disconnect(capture); });
+        connection->connectToSocket(server.fullServerName());
+        QTRY_VERIFY_WITH_TIMEOUT(server.hasPendingConnections(), 500);
+        auto *peer = server.nextPendingConnection();
+        QVERIFY(peer);
+        QTRY_VERIFY_WITH_TIMEOUT(peer->canReadLine(), 500);
+        QCOMPARE(peer->readLine(), QByteArray("\"EventStream\"\n"));
+        peer->write(QByteArray(33, 'x') + (terminated ? "\n" : ""));
+        peer->flush();
+        QTRY_COMPARE_WITH_TIMEOUT(retry.count(), 1, 500);
+        QVERIFY2(observedError.contains(QStringLiteral("Framing error")),
+                 qPrintable(observedError));
+        QCOMPARE(connection->errorString(), observedError);
+        QVERIFY(!connection->isConnected());
+        QTRY_COMPARE_WITH_TIMEOUT(peer->state(), QLocalSocket::UnconnectedState, 500);
+        QTRY_VERIFY_WITH_TIMEOUT(server.hasPendingConnections(), 1500);
+        auto *replacement = server.nextPendingConnection();
+        QVERIFY(replacement);
+        QTRY_VERIFY_WITH_TIMEOUT(replacement->canReadLine(), 500);
+        QCOMPARE(replacement->readLine(), QByteArray("\"EventStream\"\n"));
+        replacement->write("{\"Ok\":\"Handled\"}\n{\"Recovered\":{}}\n");
+        replacement->flush();
+        QTRY_COMPARE_WITH_TIMEOUT(events.count(), 1, 500);
+        QCOMPARE(events.at(0).at(0).toString(), QStringLiteral("Recovered"));
+    }
+
+    void oversizedReplyFails_data() { oversizedStreamReconnects_data(); }
+
+    void oversizedReplyFails()
+    {
+        QFETCH(bool, terminated);
+        QTemporaryDir socketDir(QDir::tempPath() + QStringLiteral("/niriqml-reply-XXXXXX"));
+        QVERIFY(socketDir.isValid());
+        QLocalServer server;
+        QVERIFY(server.listen(socketDir.filePath(QStringLiteral("socket"))));
+        auto *requests = NiriRequests::instance();
+        const auto oldLimit = requests->maxFrameBytes();
+        const auto oldTimeout = requests->requestTimeoutMs();
+        const bool socketWasSet = qEnvironmentVariableIsSet("NIRI_SOCKET");
+        const auto oldSocket = qgetenv("NIRI_SOCKET");
+        const auto restore = qScopeGuard([&]() {
+            requests->setMaxFrameBytes(oldLimit);
+            requests->setRequestTimeoutMs(oldTimeout);
+            if (socketWasSet)
+                qputenv("NIRI_SOCKET", oldSocket);
+            else
+                qunsetenv("NIRI_SOCKET");
+        });
+        NiriConnection::instance()->disconnect();
+        qputenv("NIRI_SOCKET", server.fullServerName().toUtf8());
+        requests->setMaxFrameBytes(32);
+        requests->setRequestTimeoutMs(2000);
+        auto *reply = requests->version();
+        int completions = 0;
+        bool failed = false;
+        QString error;
+        QObject observer;
+        connect(reply, &NiriPendingReply::finished, &observer, [&]() {
+            ++completions;
+            failed = reply->isError();
+            error = reply->error().message;
+        });
+        QTRY_VERIFY_WITH_TIMEOUT(server.hasPendingConnections(), 500);
+        auto *peer = server.nextPendingConnection();
+        QVERIFY(peer);
+        QTRY_VERIFY_WITH_TIMEOUT(peer->canReadLine(), 500);
+        QCOMPARE(peer->readLine(), QByteArray("\"Version\"\n"));
+        peer->write("{\"Ok\":{\"Version\":\"" + QByteArray(33, 'x') + "\"}}"
+                    + (terminated ? "\n" : ""));
+        peer->flush();
+        QTRY_COMPARE_WITH_TIMEOUT(completions, 1, 500);
+        QVERIFY(failed);
+        QVERIFY2(error.contains(QStringLiteral("Framing error")), qPrintable(error));
+        QTRY_COMPARE_WITH_TIMEOUT(peer->state(), QLocalSocket::UnconnectedState, 500);
     }
 
     void pendingReplyDeletedAfterFinished()

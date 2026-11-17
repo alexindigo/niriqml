@@ -54,6 +54,7 @@ void NiriRequests::completeRequest(PendingRequest *pr, bool ok, const QJsonObjec
 
     if (pr->socket) {
         pr->socket->disconnect();
+        pr->socket->abort();
         pr->socket->deleteLater();
         pr->socket = nullptr;
     }
@@ -70,6 +71,7 @@ void NiriRequests::send(const QJsonObject &request, Callback callback)
 void NiriRequests::sendJson(const QJsonValue &request, Callback callback)
 {
     auto *pr = new PendingRequest;
+    pr->recvBuffer = NiriLineBuffer(m_maxFrameBytes);
     pr->socket = new QLocalSocket(this);
     pr->callback = callback;
 
@@ -103,12 +105,18 @@ void NiriRequests::sendJson(const QJsonValue &request, Callback callback)
             [pr]() { pr->socket->write(pr->sendBuffer); });
 
     connect(pr->socket, &QLocalSocket::readyRead, this, [this, pr]() {
-        pr->recvBuffer += pr->socket->readAll();
-        int idx = pr->recvBuffer.indexOf('\n');
-        if (idx < 0)
+        pr->recvBuffer.feed(pr->socket->readAll());
+        if (pr->recvBuffer.error().code != NiriLineBuffer::ErrorCode::None) {
+            const auto error = QStringLiteral("Framing error: frame exceeds %1 bytes")
+                                       .arg(pr->recvBuffer.error().allowedBytes);
+            completeRequest(pr, false, QJsonObject{{"error", error}});
+            return;
+        }
+        const auto lines = pr->recvBuffer.takeCompleteLines();
+        if (lines.isEmpty())
             return;
 
-        QByteArray line = pr->recvBuffer.left(idx).trimmed();
+        const QByteArray &line = lines.first();
 
         QJsonParseError err;
         QJsonDocument doc = QJsonDocument::fromJson(line, &err);

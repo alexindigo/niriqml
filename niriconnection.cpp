@@ -101,7 +101,7 @@ QString NiriConnection::socketPath() const
 }
 QString NiriConnection::errorString() const
 {
-    return m_socket.errorString();
+    return m_framingError.isEmpty() ? m_socket.errorString() : m_framingError;
 }
 
 void NiriConnection::connectToSocket(const QString &path)
@@ -113,7 +113,7 @@ void NiriConnection::connectToSocket(const QString &path)
     m_intentionalDisconnect = false;
     m_connected = false;
     m_subscriptionConfirmed = false;
-    m_readBuffer.clear();
+    m_readBuffer = NiriLineBuffer(m_maxFrameBytes);
 
     m_socketPath = path.isEmpty() ? QString::fromUtf8(qgetenv("NIRI_SOCKET")) : path;
     // Don't attempt to connect with an empty path — QLocalSocket warns
@@ -163,6 +163,7 @@ void NiriConnection::onConnected()
 {
     qInfo() << "NiriConnection: connected, sending subscription";
     m_reconnectAttempt = 0;
+    m_framingError.clear();
     m_connected = true;
     emit connectedChanged();
     sendEventStreamSubscription();
@@ -182,6 +183,7 @@ void NiriConnection::onDisconnected()
 void NiriConnection::onErrorOccurred(QLocalSocket::LocalSocketError error)
 {
     Q_UNUSED(error)
+    m_framingError.clear();
     qWarning() << "NiriConnection: socket error:" << m_socket.errorString()
                << "| path:" << m_socketPath;
     m_connected = false;
@@ -194,6 +196,15 @@ void NiriConnection::onErrorOccurred(QLocalSocket::LocalSocketError error)
 void NiriConnection::onReadyRead()
 {
     m_readBuffer.feed(m_socket.readAll());
+    if (m_readBuffer.error().code != NiriLineBuffer::ErrorCode::None) {
+        m_framingError = QStringLiteral("Framing error: frame exceeds %1 bytes")
+                                 .arg(m_readBuffer.error().allowedBytes);
+        m_readBuffer.clear();
+        // abort() emits disconnected; retain the framing error for observers
+        // and let the existing disconnect handler schedule the next attempt.
+        m_socket.abort();
+        return;
+    }
     for (const QByteArray &line : m_readBuffer.takeCompleteLines())
         processLine(line);
 }

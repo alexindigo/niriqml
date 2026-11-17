@@ -32,6 +32,10 @@ public:
     QString errorString() const;
     PeerInfo peerInfo() const;
 
+    // Applies to the next connection attempt.
+    void setMaxFrameBytes(qsizetype bytes) { m_maxFrameBytes = qMax<qsizetype>(0, bytes); }
+    qsizetype maxFrameBytes() const { return m_maxFrameBytes; }
+
 public slots:
     void connectToSocket(const QString &path = QString());
     void disconnect();
@@ -57,6 +61,8 @@ private:
 
     QLocalSocket m_socket;
     NiriLineBuffer m_readBuffer;
+    qsizetype m_maxFrameBytes = NiriLineBuffer::DefaultMaxFrameBytes;
+    QString m_framingError;
     QString m_socketPath;
     bool m_connected = false;
     bool m_subscriptionConfirmed = false;

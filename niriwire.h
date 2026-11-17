@@ -8,6 +8,7 @@
 #include <QtQml/qqmlregistration.h>
 #include <memory>
 #include <optional>
+#include <type_traits>
 
 namespace NiriWire {
 
@@ -50,13 +51,21 @@ private:
 
 class WireValue
 {
+    struct BoolTag
+    {
+    };
+
 public:
     enum class Type { Null, Bool, String, NumberToken, Array, Object };
     using Array = QList<WireValue>;
     using Object = QList<QPair<QString, WireValue>>; // Insertion order is retained.
 
     WireValue(); // Null
-    explicit WireValue(bool value);
+    template <typename T, std::enable_if_t<std::is_same_v<T, bool>, int> = 0>
+    explicit WireValue(T value) : WireValue(value, BoolTag{})
+    {
+    }
+    explicit WireValue(const char *value) : WireValue(QString::fromUtf8(value)) { }
     explicit WireValue(QString value);
     explicit WireValue(NumberToken value);
     explicit WireValue(Array value);
@@ -75,6 +84,7 @@ public:
 
 private:
     struct Data;
+    WireValue(bool value, BoolTag);
     explicit WireValue(std::shared_ptr<const Data> data);
     std::shared_ptr<const Data> m_data; // No mutable tree or shared mutable cache.
 };

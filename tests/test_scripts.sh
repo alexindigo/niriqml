@@ -105,6 +105,9 @@ if(MODE STREQUAL "metadata")
 elseif(MODE STREQUAL "absolute-metadata")
     set(QT6_INSTALL_PREFIX /selected-sdk)
     set(QT6_INSTALL_QML /selected-sdk/imports)
+elseif(MODE STREQUAL "outside-metadata")
+    set(QT6_INSTALL_PREFIX /selected-sdk)
+    set(QT6_INSTALL_QML /external-sdk/imports)
 elseif(MODE STREQUAL "tool")
     add_executable(Qt6::qtpaths IMPORTED)
     set_target_properties(Qt6::qtpaths PROPERTIES
@@ -123,8 +126,19 @@ cmake -S "$FIXTURE/layout" -B "$FIXTURE/layout-tool" -DMODE=tool \
     -DTOOL="$FIXTURE/qtpaths" -DEXPECTED=imports
 cmake -S "$FIXTURE/layout" -B "$FIXTURE/layout-cross-override" -DMODE=cross \
     -DNIRIQML_INSTALL_QMLDIR=qml -DEXPECTED=qml
-if cmake -S "$FIXTURE/layout" -B "$FIXTURE/layout-cross" -DMODE=cross; then
+if cmake -S "$FIXTURE/layout" -B "$FIXTURE/layout-cross" -DMODE=cross \
+        > "$FIXTURE/cross.log" 2>&1; then
     echo 'cross-build without an explicit import root unexpectedly succeeded' >&2
     exit 1
 fi
+grep -q 'Set NIRIQML_INSTALL_QMLDIR' "$FIXTURE/cross.log"
+if cmake -S "$FIXTURE/layout" -B "$FIXTURE/layout-outside" -DMODE=outside-metadata \
+        -DEXPECTED=../external-sdk/imports > "$FIXTURE/outside.log" 2>&1; then
+    echo 'Qt QML root outside the Qt prefix unexpectedly accepted' >&2
+    exit 1
+fi
+grep -q 'outside its prefix' "$FIXTURE/outside.log"
+grep -q 'Set NIRIQML_INSTALL_QMLDIR' "$FIXTURE/outside.log"
+cmake -S "$FIXTURE/layout" -B "$FIXTURE/layout-outside-override" -DMODE=outside-metadata \
+    -DNIRIQML_INSTALL_QMLDIR=qml -DEXPECTED=qml
 echo 'Selected-Qt layout metadata, tool-query fallback and override checks passed'
