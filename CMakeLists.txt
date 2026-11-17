@@ -214,7 +214,8 @@ if(BUILD_TEST_MODE)
     set_tests_properties(test_connection PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     )
-    add_test(NAME test_scripts COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_scripts.sh)
+    add_test(NAME test_scripts COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_scripts.sh
+        ${CMAKE_CURRENT_BINARY_DIR}/test_scripts_scratch)
     if(ENABLE_COVERAGE)
         target_compile_options(test_connection PRIVATE --coverage -fprofile-abs-path)
         target_link_options(test_connection PRIVATE --coverage -fprofile-abs-path)

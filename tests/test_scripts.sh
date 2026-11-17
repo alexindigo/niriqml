@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# Run only in the authorized guest, with a disk-backed TMPDIR.
+# Usage: test_scripts.sh SCRATCH_ROOT
+# CTest passes a directory inside the build tree, so the test needs no
+# particular TMPDIR and leaves nothing behind.
 set -euo pipefail
-: "${TMPDIR:?set a disk-backed TMPDIR}"
+SCRATCH_ROOT=${1:?usage: test_scripts.sh SCRATCH_ROOT}
+mkdir -p "$SCRATCH_ROOT"
 SCRIPTS="$(cd -- "$(dirname -- "$0")/../scripts" && pwd -P)"
-FIXTURE=$(mktemp -d "${TMPDIR}/niriqml-scripts.XXXXXX")
+FIXTURE=$(mktemp -d "${SCRATCH_ROOT}/niriqml-scripts.XXXXXX")
+trap 'rm -rf -- "$FIXTURE"' EXIT
 SOURCE="${FIXTURE}/source with spaces"
 mkdir -p "$SOURCE/scripts" "$FIXTURE/caller"
 cp "$SCRIPTS/"* "$SOURCE/scripts/"
