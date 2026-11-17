@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(niriqml LANGUAGES CXX)
+project(niriqml VERSION 0.2.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -8,10 +8,19 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Quick Network)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Qml Quick Network)
 qt_policy(SET QTP0001 NEW)
 
 include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+include(cmake/NiriqmlInstallPaths.cmake)
+get_filename_component(_niriqml_qml_install "${NIRIQML_INSTALL_QMLDIR}/Niri"
+    ABSOLUTE BASE_DIR "${CMAKE_INSTALL_PREFIX}")
+get_filename_component(_niriqml_lib_install "${CMAKE_INSTALL_LIBDIR}"
+    ABSOLUTE BASE_DIR "${CMAKE_INSTALL_PREFIX}")
+file(RELATIVE_PATH _niriqml_plugin_to_lib "${_niriqml_qml_install}" "${_niriqml_lib_install}")
+message(STATUS "Niri QML installation: ${_niriqml_qml_install}")
 
 # ==================== QML MODULE ====================
 
@@ -48,29 +57,54 @@ set(NIRIQML_SOURCES
     niriutils.h
 )
 
+add_library(niriqml SHARED)
+add_library(niriqml::niriqml ALIAS niriqml)
 qt_add_qml_module(niriqml
     URI Niri
     VERSION 1.0
     OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Niri
-    # INSTALL_DIRECTORY is handled manually below
+    PLUGIN_TARGET niriqmlplugin
     SOURCES
         ${NIRIQML_SOURCES}
 )
 
-target_link_libraries(niriqml PRIVATE
+target_include_directories(niriqml PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/niriqml>
+)
+target_compile_features(niriqml PUBLIC cxx_std_17)
+target_link_libraries(niriqml PUBLIC
     Qt6::Core
-    Qt6::Quick
+    Qt6::Qml
     Qt6::Network
+    PRIVATE Qt6::Quick
+)
+
+set_target_properties(niriqml niriqmlplugin PROPERTIES
+    BUILD_RPATH_USE_ORIGIN ON
+    BUILD_WITH_INSTALL_RPATH OFF
+    INSTALL_RPATH_USE_LINK_PATH OFF
+)
+set_target_properties(niriqml PROPERTIES INSTALL_RPATH "$ORIGIN")
+set_target_properties(niriqmlplugin PROPERTIES
+    INSTALL_RPATH "$ORIGIN/${_niriqml_plugin_to_lib}"
 )
 
 # ==================== INSTALL ====================
 
 install(TARGETS niriqml
+    EXPORT niriqmlTargets
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
-
-install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Niri/
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/qt6/qml/Niri
+install(TARGETS niriqmlplugin
+    LIBRARY DESTINATION ${NIRIQML_INSTALL_QMLDIR}/Niri
+)
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/Niri/qmldir
+    ${CMAKE_CURRENT_BINARY_DIR}/Niri/niriqml.qmltypes
+    DESTINATION ${NIRIQML_INSTALL_QMLDIR}/Niri
 )
 
 install(FILES
@@ -90,6 +124,22 @@ install(FILES
     nirilinebuffer.h
     niriutils.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/niriqml
+)
+
+configure_package_config_file(cmake/niriqmlConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/niriqmlConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/niriqml
+)
+# Pre-1.0 releases make no cross-version ABI compatibility promise.
+write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/niriqmlConfigVersion.cmake
+    VERSION ${PROJECT_VERSION} COMPATIBILITY ExactVersion
+)
+install(EXPORT niriqmlTargets NAMESPACE niriqml::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/niriqml
+)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/niriqmlConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/niriqmlConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/niriqml
 )
 
 # ==================== TESTS ====================
@@ -159,6 +209,7 @@ if(BUILD_TEST_MODE)
     set_tests_properties(test_connection PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     )
+    add_test(NAME test_scripts COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_scripts.sh)
     if(ENABLE_COVERAGE)
         target_compile_options(test_connection PRIVATE --coverage -fprofile-abs-path)
         target_link_options(test_connection PRIVATE --coverage -fprofile-abs-path)

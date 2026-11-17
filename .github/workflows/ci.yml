@@ -104,10 +104,7 @@ jobs:
 
       - name: Package
         run: |
-          mkdir -p release/{usr/lib,usr/lib/qt6/qml/Niri,usr/include/niriqml}
-          cp build/libniriqml.so release/usr/lib/
-          cp build/Niri/* release/usr/lib/qt6/qml/Niri/
-          cp niri*.h release/usr/include/niriqml/
+          DESTDIR="$PWD/release" cmake --install build
           tar -C release -czf \
             qt6-niriqml-${GITHUB_REF_NAME#v}-linux-x86_64.tar.gz \
             usr/

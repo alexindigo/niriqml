@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BUILD_DIR="${BUILD_DIR:-build-release}"
+source "$(dirname -- "$0")/build-paths.sh"
+resolve_build_dir "${BUILD_DIR:-build-release}"
+clean_build_if_requested "${1:-}"
+if [[ "${1:-}" == --clean ]]; then shift; fi
 
-rm -rf "${BUILD_DIR}"
-
-cmake -B "${BUILD_DIR}" -S . \
+configure_build \
     -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_TEST_MODE=OFF
+    -DBUILD_TEST_MODE=OFF "$@"
 
 cmake --build "${BUILD_DIR}" -j"$(nproc)"

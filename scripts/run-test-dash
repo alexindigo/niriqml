@@ -1,24 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-
-BUILD_DIR="${PROJECT_DIR}/build-release"
-if [ ! -f "${BUILD_DIR}/Niri/libniriqmlplugin.so" ]; then
-    "${SCRIPT_DIR}/build"
-fi
-
-# Resolve and export NIRI_SOCKET
-if [ -z "${NIRI_SOCKET:-}" ]; then
-    NIRI_SOCKET=$(ls /run/user/$(id -u)/niri.wayland-*.sock 2>/dev/null | head -1 || true)
-fi
-
-if [ -z "$NIRI_SOCKET" ]; then
-    echo "error: no niri socket found. Is niri running?"
-    echo "  looked in \$NIRI_SOCKET and /run/user/$(id -u)/niri.wayland-*.sock"
-    exit 1
-fi
+source "$(dirname -- "$0")/build-paths.sh"
+resolve_build_dir "${BUILD_DIR:-build-release}"
+require_build_dir
+[[ -f "${BUILD_DIR}/Niri/libniriqmlplugin.so" ]] || fail "build the QML plugin first: ${BUILD_DIR}"
+[[ -n "${NIRI_SOCKET:-}" ]] || fail "set NIRI_SOCKET to the intended test compositor endpoint"
 
 export NIRI_SOCKET
 

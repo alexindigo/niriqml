@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BUILD_DIR="${BUILD_DIR:-build-debug}"
+source "$(dirname -- "$0")/build-paths.sh"
+resolve_build_dir "${BUILD_DIR:-build-debug}"
+clean_build_if_requested "${1:-}"
+if [[ "${1:-}" == --clean ]]; then shift; fi
 
-rm -rf "${BUILD_DIR}"
-
-cmake -B "${BUILD_DIR}" -S . \
+configure_build \
     -DCMAKE_BUILD_TYPE=Debug \
     -DBUILD_TEST_MODE=ON \
-    -DENABLE_COVERAGE=ON
+    -DENABLE_COVERAGE=OFF "$@"
 
 cmake --build "${BUILD_DIR}" -j"$(nproc)"
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 "${SCRIPT_DIR}/run-tests" "${BUILD_DIR}"

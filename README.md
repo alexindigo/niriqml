@@ -237,16 +237,53 @@ cd aur-qt6-niriqml-git && makepkg -si
 ### Build from source
 
 ```bash
-scripts/build          # → build-release/
-scripts/install        # installs to system Qt QML path
+scripts/build          # incremental Release build in build-release/
+scripts/install        # uses the configured CMAKE_INSTALL_PREFIX
 ```
 
 For development builds with tests:
 
 ```bash
-scripts/build-test     # Debug + coverage, → build-debug/
+scripts/build-test     # Debug, coverage off, in build-debug/
 scripts/run-tests      # or: ctest --test-dir build-debug
 ```
+
+Run builds, tests and examples inside the project's authorized test guest, not
+on the development host. Helpers resolve relative `BUILD_DIR` values against
+the checkout, regardless of the caller's working directory. `--clean` on
+`scripts/build` or `scripts/build-test` cleans only generated targets in an
+existing, verified build; it does not delete the build directory. Builders
+accept `-D` cache definitions and `-G`/`-A`/`-T` generator options; select the
+build path with `BUILD_DIR`, not a second `-B` or a preset. To collect coverage,
+use a separate build with `-DENABLE_COVERAGE=ON`.
+
+Installation uses the selected Qt's QML layout relative to the install prefix
+(for example, `lib/qt6/qml` on Arch or `qml` in an SDK). Override the import
+root with `-DNIRIQML_INSTALL_QMLDIR=qml` at configure time. Relative paths
+relocate with the prefix; absolute paths select a fixed destination and support
+`DESTDIR` staging. `PREFIX=/path scripts/install` overrides the configured
+prefix explicitly. A private-prefix import needs `QML_IMPORT_PATH` pointing
+to that prefix's import root. The installed plugin locates the backing library
+relative to itself; no niriqml-specific `LD_LIBRARY_PATH` is needed. Qt itself
+must still be resolvable by the application's SDK or system loader.
+
+C++ consumers can use the installed package (or the same target after
+`add_subdirectory`):
+
+```cmake
+find_package(niriqml CONFIG REQUIRED)
+target_link_libraries(app PRIVATE niriqml::niriqml)
+```
+
+Point `CMAKE_PREFIX_PATH` at a private install prefix. The package supplies
+public headers and Qt Core/Qml/Network dependencies. Its version file describes
+the existing 0.2.0 release and accepts exact versions only; no pre-1.0 ABI
+compatibility across releases is promised. Release archives use these same
+`cmake --install` rules.
+
+`scripts/run-test-dash` requires an already-built module and an explicit
+`NIRI_SOCKET` selecting the intended test compositor; it does not build or
+auto-select a desktop session.
 
 ---
 
