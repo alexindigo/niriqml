@@ -42,6 +42,25 @@ NiriRequests *NiriRequests::instance()
 
 NiriRequests::NiriRequests(QObject *parent) : QObject(parent) { }
 
+NiriRequests::PendingRequest::~PendingRequest()
+{
+    // Requests are facade children, including when the facade is torn down
+    // without completion. Retire I/O now, but release Qt senders only after
+    // their signal stacks unwind (a finished handler may destroy the engine).
+    if (timeout) {
+        timeout->stop();
+        timeout->disconnect();
+        timeout->setParent(nullptr);
+        timeout->deleteLater();
+    }
+    if (socket) {
+        socket->disconnect();
+        socket->setParent(nullptr);
+        socket->abort();
+        socket->deleteLater();
+    }
+}
+
 QString NiriRequests::socketPath() const
 {
     if (!NiriSession::checkThread(this))
@@ -55,23 +74,7 @@ void NiriRequests::completeRequest(PendingRequest *pr, bool ok, const QJsonObjec
         return;
     pr->finished = true;
 
-    // Disarm the timeout and schedule its deletion. Deleting the timer also
-    // severs its (context-bound) timeout connection, so the lambda can never
-    // fire after pr is gone.
-    if (pr->timeout) {
-        pr->timeout->stop();
-        pr->timeout->deleteLater();
-        pr->timeout = nullptr;
-    }
-
-    Callback cb = pr->callback;
-
-    if (pr->socket) {
-        pr->socket->disconnect();
-        pr->socket->abort();
-        pr->socket->deleteLater();
-        pr->socket = nullptr;
-    }
+    Callback cb = std::move(pr->callback);
     delete pr;
 
     cb(ok, result);
@@ -87,9 +90,9 @@ void NiriRequests::sendJson(const QJsonValue &request, Callback callback)
     if (!NiriSession::checkThread(this))
         return;
     NiriSession::instance()->ensureStarted();
-    auto *pr = new PendingRequest;
+    auto *pr = new PendingRequest(this);
     pr->recvBuffer = NiriLineBuffer(m_maxFrameBytes);
-    pr->socket = new QLocalSocket(this);
+    pr->socket = new QLocalSocket(pr);
     pr->callback = callback;
 
     // QJsonDocument only supports arrays/objects as roots; for bare strings
@@ -107,7 +110,7 @@ void NiriRequests::sendJson(const QJsonValue &request, Callback callback)
                 + "\n";
     }
 
-    auto *timeout = new QTimer(this);
+    auto *timeout = new QTimer(pr);
     timeout->setSingleShot(true);
     // Context = the timer itself: when completeRequest disarms and deletes
     // the timer, this connection is severed, so the lambda can never fire

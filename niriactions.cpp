@@ -5,6 +5,7 @@
 #include <QJsonObject>
 #include <QJsonValue>
 #include <QCoreApplication>
+#include <QPointer>
 #include "nirisession.h"
 
 #include "nirierror.h"
@@ -48,16 +49,20 @@ NiriPendingReply *NiriActions::sendAction(const QJsonObject &action)
     QJsonObject request;
     request["Action"] = action;
 
-    NiriRequests::instance()->send(request, [reply](bool ok, const QJsonObject &result) {
-        if (ok) {
-            reply->setFinished(QVariant::fromValue(result.toVariantMap()));
-        } else {
-            NiriError err;
-            err.code = -1;
-            err.message = result.value("error").toString();
-            reply->setError(err);
-        }
-    });
+    NiriRequests::instance()->send(
+            request,
+            [reply = QPointer<NiriPendingReply>(reply)](bool ok, const QJsonObject &result) {
+                if (!reply)
+                    return;
+                if (ok) {
+                    reply->setFinished(QVariant::fromValue(result.toVariantMap()));
+                } else {
+                    NiriError err;
+                    err.code = -1;
+                    err.message = result.value("error").toString();
+                    reply->setError(err);
+                }
+            });
     return reply;
 }
 

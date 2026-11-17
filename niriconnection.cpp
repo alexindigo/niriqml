@@ -42,6 +42,8 @@ NiriConnection::NiriConnection(QObject *parent)
     FORWARD(errorChanged);
     FORWARD(peerInfoChanged);
     FORWARD(reconnectScheduled);
+    // Public compatibility signal omits epoch, but the internal typed event
+    // receiver subscribes to the session's producing-epoch signal directly.
     FORWARD(eventReceived);
 #undef FORWARD
 }

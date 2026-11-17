@@ -95,7 +95,7 @@ QString NiriWorkspaceReactive::output() const
 }
 bool NiriWorkspaceReactive::isUrgent() const
 {
-    return m_data.isUrgent;
+    return NiriSession::checkThread(this) && m_data.isUrgent;
 }
 bool NiriWorkspaceReactive::isActive() const
 {

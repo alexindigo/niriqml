@@ -19,6 +19,7 @@ public:
     static NiriEvents *instance();
 
     void dispatchEvent(const QString &name, const QVariantMap &payload);
+    void dispatchEvent(const QString &name, const QVariantMap &payload, quint64 producingEpoch);
 
     // Snapshot getters: last-known state from initial event burst.
     // Consumers instantiated AFTER events fired can bootstrap from these.

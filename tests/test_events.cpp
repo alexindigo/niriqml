@@ -529,7 +529,8 @@ private:
     void emitEvent(const QString &name, const QVariantMap &payload)
     {
         QMetaObject::invokeMethod(NiriSession::instance(), "eventReceived", Qt::DirectConnection,
-                                  Q_ARG(QString, name), Q_ARG(QVariantMap, payload));
+                                  Q_ARG(QString, name), Q_ARG(QVariantMap, payload),
+                                  Q_ARG(quint64, NiriSession::instance()->epoch()));
     }
 };
 

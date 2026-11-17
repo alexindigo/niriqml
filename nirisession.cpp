@@ -497,7 +497,8 @@ void NiriSession::applyEvent(const NiriWire::Document &document, quint64 token)
     // Temporary compatibility projection for the pre-generated dispatch only.
     // Authoritative parsed data stays in eventFrame, never reparsed here.
     const auto value = NiriWire::toQJsonValueLossy(event.second);
-    emit eventReceived(event.first, value ? value->toObject().toVariantMap() : QVariantMap{});
+    emit eventReceived(event.first, value ? value->toObject().toVariantMap() : QVariantMap{},
+                       token);
     // No work follows publication without returning to the drain's epoch check.
 }
 

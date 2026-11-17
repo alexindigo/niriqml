@@ -65,8 +65,10 @@ public:
 private:
     explicit NiriRequests(QObject *parent = nullptr);
 
-    struct PendingRequest
+    struct PendingRequest : QObject
     {
+        explicit PendingRequest(QObject *owner) : QObject(owner) { }
+        ~PendingRequest() override;
         QLocalSocket *socket = nullptr;
         QTimer *timeout = nullptr;
         QByteArray sendBuffer;
