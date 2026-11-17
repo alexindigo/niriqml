@@ -55,6 +55,8 @@ set(NIRIQML_SOURCES
     nirilinebuffer.h
     niriutils.cpp
     niriutils.h
+    niriwire.cpp
+    niriwire.h
 )
 
 add_library(niriqml SHARED)
@@ -123,6 +125,7 @@ install(FILES
     nirieventlog.h
     nirilinebuffer.h
     niriutils.h
+    niriwire.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/niriqml
 )
 
@@ -167,6 +170,8 @@ if(BUILD_TEST_MODE)
     endmacro()
 
     add_niriqml_test(test_framing)
+    add_niriqml_test(test_linebuffer)
+    add_niriqml_test(test_wire)
     add_niriqml_test(test_types)
     add_niriqml_test(test_converter)
     add_niriqml_test(test_events)
