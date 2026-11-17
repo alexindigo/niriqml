@@ -28,15 +28,21 @@ bool equivalent(const WireValue &left, const WireValue &right)
     if (left.type() != right.type())
         return false;
     if (left.numberValue()) {
-        const auto a = left.numberValue()->toUInt64();
-        const auto b = right.numberValue()->toUInt64();
-        if (a && b)
-            return a == b;
-        const auto signedA = left.numberValue()->toInt64();
-        const auto signedB = right.numberValue()->toInt64();
-        if (signedA && signedB)
-            return signedA == signedB;
-        return left.numberValue()->toDouble() == right.numberValue()->toDouble();
+        const auto &a = *left.numberValue();
+        const auto &b = *right.numberValue();
+        if (a.isIntegerToken() && b.isIntegerToken())
+            return a.lexeme() == b.lexeme();
+        const auto floatingA = a.toDouble();
+        const auto floatingB = b.toDouble();
+        if (!floatingA || !floatingB)
+            return false;
+        // A float spelling may match an integer only if the latter was not
+        // rounded by projection (serde emits 1.0 where our encoder emits 1).
+        if (a.isIntegerToken() && a.lexeme() != QByteArray::number(*floatingA, 'f', 0))
+            return false;
+        if (b.isIntegerToken() && b.lexeme() != QByteArray::number(*floatingB, 'f', 0))
+            return false;
+        return floatingA == floatingB;
     }
     if (left.objectValue()) {
         if (left.objectValue()->size() != right.objectValue()->size())
@@ -147,6 +153,20 @@ private slots:
         QFile file(QFINDTESTDATA("fixtures/serde-v26.04/vectors.json"));
         QVERIFY(file.open(QIODevice::ReadOnly));
         fixtures = parsed(file.readAll());
+    }
+
+    void equivalentRejectsIntegerOverflow()
+    {
+        const auto maximum = parsed("18446744073709551615");
+        const auto overflow = parsed("18446744073709551616");
+        QVERIFY(!equivalent(maximum, overflow));
+        QVERIFY(!equivalent(overflow, maximum));
+        QVERIFY(equivalent(overflow, overflow));
+        QVERIFY(!equivalent(parsed("-9223372036854775809"), parsed("-9223372036854775810")));
+        QVERIFY(equivalent(parsed("1.5"), parsed("1.50")));
+        QVERIFY(equivalent(parsed("1.0"), parsed("1")));
+        QVERIFY(!equivalent(maximum, parsed("18446744073709551616.0")));
+        QVERIFY(!equivalent(parsed("1e400"), parsed("2e400")));
     }
 
     void serdeRoundtrip_data()
@@ -626,6 +646,66 @@ private slots:
         QVERIFY(!nativeTimestamps.first().at(1).value<std::optional<NiriTimestamp>>());
     }
 
+    void nonObjectEventPayloads_data()
+    {
+        QTest::addColumn<QString>("name");
+        QTest::addColumn<QByteArray>("json");
+        for (const auto *name :
+             {"WorkspacesChanged", "WorkspaceUrgencyChanged", "WorkspaceActivated",
+              "WorkspaceActiveWindowChanged", "WindowsChanged", "WindowOpenedOrChanged",
+              "WindowClosed", "WindowFocusChanged", "WindowFocusTimestampChanged",
+              "WindowUrgencyChanged", "WindowLayoutsChanged", "KeyboardLayoutsChanged",
+              "KeyboardLayoutSwitched", "OverviewOpenedOrClosed", "ConfigLoaded",
+              "ScreenshotCaptured", "CastsChanged", "CastStartedOrChanged", "CastStopped"}) {
+            for (const auto *json : {"null", "[]", "[{}]", "true", "42", "\"bad\""}) {
+                const auto row = QByteArray(name) + '-' + json;
+                QTest::newRow(row.constData()) << QString::fromLatin1(name) << QByteArray(json);
+            }
+        }
+    }
+
+    void nonObjectEventPayloads()
+    {
+        QFETCH(QString, name);
+        QFETCH(QByteArray, json);
+        auto *events = NiriEvents::instance();
+        NiriSession::instance()->stop();
+        const auto epoch = NiriSession::instance()->epoch();
+        auto window = replaced(fixture("window-present"), "is_focused", WireValue(true));
+        events->dispatchWireEvent(
+                "WindowsChanged",
+                *WireValue::object({{"windows", WireValue(WireValue::Array{window})}}), epoch);
+        events->dispatchWireEvent(
+                "WorkspacesChanged",
+                *WireValue::object({{"workspaces",
+                                     WireValue(WireValue::Array{fixture("workspace-present")})}}),
+                epoch);
+        const auto windows = events->lastWindowsSnapshot();
+        const auto workspaces = events->lastWorkspacesSnapshot();
+        const auto focus = events->lastFocusedWindowId();
+        const auto layouts = events->lastKeyboardLayouts();
+        const auto overview = events->lastOverviewOpen();
+        QSignalSpy errors(events, &NiriEvents::decodeError);
+        QSignalSpy raw(events, &NiriEvents::rawEvent);
+        QSignalSpy focused(events, &NiriEvents::windowFocusChanged);
+        QSignalSpy active(events, &NiriEvents::workspaceActiveWindowChanged);
+        QSignalSpy timestamps(events, &NiriEvents::windowFocusTimestampChanged);
+        events->dispatchWireEvent(name, parsed(json), epoch);
+        QCOMPARE(errors.count(), 1);
+        QCOMPARE(errors.first().at(0).toString(), childPath("$", name));
+        QCOMPARE(errors.first().at(1).toString(), "expected event payload object");
+        QCOMPARE(raw.count(), 1);
+        QCOMPARE(raw.first().at(0).toString(), name);
+        QCOMPARE(focused.count(), 0);
+        QCOMPARE(active.count(), 0);
+        QCOMPARE(timestamps.count(), 0);
+        QCOMPARE(events->lastFocusedWindowId(), focus);
+        QCOMPARE(events->lastWindowsSnapshot(), windows);
+        QCOMPARE(events->lastWorkspacesSnapshot(), workspaces);
+        QCOMPARE(events->lastKeyboardLayouts(), layouts);
+        QCOMPARE(events->lastOverviewOpen(), overview);
+    }
+
     void socketConsumers_data() { exactIds_data(); }
     void socketConsumers()
     {
@@ -735,6 +815,21 @@ private slots:
         QCOMPARE(errors.first().first().toString(), "$['WindowOpenedOrChanged']['window']['pid']");
         QCOMPARE(raw.last().at(1).toMap()["window"].toMap()["id"].toString(), text);
         QVERIFY(object->property("streamPassed").toBool());
+
+        // A malformed optional-only payload must not turn into a focus-clear delta.
+        server.stream->write("{\"WindowFocusChanged\":null}\n");
+        QTRY_COMPARE(errors.count(), 2);
+        QCOMPARE(errors.last().first().toString(), "$['WindowFocusChanged']");
+        QCOMPARE(raw.last().first().toString(), "WindowFocusChanged");
+        QVERIFY(object->property("streamPassed").toBool());
+        QCOMPARE(events->lastFocusedWindowId(), parsed(text.toLatin1()).numberValue()->toUInt64());
+
+        QSignalSpy focused(events, &NiriEvents::windowFocusChanged);
+        server.stream->write("{\"WindowFocusChanged\":{\"id\":null}}\n");
+        QTRY_COMPARE(focused.count(), 1);
+        QCOMPARE(errors.count(), 2);
+        QVERIFY(!events->lastFocusedWindowId());
+        QVERIFY(!object->property("streamPassed").toBool());
     }
 
     void malformed_data()
@@ -762,6 +857,12 @@ private slots:
                 << QByteArray("42") << QString("Transform") << QString("$");
         QTest::newRow("unit-wrapper")
                 << QByteArray("{\"Automatic\":null}") << QString("ModeToSet") << QString("$");
+        QTest::newRow("generated-empty-record-null")
+                << QByteArray("{\"Nothing\":null}") << QString("CastTarget")
+                << QString("$['Nothing']");
+        QTest::newRow("generated-empty-record-array")
+                << QByteArray("{\"Nothing\":[]}") << QString("CastTarget")
+                << QString("$['Nothing']");
     }
     void malformed()
     {

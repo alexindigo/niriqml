@@ -163,6 +163,14 @@ void NiriEvents::dispatchWireEvent(const QString &name, const NiriWire::WireValu
         if (NiriSession::instance()->epoch() == token)
             emit rawEvent(name, raw);
     };
+    // Event bodies are records, including empty and all-optional payloads.
+    // Check the container once, before lookup can confuse non-objects with
+    // absent optional fields, and before any state or typed publication.
+    if (!payload.objectValue()) {
+        NiriIpc::fail(detail, path, QStringLiteral("expected event payload object"));
+        reject();
+        return;
+    }
 #define FIELD(T, V, K)                                              \
     T V{};                                                          \
     if (!eventField(payload, QStringLiteral(K), V, detail, path)) { \

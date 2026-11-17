@@ -188,7 +188,7 @@ private slots:
     {
         std::vector<std::future<bool>> jobs;
         for (int i = 0; i < 8; ++i) {
-            jobs.push_back(std::async(std::launch::async, [] {
+            jobs.push_back(std::async(std::launch::async, [i] {
                 for (int n = 0; n < 100; ++n) {
                     auto json = windowJson();
                     json["id"] = n;
@@ -197,6 +197,28 @@ private slots:
                             jsonToGadget(workspaceJson(), QMetaType::fromType<NiriWorkspace>());
                     if (window.value<NiriWindow>().id != quint64(n)
                         || workspace.value<NiriWorkspace>().output != "eDP-1")
+                        return false;
+
+                    // PeerInfo is hand-written: unlike Niri* values it uses reflection.
+                    const auto id = i * 100 + n;
+                    const auto label = QStringLiteral("peer-%1").arg(id);
+                    const auto peer = jsonToGadget({{"pid", id},
+                                                    {"uid", id + 1},
+                                                    {"gid", id + 2},
+                                                    {"peer_security_context", label},
+                                                    {"credentials_available", bool(n % 2)},
+                                                    {"security_context_available", bool(i % 2)},
+                                                    {"credentials_error", id + 3},
+                                                    {"security_context_error", id + 4}},
+                                                   QMetaType::fromType<PeerInfo>());
+                    if (!peer.isValid())
+                        return false;
+                    const auto value = peer.value<PeerInfo>();
+                    if (value.pid != id || value.uid != quint32(id + 1)
+                        || value.gid != quint32(id + 2) || value.peerSecurityContext != label
+                        || value.credentialsAvailable != bool(n % 2)
+                        || value.securityContextAvailable != bool(i % 2)
+                        || value.credentialsError != id + 3 || value.securityContextError != id + 4)
                         return false;
                 }
                 return true;

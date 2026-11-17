@@ -337,5 +337,6 @@ pub fn write_vectors() -> Result<(), Box<dyn std::error::Error>> {
     let mut output = io::BufWriter::new(stdout.lock());
     serde_json::to_writer_pretty(&mut output, &document)?;
     writeln!(output)?;
+    output.flush()?;
     Ok(())
 }
