@@ -1,5 +1,23 @@
 # Known Issues
 
+## Historical QML teardown/coverage crash: cause unconfirmed
+
+On 2026-11-17, the E9 investigation ran `test_api`, `test_events` and
+`test_session_review` in fresh processes ten times each in three separate Debug
+builds: coverage OFF, GCC `--coverage` ON, and AddressSanitizer with
+`halt_on_error=1` and leak detection enabled. All 90 suite executions passed;
+no teardown crash or sanitizer diagnostic was observed. The tests cover real
+QML reply/state consumers, engine destruction and reconnect/exit paths.
+
+Environment: DigitalOcean guest `niriqml-full-ipc-api`, Arch container,
+Qt 6.12.0, GCC 16.2.1. The bounded investigation took less than 45 minutes.
+Raw evidence is in the external E9 execution record's `teardown-matrix.log`.
+This does not reproduce the older Qt/toolchain environment, establish a Qt bug,
+identify the historical cause, or guarantee absence of lifecycle defects.
+Earlier lifecycle corrections on this branch have independent regression
+evidence; this non-reproduction cannot attribute the old crash to any one fix.
+CI retains a distinct coverage-OFF QML lane without claiming an external cause.
+
 ## niri 26.04: "error writing reply" / Broken pipe WARN in niri log
 
 **Status:** niri-side bug — fix submitted upstream (PR #4180 / mailing list patch)

@@ -1,0 +1,16 @@
+input {
+    keyboard {
+        xkb { layout "us"; }
+    }
+}
+layout {
+    gaps 8
+    default-column-width { fixed 400; }
+    focus-ring { off; }
+    border { off; }
+}
+workspace "e9-main"
+workspace "e9-other"
+animations { off; }
+prefer-no-csd
+hotkey-overlay { skip-at-startup; }
