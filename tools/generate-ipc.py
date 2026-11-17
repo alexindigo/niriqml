@@ -321,6 +321,33 @@ class Compiler:
         return {"formatVersion": 1, "source": self.schema["x-niri-source"], "roots": roots, "types": types, "tupleTypes": self.tuples}
 
 
+class SourceBuckets:
+    """Pack complete semantic definitions, never slices of C++ source text."""
+    def __init__(self, emitter, family, prefix, suffix=(), limit=12000):
+        self.emitter, self.family = emitter, family
+        self.prefix, self.suffix, self.limit = prefix, list(suffix), limit
+        self.buckets = []
+
+    def add(self, lines):
+        if not lines:
+            return
+        size = sum(len(line) + 1 for line in lines)
+        if not self.buckets or self.buckets[-1][0] + size > self.limit:
+            self.buckets.append([0, []])
+        self.buckets[-1][0] += size
+        self.buckets[-1][1].extend(lines)
+
+    def take(self, lines, start):
+        self.add(lines[start:])
+        del lines[start:]
+
+    def outputs(self):
+        return {f"generated/{self.family}_{i:03d}_generated.cpp":
+                "\n".join([self.emitter.header(), "// clang-format off", *self.prefix, *lines,
+                            *self.suffix, "// clang-format on", ""])
+                for i, (_, lines) in enumerate(self.buckets, 1)}
+
+
 class CppEmitter:
     """Supporting value types. Callable wrappers are emitted separately."""
 
@@ -462,7 +489,11 @@ class CppEmitter:
         cpp = [self.header(), '#include "niriipctypes_generated.h"', '#include "niriipccodec_generated.h"', ""]
         codec_h = [self.header(), "#pragma once", "", '#include "niriipctypes_generated.h"', "#include <cmath>", "#include <limits>", "", "namespace NiriIpc {", "struct DecodeError", "{", "    QString path;", "    QString message;", "};", "enum class DecodeMode { Received, Outbound };", "bool fail(DecodeError &error, const QString &path, const QString &message);", "QString childPath(const QString &path, const QString &key);", ""]
         codec_cpp = [self.header(), '#include "niriipccodec_generated.h"', '#include <QJSValueIterator>', "", "namespace NiriIpc {", "using NiriWire::WireValue;", "using NiriWire::NumberToken;", ""]
+        self.special_outputs = {}
+        self.type_chunks = SourceBuckets(self, "niriipctypes", cpp[1:])
+        self.codec_chunks = SourceBuckets(self, "niriipccodec", codec_cpp[1:], ["} // namespace NiriIpc"])
         for name in self.ordered:
+            type_start = len(cpp)
             ir, typ = self.types[name], self.c.name(name)
             qml = self.c.bindings["types"].get(name, {}).get("qmlName", typ[:1].lower() + typ[1:])
             if ir["kind"] == "record":
@@ -501,9 +532,32 @@ class CppEmitter:
                         if ptype:
                             prop = alias[:1].lower() + alias[1:]
                             h.append(f"    Q_PROPERTY(QVariant {prop} READ qml{alias} CONSTANT)")
-                            h += [f"    QVariant qml{alias}() const", "    {", f"        const auto *item = std::get_if<{alias}Value>(&value);", "        return item ? NiriIpc::qmlValue(item->payload) : QVariant::fromValue(nullptr);", "    }"]
-                        h += [f"    static {typ} from{alias}({('const ' + ptype + ' &payload') if ptype else ''})", "    {", f"        {typ} result;", f"        result.value = {alias}Value{{{'payload' if ptype else ''}}};", "        return result;", "    }"]
-                    h += [f"    bool operator==(const {typ} &other) const", "    {", "        return value == other.value && invalidReason == other.invalidReason;", "    }", f"    bool operator!=(const {typ} &other) const {{ return !(*this == other); }}", "};", ""]
+                            h += [f"    QVariant qml{alias}() const;"]
+                            self.type_chunks.add([f"QVariant {typ}::qml{alias}() const", "{", f"    const auto *item = std::get_if<{alias}Value>(&value);", "    return item ? NiriIpc::qmlValue(item->payload) : QVariant::fromValue(nullptr);", "}"])
+                        parameter = ('const ' + ptype + ' &payload') if ptype else ''
+                        h += [f"    static {typ} from{alias}({parameter});"]
+                        self.type_chunks.add([f"{typ} {typ}::from{alias}({parameter})", "{", f"    {typ} result;", f"    result.value.emplace<{alias}Value>({alias}Value{{{'payload' if ptype else ''}}});", "    return result;", "}"])
+                    h += [f"    {typ}();", f"    ~{typ}();", f"    {typ}(const {typ} &);", f"    {typ}({typ} &&) noexcept;", f"    {typ} &operator=(const {typ} &);", f"    {typ} &operator=({typ} &&) noexcept;", f"    bool operator==(const {typ} &other) const;", f"    bool operator!=(const {typ} &other) const {{ return !(*this == other); }}", "};", ""]
+                    members = [f"{typ}::{typ}() = default;", f"{typ}::~{typ}() = default;", f"{typ}::{typ}(const {typ} &) = default;", f"{typ}::{typ}({typ} &&) noexcept = default;", f"{typ} &{typ}::operator=(const {typ} &) = default;", f"{typ} &{typ}::operator=({typ} &&) noexcept = default;", f"bool {typ}::operator==(const {typ} &other) const {{ return value == other.value && invalidReason == other.invalidReason; }}"]
+                    if len(variants) > 32:
+                        # Reuse the per-tag factories instead of instantiating variant's
+                        # converting-copy machinery for every alternative in one TU.
+                        copy = [f"{typ}::{typ}(const {typ} &other) : {typ}()", "{", "    switch (other.kind()) {"]
+                        for v in variants:
+                            alias, ptype = self.alias(name, v["tag"]), self.payload_type(name, v)
+                            argument = f"std::get<{alias}Value>(other.value).payload" if ptype else ""
+                            copy += [f"    case {alias}: *this = from{alias}({argument}); break;"]
+                        copy += ["    case Unknown: value.emplace<NiriUnknownVariant>(std::get<NiriUnknownVariant>(other.value)); break;", "    default: break;", "    }", "    invalidReason = other.invalidReason;", "}"]
+                        members[2] = "\n".join(copy)
+                        members[3] = f"{typ}::{typ}({typ} &&other) noexcept : {typ}() {{ *this = std::move(other); }}"
+                        members[4] = f"{typ} &{typ}::operator=(const {typ} &other) {{ if (this != &other) {{ {typ} copy(other); *this = std::move(copy); }} return *this; }}"
+                    for i, member in enumerate(members):
+                        if len(variants) > 32:
+                            # Variant-wide dispatch tables are separate from per-tag factories.
+                            key = f"generated/niriipctypes_{name.lower()}_special_{i}_generated.cpp"
+                            self.special_outputs[key] = "\n".join([self.header(), '#include "niriipctypes_generated.h"', "// clang-format off", member, "// clang-format on", ""])
+                        else:
+                            self.type_chunks.add([member])
                     cpp += [f"{typ}::Kind {typ}::kind() const", "{", "    switch (value.index()) {", "    case 0: return Invalid;"]
                     for i, v in enumerate(variants, 1):
                         cpp += [f"    case {i}: return {self.alias(name, v['tag'])};"]
@@ -518,7 +572,9 @@ class CppEmitter:
                 variants = ir.get("variants", [{"tag": v, "payload": None} for v in ir.get("values", [])])
                 kinds = ["Invalid", "Unknown"] + [self.alias(name, v["tag"]) for v in variants]
                 h += [f"class {typ}EnumRegistration : public QObject", "{", "    Q_OBJECT", f"    QML_NAMED_ELEMENT({typ})", '    QML_UNCREATABLE("Enum namespace")', "public:", "    enum Kind { " + ", ".join(f"{kind} = {typ}::{kind}" for kind in kinds) + " };", "    Q_ENUM(Kind)", "};", ""]
+            self.type_chunks.take(cpp, type_start)
         for binding in self.c.tuples.values():
+            codec_start = len(codec_cpp)
             typ = binding["cppName"]
             fields = list(zip(binding["members"], binding["type"]["items"]))
             h += [f"struct {typ}", "{", "    Q_GADGET", f"    QML_VALUE_TYPE({binding['qmlName']})", "public:"]
@@ -533,12 +589,14 @@ class CppEmitter:
             codec_cpp += [f"bool read(const WireValue &wire, {typ} &value, DecodeError &error, const QString &path, DecodeMode mode)", "{", f"    {tuple_type} tuple;", "    if (!read(wire, tuple, error, path, mode)) return false;"]
             codec_cpp += [f"    value.{name} = std::get<{i}>(tuple);" for i, (name, _) in enumerate(fields)]
             codec_cpp += ["    return true;", "}", f"bool write(const {typ} &value, WireValue &wire, DecodeError &error, const QString &path)", "{", "    return write(std::tie(" + ", ".join(f"value.{name}" for name, _ in fields) + "), wire, error, path);", "}", ""]
+            self.codec_chunks.take(codec_cpp, codec_start)
         h += ["struct NiriInvalidArgument", "{", "    Q_GADGET", "    QML_VALUE_TYPE(niriInvalidArgument)", "    Q_PROPERTY(bool valid READ valid CONSTANT)", "    Q_PROPERTY(QString error READ error CONSTANT)", "public:", "    QString path;", "    QString message;", "    bool valid() const { return false; }", '    QString error() const { return path + QStringLiteral(": ") + message; }', "};", "Q_DECLARE_METATYPE(NiriInvalidArgument)", ""]
         for name in self.ordered:
             h += [f"Q_DECLARE_METATYPE({self.c.name(name)})"]
         h += [""]
         h += ['#include <QJSValue>', "", "class NiriArgs : public QObject", "{", "    Q_OBJECT", "    QML_NAMED_ELEMENT(NiriArgs)", "    QML_SINGLETON", "public:", "    using QObject::QObject;"]
         cpp += ["namespace {", "template <typename T, typename = void> struct HasInvalidReason : std::false_type {};", "template <typename T> struct HasInvalidReason<T, std::void_t<decltype(std::declval<T>().invalidReason)>> : std::true_type {};", "template <typename T>", "QVariant invalidArgument(const NiriIpc::DecodeError &error)", "{", "    if constexpr (HasInvalidReason<T>::value) {", "        T result;", '        result.invalidReason = error.path + QStringLiteral(": ") + error.message;', "        return QVariant::fromValue(result);", "    } else {", "        NiriInvalidArgument result;", "        result.path = error.path;", "        result.message = error.message;", "        return QVariant::fromValue(result);", "    }", "}", "template <typename T>", "QVariant constructArgument(const NiriWire::WireValue &wire)", "{", "    T typed{};", "    NiriIpc::DecodeError error;", "    if (!NiriIpc::decode(wire, typed, &error, QStringLiteral(\"$\"), NiriIpc::DecodeMode::Outbound))", "        return invalidArgument<T>(error);", "    return QVariant::fromValue(typed);", "}", "} // namespace", ""]
+        argument_chunks = SourceBuckets(self, "niriipcarguments", cpp[1:])
         for name in self.ordered:
             ir, typ = self.types[name], self.c.name(name)
             if ir["kind"] == "record":
@@ -547,6 +605,7 @@ class CppEmitter:
                 variants = ir.get("variants", [{"tag": v, "payload": None} for v in ir.get("values", [])])
                 methods = [(name[:1].lower() + name[1:] + self.alias(name, v["tag"]), v["tag"], v["payload"] is None) for v in variants]
             for method, tag, unit in methods:
+                argument_start = len(cpp)
                 h += [f"    Q_INVOKABLE QVariant {method}({'' if unit else 'const QJSValue &input'});"]
                 cpp += [f"QVariant NiriArgs::{method}({'' if unit else 'const QJSValue &input'})", "{"]
                 if unit:
@@ -556,31 +615,46 @@ class CppEmitter:
                     wire = f"*NiriWire::WireValue::object({{{{QStringLiteral({json.dumps(tag)}), payload}}}})" if tag else "payload"
                     cpp += [f"    return constructArgument<{typ}>({wire});"]
                 cpp += ["}", ""]
+                argument_chunks.take(cpp, argument_start)
         h += ["};", ""]
+        # Qt's registrar emits one template call per value type in a single TU.
+        # Explicit instantiations keep that TU a dispatcher, not another monolith.
+        registration_types = [self.c.name(name) for name in self.ordered]
+        registration_types += [self.c.name(name) + "EnumRegistration" for name in self.ordered if self.types[name]["kind"] != "record"]
+        registration_types += [self.variant_record_name(name, v["tag"]) for name in self.ordered for v in self.types[name].get("variants", []) if v["payload"] and v["payload"]["kind"] == "record"]
+        registration_types += [b["cppName"] for b in self.c.tuples.values()] + ["NiriInvalidArgument", "NiriArgs"]
+        h += ['#include <QtQml/qqml.h>']
+        registration_chunks = SourceBuckets(self, "niriipcregistration", ['#include "niriipctypes_generated.h"'], limit=1000)
+        for typ in sorted(registration_types):
+            signature = f"void qmlRegisterTypesAndRevisions<{typ}>(const char *, int, QList<int> *)"
+            h += ["extern template " + signature + ";"]
+            registration_chunks.add(["template " + signature + ";"])
         codec_h += ["bool decodeNamed(const QString &name, const NiriWire::WireValue &wire, QVariant &value, DecodeError &error, DecodeMode mode = DecodeMode::Received);", "std::optional<NiriWire::WireValue> encodeVariant(const QVariant &value, DecodeError *error = nullptr);", "bool qmlNumber(double input, NiriWire::WireValue &wire, DecodeError &error, const QString &path);", "bool qmlInput(const QJSValue &input, NiriWire::WireValue &wire, DecodeError &error, const QString &path, int depth = 0);", ""]
         codec_h += [self.runtime_header(), "} // namespace NiriIpc", ""]
+        dispatch_h = [self.header(), "#pragma once", '#include "niriipccodec_generated.h"', "// clang-format off", "namespace NiriIpc {"]
+        named_types = [(name, self.c.name(name)) for name in self.ordered] + [(b["cppName"], b["cppName"]) for b in self.c.tuples.values()]
+        for name, typ in named_types:
+            dispatch_h += [f"bool decode{typ}(const NiriWire::WireValue &, QVariant &, DecodeError &, DecodeMode);", f"std::optional<NiriWire::WireValue> encode{typ}(const QVariant &, DecodeError *);"]
+            self.codec_chunks.add([f"bool decode{typ}(const WireValue &wire, QVariant &value, DecodeError &error, DecodeMode mode)", "{", f"    {typ} typed;", '    if (!decode(wire, typed, &error, QStringLiteral("$"), mode)) return false;', "    value = QVariant::fromValue(typed);", "    return true;", "}", f"std::optional<WireValue> encode{typ}(const QVariant &value, DecodeError *error)", "{", f"    if (value.metaType() != QMetaType::fromType<{typ}>()) return std::nullopt;", f"    return encode(value.value<{typ}>(), error);", "}"])
+        dispatch_h += ["} // namespace NiriIpc", "// clang-format on", ""]
+        codec_cpp.insert(2, '#include "niriipcdispatch_generated.h"')
         codec_cpp += [self.runtime_cpp(), "bool decodeNamed(const QString &name, const WireValue &wire, QVariant &value, DecodeError &error, DecodeMode mode)", "{"]
-        for name in self.ordered:
-            typ = self.c.name(name)
-            codec_cpp += [f"    if (name == QStringLiteral({json.dumps(name)})) {{", f"        {typ} typed;", '        if (!decode(wire, typed, &error, QStringLiteral("$"), mode)) return false;', "        value = QVariant::fromValue(typed);", "        return true;", "    }"]
-        for binding in self.c.tuples.values():
-            typ = binding["cppName"]
-            codec_cpp += [f"    if (name == QStringLiteral({json.dumps(typ)})) {{", f"        {typ} typed;", '        if (!decode(wire, typed, &error, QStringLiteral("$"), mode)) return false;', "        value = QVariant::fromValue(typed);", "        return true;", "    }"]
+        for name, typ in named_types:
+            codec_cpp += [f"    if (name == QStringLiteral({json.dumps(name)})) return decode{typ}(wire, value, error, mode);"]
         codec_cpp += ['    return fail(error, QStringLiteral("$"), QStringLiteral("unknown type name"));', "}", "std::optional<WireValue> encodeVariant(const QVariant &value, DecodeError *error)", "{"]
         codec_cpp += ["    if (value.metaType() == QMetaType::fromType<NiriInvalidArgument>()) {", "        const auto invalid = value.value<NiriInvalidArgument>();", "        if (error) *error = {invalid.path, invalid.message};", "        return std::nullopt;", "    }"]
-        for name in self.ordered:
-            typ = self.c.name(name)
-            codec_cpp += [f"    if (value.metaType() == QMetaType::fromType<{typ}>()) return encode(value.value<{typ}>(), error);"]
-        for binding in self.c.tuples.values():
-            typ = binding["cppName"]
-            codec_cpp += [f"    if (value.metaType() == QMetaType::fromType<{typ}>()) return encode(value.value<{typ}>(), error);"]
+        for name, typ in named_types:
+            codec_cpp += [f"    if (const auto wire = encode{typ}(value, error)) return wire;"]
         codec_cpp += ["    return std::nullopt;", "}", "} // namespace NiriIpc", ""]
-        cmake = self.header("#") + "set(NIRIQML_GENERATED_SOURCES\n    generated/niriipctypes_generated.h\n    generated/niriipctypes_generated.cpp\n    generated/niriipccodec_generated.h\n    generated/niriipccodec_generated.cpp\n)\nset(NIRIQML_GENERATED_HEADERS\n    generated/niriipctypes_generated.h\n    generated/niriipccodec_generated.h\n)\n"
         def expanded_region(lines):
             first = next(i for i, line in enumerate(lines) if line and not line.startswith(("//", "#")))
             lines[first:first] = ["// Schema-expanded declarations/dispatch keep deterministic layout without a formatter dependency.", "// clang-format off"]
             return "\n".join(lines).rstrip() + "\n// clang-format on\n"
-        return {"generated/niriipctypes_generated.h": expanded_region(h), "generated/niriipctypes_generated.cpp": expanded_region(cpp), "generated/niriipccodec_generated.h": expanded_region(codec_h), "generated/niriipccodec_generated.cpp": expanded_region(codec_cpp), "generated/ipc-generated.cmake": cmake}
+        result = {"generated/niriipctypes_generated.h": expanded_region(h), "generated/niriipccodec_generated.h": expanded_region(codec_h), "generated/niriipccodec_generated.cpp": expanded_region(codec_cpp), "generated/niriipcdispatch_generated.h": "\n".join(dispatch_h)}
+        for chunks in (self.type_chunks, self.codec_chunks, argument_chunks, registration_chunks):
+            result.update(chunks.outputs())
+        result.update(self.special_outputs)
+        return result
 
     def payload_type(self, name, variant):
         payload = variant["payload"]
@@ -592,6 +666,7 @@ class CppEmitter:
         h += [f"bool read(const NiriWire::WireValue &wire, {typ} &value, DecodeError &error, const QString &path, DecodeMode mode);", f"bool write(const {typ} &value, NiriWire::WireValue &wire, DecodeError &error, const QString &path);", ""]
 
     def codec_record(self, typ, ir, h, cpp):
+        start = len(cpp)
         self.declarations(typ, h)
         cpp += [f"bool read(const WireValue &wire, {typ} &value, DecodeError &error, const QString &path, DecodeMode mode)", "{", "    const auto *object = wire.objectValue();", '    if (!object) return fail(error, path, QStringLiteral("expected record"));', f"    {typ} result;"]
         for f in ir["fields"]:
@@ -618,11 +693,17 @@ class CppEmitter:
             cpp += ["    {", "        WireValue item;", f"        const auto key = QStringLiteral({json.dumps(f['wire'])});", f"        if (!write(value.{f['name']}, item, error, childPath(path, key))) return false;", "        members.append({key, item});", "    }"]
         cpp += ["    for (const auto &member : value.extensions) {", "        for (const auto &known : members) {", '            if (known.first == member.first) return fail(error, childPath(path, member.first), QStringLiteral("extension collides with a known field"));', "        }", "        members.append(member);", "    }", "    const auto object = WireValue::object(members);", '    if (!object) return fail(error, path, QStringLiteral("duplicate extension"));', "    wire = *object;", "    return true;", "}", ""]
 
+        self.codec_chunks.take(cpp, start)
+
     def codec_unit(self, typ, h, cpp):
+        start = len(cpp)
         self.declarations(typ, h)
         cpp += [f"bool read(const WireValue &wire, {typ} &value, DecodeError &error, const QString &path, DecodeMode mode)", "{", "    const auto *name = wire.stringValue();", '    if (!name) return fail(error, path, QStringLiteral("expected enum string"));', f"    const auto result = {typ}::fromWireName(*name);", '    if (mode == DecodeMode::Outbound && !result.known()) return fail(error, path, QStringLiteral("unknown enum value"));', "    value = result;", "    return true;", "}", f"bool write(const {typ} &value, WireValue &wire, DecodeError &error, const QString &path)", "{", "    Q_UNUSED(error); Q_UNUSED(path);", "    wire = WireValue(value.wireName());", "    return true;", "}", ""]
 
+        self.codec_chunks.take(cpp, start)
+
     def codec_union(self, name, typ, variants, h, cpp):
+        start = len(cpp)
         self.declarations(typ, h)
         cpp += [f"bool read(const WireValue &wire, {typ} &value, DecodeError &error, const QString &path, DecodeMode mode)", "{", "    QString tag;", "    const WireValue *payload = nullptr;", "    if (const auto *text = wire.stringValue()) tag = *text;", "    else if (const auto *object = wire.objectValue(); object && object->size() == 1) {", "        tag = object->first().first;", "        payload = &object->first().second;", '    } else return fail(error, path, QStringLiteral("expected enum string or single-key variant"));']
         for v in variants:
@@ -643,6 +724,8 @@ class CppEmitter:
                 cpp += [f"        wire = WireValue(QStringLiteral({json.dumps(v['tag'])}));"]
             cpp += ["        return true;", "    }"]
         cpp += [f"    case {typ}::Unknown: wire = std::get<NiriUnknownVariant>(value.value).raw; return true;", '    default: return fail(error, path, value.invalidReason.isEmpty() ? QStringLiteral("invalid union construction") : value.invalidReason);', "    }", "}", ""]
+
+        self.codec_chunks.take(cpp, start)
 
     def runtime_header(self):
         return r'''
@@ -1009,7 +1092,9 @@ class ActionEmitter(CppEmitter):
             if ir["kind"] == "ref": return self.c.name(ir["name"])[:1].lower() + self.c.name(ir["name"])[1:] + " / object"
             return shape(ir)
 
+        chunks = SourceBuckets(self, "niriipcactions", cpp[1:])
         for index, variant in enumerate(self.c.ir["Action"]["variants"], 1):
+            start = len(cpp)
             tag = variant["tag"]
             method = self.c.bindings.get("actions", {}).get(tag, {}).get("name", tag[:1].lower() + tag[1:])
             fields = self.action_fields(variant)
@@ -1054,9 +1139,10 @@ class ActionEmitter(CppEmitter):
             signature = ", ".join(f["name"] + ": " + qml_shape(f["type"]) for f in fields)
             wire_shape = '{"Action":{"' + tag + '":{' + ",".join(json.dumps(f["wire"]) + ":" + shape(f["type"]) for f in fields) + "}}}"
             docs.append(f"| {index} | `NiriActions.{method}({signature}) -> NiriHandledReply` | `{wire_shape}` |")
+            chunks.take(cpp, start)
         h += ["protected:", "    virtual NiriHandledReply *submitAction(const NiriWire::WireValue &action, const QString &validationError) = 0;", "};", "// clang-format on", ""]
         cpp += ["// clang-format on", ""]
-        return {"generated/niriipcactions_generated.h": "\n".join(h), "generated/niriipcactions_generated.cpp": "\n".join(cpp), "generated/ipc-actions.json": json.dumps(manifest, indent=2, sort_keys=True) + "\n", "docs/generated/IPC-API.md": "\n".join(docs) + "\n"}
+        return {"generated/niriipcactions_generated.h": "\n".join(h), **chunks.outputs(), "generated/ipc-actions.json": json.dumps(manifest, indent=2, sort_keys=True) + "\n", "docs/generated/IPC-API.md": "\n".join(docs) + "\n"}
 
 
 class ReplyEmitter(CppEmitter):
@@ -1399,13 +1485,11 @@ def outputs(root=ROOT):
     result.update(request_outputs)
     result.update(EventEmitter(compiler, hashes).emit())
     result.update(ReferenceEmitter(compiler, hashes).emit())
-    result["generated/ipc-generated.cmake"] = result["generated/ipc-generated.cmake"].replace(
-        "set(NIRIQML_GENERATED_SOURCES\n", "set(NIRIQML_GENERATED_SOURCES\n    generated/niriipcactions_generated.h\n    generated/niriipcactions_generated.cpp\n").replace(
-        "set(NIRIQML_GENERATED_HEADERS\n", "set(NIRIQML_GENERATED_HEADERS\n    generated/niriipcactions_generated.h\n")
-    for group in ("requests", "replies", "events"):
-        base = "generated/niriipc" + group + "_generated"
-        result["generated/ipc-generated.cmake"] = result["generated/ipc-generated.cmake"].replace("set(NIRIQML_GENERATED_SOURCES\n", f"set(NIRIQML_GENERATED_SOURCES\n    {base}.h\n    {base}.cpp\n").replace("set(NIRIQML_GENERATED_HEADERS\n", f"set(NIRIQML_GENERATED_HEADERS\n    {base}.h\n")
-    result["generated/ipc-generated.cmake"] = result["generated/ipc-generated.cmake"].replace("set(NIRIQML_GENERATED_HEADERS\n", "set(NIRIQML_GENERATED_HEADERS\n    generated/niriipcinventory_generated.h\n").replace("set(NIRIQML_GENERATED_SOURCES\n", "set(NIRIQML_GENERATED_SOURCES\n    generated/niriipcinventory_generated.h\n")
+    sources = sorted(p for p in result if p.startswith("generated/") and p.endswith((".h", ".cpp")))
+    headers = [p for p in sources if p.endswith(".h")]
+    result["generated/ipc-generated.cmake"] = CppEmitter(compiler, hashes).header("#") + "".join(
+        f"set({variable}\n" + "".join(f"    {p}\n" for p in paths) + ")\n"
+        for variable, paths in (("NIRIQML_GENERATED_SOURCES", sources), ("NIRIQML_GENERATED_HEADERS", headers)))
     return result
 
 

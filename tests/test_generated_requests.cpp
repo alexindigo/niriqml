@@ -56,6 +56,21 @@ class TestGeneratedRequests : public QObject
 {
     Q_OBJECT
     WireValue fixtures, manifest;
+    void checkActionCopies(const NiriAction &original)
+    {
+        NiriAction copied(original);
+        QVERIFY(copied == original);
+        NiriAction assigned = NiriAction::fromQuit(NiriActionQuitPayload{});
+        assigned = original;
+        QVERIFY(assigned == original);
+        auto &self = assigned;
+        assigned = self;
+        QVERIFY(assigned == original);
+        NiriAction moved(std::move(copied));
+        QVERIFY(moved == original);
+        assigned = std::move(moved);
+        QVERIFY(assigned == original);
+    }
     const WireValue &fixture(const QString &name) const
     {
         for (const auto &row : *fixtures.lookup("surfaceVectors")->arrayValue()) {
@@ -332,6 +347,21 @@ private slots:
         const auto encoded = NiriIpc::encodeVariant(typed, &error);
         QVERIFY(encoded);
         QCOMPARE(NiriWire::encode(canonical(*encoded)), NiriWire::encode(canonical(wire)));
+        if (type == "Action")
+            checkActionCopies(typed.value<NiriAction>());
+    }
+    void actionCopyStates()
+    {
+        NiriAction invalid;
+        invalid.invalidReason = "retained diagnostic";
+        checkActionCopies(invalid);
+        NiriAction future;
+        NiriIpc::DecodeError error;
+        const auto document = parse("{\"FutureAction\":{\"id\":18446744073709551615}}");
+        QVERIFY(document);
+        QVERIFY(NiriIpc::decode(document->root, future, &error));
+        QCOMPARE(future.kind(), NiriAction::Unknown);
+        checkActionCopies(future);
     }
     void picksNoDeadline_data()
     {

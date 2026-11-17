@@ -241,6 +241,28 @@ class GeneratorTest(unittest.TestCase):
             self.assertIn(b"Unexpected generated", run("--check").stderr)
             self.assertEqual(extra.read_text(), "preserve\n")
 
+    def test_semantic_source_partitioning(self):
+        generated = GEN.outputs()
+        manifest = generated["generated/ipc-generated.cmake"]
+        sources = {p for p in generated if p.startswith("generated/") and p.endswith(".cpp")}
+        for source in sources:
+            self.assertEqual(manifest.count("    " + source + "\n"), 1, source)
+        self.assertNotIn("generated/niriipctypes_generated.cpp", sources)
+        self.assertNotIn("generated/niriipcactions_generated.cpp", sources)
+        for family in ("types", "codec", "actions", "arguments", "registration"):
+            self.assertGreater(len([p for p in sources if f"niriipc{family}_" in p]), 1)
+        header = generated["generated/niriipctypes_generated.h"]
+        self.assertIn("static NiriAction fromCloseWindow(const NiriActionCloseWindowPayload &payload);", header)
+        self.assertIn("NiriAction(const NiriAction &);", header)
+        self.assertIn("extern template void qmlRegisterTypesAndRevisions<NiriAction>", header)
+        self.assertNotIn("result.value =", header)
+        chunks = GEN.SourceBuckets(GEN.CppEmitter(self.compiler(), {}), "test", [], limit=4)
+        chunks.add(["first complete definition"])
+        chunks.add(["second complete definition"])
+        output = chunks.outputs()
+        self.assertEqual(len(output), 2)
+        self.assertIn("first complete definition", output["generated/test_001_generated.cpp"])
+
 
 if __name__ == "__main__":
     unittest.main()
