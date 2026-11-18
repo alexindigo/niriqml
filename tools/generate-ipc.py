@@ -1489,7 +1489,7 @@ class ReferenceEmitter(EventEmitter):
             payload = variant["payload"]
             docs.append(f'| {i} | `Niri{variant["tag"]}Reply` | `{self.cpp(payload) if payload else "NiriHandled"}` | `{self.qml_type(payload) if payload else "niriHandled"}` | `{{"Ok":{self.variant_shape(variant)}}}` |')
         docs += ["", "## Events", "", f"The {len(self.c.ir['Event']['variants'])} native and QML signals below publish the SAME decoded event after the",
-                 "coordinator's existing state updates. Generated buses do not parse or cache.",
+                  "session's canonical reducer/model updates. Generated buses do not parse or cache.",
                  "Native C++ uses NiriEvents::nativeEvents() (not invokable from QML). The QML",
                  "singleton inherits the projected signals. An epoch change during a native",
                  "callback suppresses the stale QML/raw continuation.",
@@ -1588,6 +1588,118 @@ class ReferenceEmitter(EventEmitter):
         return {"docs/generated/IPC-API.md": "\n".join(docs), "generated/niriipcinventory_generated.h": "\n".join(inventory)}
 
 
+class GuideEmitter(ReferenceEmitter):
+    """Checked navigation and provenance, derived from the same inventory IR."""
+
+    def guides(self, inventory, released):
+        counts = {name: len(inventory["types"][name]["variants"]) for name in ROOT_GROUPS}
+        base_counts = {name: len(released["$defs"][name]["oneOf"]) for name in ROOT_GROUPS}
+        mapping = ["# Feature mapping", "", self.header("<!--").replace("\n", " -->\n"),
+                   "Generated from schema/ipc-inventory.json's normalized model. Do not edit.",
+                   "The [generated reference](docs/generated/IPC-API.md) supplies every exact",
+                   "wire shape, native/QML signature, field constraint and factory. Raw access",
+                   "remains available for all protocol values, including unknown future data.",
+                   "This inventory describes API availability, not proof of every action effect.",
+                   "", "| # | Root | Released v26.04 | With selected newer additions |",
+                   "|---|---|---|---|"]
+        for i, name in enumerate(ROOT_GROUPS, 1):
+            mapping.append(f"| {i} | {name} | {base_counts[name]} | {counts[name]} |")
+        mapping += ["", "Query replies are snapshots and never seed state. Output/layer metadata",
+                    "are query-only, not invented stream parts. Current-state projections retain",
+                    "windows, workspaces, optional layouts, overview, config and casts, plus optional",
+                    "newer touchpad availability. ScreenshotCaptured is transient; EventLog is",
+                    "bounded history rather than another reducer. Unknown/malformed data remains raw.",
+                    "See [authored contracts](API.md) for readiness, selectors and notification rules.",
+                    "The schema Reply alias Result_of_Response_or_string maps the Ok/Err envelope",
+                    "to NiriPendingReply.document/json, not a fictional Request/Response value gadget."]
+        sections = {"Action": ("actions", "NiriActions"), "Request": ("requests", "NiriRequests"),
+                    "Event": ("events", "NiriEvents"), "OutputAction": ("niriargs-factories", "NiriArgs"),
+                    "Response": ("typed-replies", "")}
+        for group in ROOT_GROUPS:
+            section, facade = sections[group]
+            mapping += ["", f"## {group}", "", "| # | Wire variant / fields | QML entry | Native API | Availability / reference |", "|---|---|---|---|---|"]
+            for i, variant in enumerate(inventory["types"][group]["variants"], 1):
+                tag, payload = variant["tag"], variant["payload"]
+                fields = (", ".join(f["wire"] for f in payload["fields"]) or "empty object") if payload and payload["kind"] == "record" else ("value" if payload else "unit")
+                if group in {"Action", "Request", "Event"}:
+                    method = self.c.bindings.get(section, {}).get(tag, {}).get("name", tag[:1].lower() + tag[1:])
+                    qml = facade + "." + method
+                    native = ("NiriNativeEvents::" if group == "Event" else facade + "::") + method
+                elif group == "Response":
+                    qml, native = "Niri" + tag + "Reply.result", "Niri" + tag + "Reply::result()"
+                else:
+                    qml = "NiriArgs.outputAction" + self.alias(group, tag) + " -> NiriRequests.output"
+                    native = "NiriOutputAction::from" + self.alias(group, tag)
+                availability = "post-v26.04" if variant.get("introducedAfter") else "v26.04"
+                mapping.append(f"| {i} | `{tag}`: {fields} | `{qml}` | `{native}` | {availability}; [reference](docs/generated/IPC-API.md#{section}) |")
+        mapping += ["", "## Supporting values and fields", "", "Every field below maps to a generated read-only QML property and canonical",
+                    "native field; record/variant payload details and enum alternatives are in the",
+                    "linked reference. Wide integers use QML strings; optional fields use null.",
+                    "", "| # | Wire type | Native / QML value | Fields / alternatives | Reference |", "|---|---|---|---|---|"]
+        index = 0
+        for name, ir in inventory["types"].items():
+            if name in {"Request", "Response", "Result_of_Response_or_string"}:
+                continue  # These roots export methods/replies, not fictional value gadgets.
+            index += 1
+            if ir["kind"] == "record":
+                entries = [f['wire'] + " -> " + f['name'] for f in ir["fields"]]
+            else:
+                entries = [v["tag"] for v in ir.get("variants", [])] or ir.get("values", [])
+            section = "records-and-variant-payloads" if ir["kind"] == "record" else "tuple-enum-and-union-values"
+            mapping.append(f"| {index} | `{name}` | `{ir['cppName']}` / `{self.qml_type({'kind': 'ref', 'name': name})}` | {', '.join(entries)} | [reference](docs/generated/IPC-API.md#{section}) |")
+        mapping += ["", "Tuple members and every inline variant field are exhaustively listed in the",
+                    "[record/tuple reference](docs/generated/IPC-API.md#records-and-variant-payloads).",
+                    "[Selected newer nodes](docs/generated/IPC-API.md#selected-post-v2604-surface)",
+                    "carry introducedAfter metadata; they do not relax released required fields.",
+                    "", "## Verification links", "", "| # | Surface | Consumer check |", "|---|---|---|",
+                    "| 1 | Requests/actions/output controls | tests/test_generated_requests.cpp, tests/test_generated_actions.cpp; independent serde socket bytes |",
+                    "| 2 | Replies/events/records | tests/test_codec.cpp, tests/test_generated_events.cpp; native and real QML values |",
+                    "| 3 | Exported surface | tests/test_ipc_inventory.cpp; actual Qt metaobjects vs inventory |",
+                    "| 4 | Retained state/projections | tests/test_state.cpp, tests/test_state_projections.cpp, tests/test_projection_reset.cpp |",
+                    "| 5 | Live outcomes | tests/test_live_acceptance.cpp; representative effects, not every destructive action |",
+                    "| 6 | Mapping/schema/reference drift | tools/generate-ipc.py --check, tests/test_generator.py |", ""]
+        schema = ["# IPC schema and checked inventory", "", self.header("<!--").replace("\n", " -->\n"),
+                  "Generated by tools/generate-ipc.py from the same inventory as the typed API.",
+                  "", "| # | Input | Provenance | SHA256 |", "|---|---|---|---|",
+                  f"| 1 | `{SCHEMA}` | {inventory['source']['release']} / `{inventory['source']['commit']}` | `{self.hashes['schema']}` |",
+                  f"| 2 | `{NEWER_SCHEMA}` | selected main `{self.c.extensions['commit']}` | `{self.hashes['newer_schema']}` |",
+                  f"| 3 | `{EXTENSIONS}` | explicit additive selections, introducedAfter:v26.04 | `{self.hashes['extensions']}` |",
+                  f"| 4 | `{BINDINGS}` | names/order/aliases and cited request-response pairings only | `{self.hashes['bindings']}` |",
+                  "", "Dialect: JSON Schema Draft 2020-12, canonical deserialize contract.",
+                  "The dumper pins schemars/serde_json and emits provenance in x-niri-source.",
+                  "The synthetic six-root schema index is NOT an IPC Request wrapper.",
+                  "", "## Actual protocol examples", "", "Unix socket selected from NIRI_SOCKET or explicit endpoint. One JSON document",
+                  "per LF-delimited frame. Requests can be bare strings or tagged objects:",
+                  "", "```json", '"Version"', '{"Action":{"MoveWindowToWorkspace":{"window_id":123,"reference":{"Id":456},"focus":false}}}',
+                  '{"Output":{"output":"DP-1","action":"Off"}}', '{"Ok":"Handled"}', '{"Ok":{"Version":"26.04"}}', '{"Err":"example server error"}',
+                  '{"WindowFocusChanged":{"id":null}}', "```", "", "Each line above is a separate example, not one combined document. There is",
+                  "no extra Request key. Handled is a string; optional values are real null.",
+                  "Wire u64 values are JSON numbers, while typed QML IDs are decimal strings.",
+                  "Required released fields stay required; CLI/newer serde defaults are not inferred.",
+                  "", "## Coverage", "", "| # | Root | Released | Selected surface |", "|---|---|---|---|"]
+        for i, name in enumerate(ROOT_GROUPS, 1):
+            schema.append(f"| {i} | {name} | {base_counts[name]} | {counts[name]} |")
+        schema += ["", "[FeatureMapping](../FeatureMapping.md) and the [complete generated reference](generated/IPC-API.md)",
+                   "include every field/variant, QML/native name and optional newer selection.",
+                   "schema/ipc-inventory.json is the machine-readable normalized model. Normal",
+                   "builds compile committed C++ and need no Rust or schema generation.",
+                   "", "## Reproduction and release updates", "", "Run only in the named project guest/container from [DESIGN.md](../DESIGN.md#per-release-maintenance-procedure):",
+                   "DigitalOcean niriqml-full-ipc-api, localhost/niriqml-dev:latest, /w/src,",
+                   "TMPDIR=/w/tmp, CARGO_HOME=/w/cargo. The host guest helper transports commands.",
+                   "", "```sh", "export CARGO_TARGET_DIR=/w/build/ipc-schema-dump",
+                   "cargo run --locked --manifest-path tools/ipc-schema-dump/Cargo.toml > /w/tmp/schema.json",
+                   f"cmp /w/tmp/schema.json {SCHEMA}", "python3 tools/generate-ipc.py", "python3 tools/generate-ipc.py --check", "```", "",
+                   "Generation is stdlib-only, deterministic and network-free; --check diffs in",
+                   "memory and never rewrites stale files. It checks C++, manifests, inventory,",
+                   "this file, FeatureMapping and IPC-API together. Review all diffs, do not hand-edit.",
+                   "For each release: dump twice, compare deserialize/serialize, review all schema",
+                   "and extension changes, re-read state.rs/server.rs replication/ack order and",
+                   "readiness, refresh independent native serde vectors, run full non-live/QML/lint",
+                   "and owned live suites plus installed-consumer proof. Follow the exact procedure",
+                   "in DESIGN.md and [dumper README](../tools/ipc-schema-dump/README.md).", ""]
+        return {"FeatureMapping.md": "\n".join(mapping), "docs/SCHEMA.md": "\n".join(schema)}
+
+
 def outputs(root=ROOT):
     schema, bindings = load(root / SCHEMA), load(root / BINDINGS)
     extensions = load(root / EXTENSIONS)
@@ -1609,6 +1721,7 @@ def outputs(root=ROOT):
     result.update(request_outputs)
     result.update(EventEmitter(compiler, hashes).emit())
     result.update(ReferenceEmitter(compiler, hashes).emit())
+    result.update(GuideEmitter(compiler, hashes).guides(inventory, load(root / SCHEMA)))
     sources = sorted(p for p in result if p.startswith("generated/") and p.endswith((".h", ".cpp")))
     headers = [p for p in sources if p.endswith(".h")]
     result["generated/ipc-generated.cmake"] = CppEmitter(compiler, hashes).header("#") + "".join(

@@ -115,6 +115,27 @@ class GeneratorTest(unittest.TestCase):
                     self.assertIn("### " + emitter.variant_record_name(name, variant["tag"]), text)
         self.assertIn("19> Event", outputs["generated/niriipcinventory_generated.h"])
 
+    def test_guide_inventory_coverage(self):
+        generated = GEN.outputs()
+        inventory = json.loads(generated["schema/ipc-inventory.json"])
+        mapping = generated["FeatureMapping.md"]
+        for name, ir in inventory["types"].items():
+            if name not in {"Request", "Response", "Result_of_Response_or_string"}:
+                self.assertIn("`" + name + "`", mapping)
+            for variant in ir.get("variants", []):
+                self.assertIn(variant["tag"], mapping)
+                payload = variant["payload"]
+                if payload and payload["kind"] == "record":
+                    for field in payload["fields"]:
+                        self.assertIn(field["wire"], mapping)
+            for field in ir.get("fields", []):
+                self.assertIn(field["wire"] + " -> " + field["name"], mapping)
+        for name, count in {"Request": 16, "Action": 149, "OutputAction": 10, "Response": 14, "Event": 20}.items():
+            self.assertIn(f"{name} |", generated["docs/SCHEMA.md"])
+            self.assertIn(f"| {count} |", generated["docs/SCHEMA.md"])
+        self.assertIn(inventory["source"]["commit"], generated["docs/SCHEMA.md"])
+        self.assertNotIn('"Request":', generated["docs/SCHEMA.md"])
+
     def test_reject_bad_ref_and_ambiguous_union(self):
         for ref in ("https://example.invalid/schema", "#/$defs/DoesNotExist"):
             with self.assertRaises(GEN.SchemaError):
@@ -232,6 +253,15 @@ class GeneratorTest(unittest.TestCase):
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertEqual(snapshot, {str(p.relative_to(root)): p.read_bytes() for p in root.rglob("*") if p.is_file()})
             self.assertEqual(run("--check").returncode, 0)
+            for name in ("FeatureMapping.md", "docs/SCHEMA.md"):
+                path = root / name
+                original = path.read_text()
+                path.write_text("stale guide\n")
+                stale = run("--check")
+                self.assertEqual(stale.returncode, 1)
+                self.assertIn(name.encode(), stale.stdout)
+                self.assertEqual(path.read_text(), "stale guide\n")
+                path.write_text(original)
             inventory = root / "schema/ipc-inventory.json"
             inventory.write_text("stale\n")
             stale = run("--check")

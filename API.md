@@ -1,486 +1,420 @@
-# niriqml API Reference
+# niriqml contracts
 
-Complete QML API surface for niriqml, derived from library headers.
-Verified against `niriqml v0.1.0`.
+Import `Niri 1.0`. The supported baseline is niri >= 26.04, pinned to
+`8ed0da44d974c32c6877d2f4630c314da0717ecb`. Selected optional additions are
+pinned separately to main `689c1e9`; they are not requirements on 26.04.
 
-## Import
+This is the hand-written behavioral reference. The checked
+[generated reference](docs/generated/IPC-API.md) lists **every method, signal,
+record, field, enum, argument factory and response**, including exact wire
+shapes and native/QML types. [FeatureMapping](FeatureMapping.md) maps the
+inventory to that reference. [Requests](docs/REQUESTS.md) provides runnable
+retention/sequence examples; it uses the contracts below.
+
+## Architecture and ownership
+
+Raw access is the base; generated typed calls/codecs are an abstraction over
+it, not a separate transport. One application-owned `NiriSession` selects the
+endpoint, owns one event subscription and reduces stream events into one
+canonical state. Queries/actions normally use independent short-lived sockets.
+An explicit sequence owns its own persistent request socket.
+
+`NiriState`, models, reactive trackers and snapshot getters only project the
+reducer. They neither query to seed state nor replay events into private caches.
+Late consumers see current state immediately. Query results are value snapshots
+and never overwrite stream state.
+
+| # | QML export | Ownership / purpose |
+|---|---|---|
+| 1 | `NiriConnection`, `NiriEvents`, `NiriState`, `NiriActions`, `NiriRequests` | Engine-local singleton facades, CppOwnership; shared application session |
+| 2 | `NiriWindows`, `NiriWorkspaces` | QML-created list models, owned with their QML objects; C++ classes are NiriWindowsModel/NiriWorkspacesModel |
+| 3 | `NiriWindow`, `NiriWorkspace` | QML-created reactive trackers; C++ classes are NiriWindowReactive/NiriWorkspaceReactive |
+| 4 | `niriWindow`, `niriWorkspace`, other lowercase names | Immutable generated value gadgets, not tracker objects; native records are NiriWindow/NiriWorkspace |
+| 5 | `NiriPendingReply`, generated reply subclasses, `NiriRequestSequence` | Uncreatable by QML; returned retainable JavaScript-owned objects |
+| 6 | `NiriEventLog` | QML-created bounded history model |
+
+`NiriArgs` is an engine-local generated value-constructor singleton, not a
+session consumer or transport owner. Constructing a value alone needs no IPC.
+
+All service/model/tracker QObject acquisition and use, including getters,
+requests and cancellation, must occur on the **application thread**. Engines
+must live on that thread too. Pure copied value records/codecs are not session
+consumers.
+Wrong-thread acquisition/calls are rejected with a diagnostic, not marshalled.
+Multiple same-thread engines have separate facades over the same session.
+Destroying an engine cancels its facade's operations, not other engines' work.
+The application owns session shutdown; there is no process-static QObject that
+outlives Qt's event dispatcher.
+
+## Startup, endpoint and connection
+
+Acquiring **any** public consumer starts the session automatically, including
+state-only, model-only, reactive-only and event-log-only applications. No prior
+`NiriConnection` or `NiriEvents` access is needed. Startup is queued so receivers
+exist before the first subscription. Later consumers do not undo an explicit
+stop. Call `NiriConnection.start()` to resume.
+
+`stop()` (also `disconnect()`) stops subscription/retries, invalidates the epoch
+and clears canonical state/readiness. It cancels pending stream observers;
+independent request calls remain separate operations and are not rolled back.
+Setting `autoReconnect` does not itself override explicit stop.
+
+| # | Endpoint operation | Meaning |
+|---|---|---|
+| 1 | Default / `useEnvironmentEndpoint()` | Select current `NIRI_SOCKET`, including unset/empty; explicit refresh, not continuous environment watching |
+| 2 | `selectEndpoint(path)` | Select Explicit even for empty path; no environment fallback |
+| 3 | `connectToSocket(path)` | Compatibility adapter: nonempty selects Explicit; empty/no argument refreshes Environment; starts subscription |
+| 4 | `start()` | Resume selected endpoint without changing its source |
+
+Selection is independent of socket liveness. Every request captures endpoint,
+revision and request ID before queued work. Endpoint replacement cancels old
+revision operations as EndpointChanged; they are never retargeted or replayed.
+A stream reconnect at the same endpoint does not cancel independent requests.
+
+| # | Connection property | Notify / meaning |
+|---|---|---|
+| 1 | `socketPath: string` | `socketPathChanged`; selected path, not necessarily connected |
+| 2 | `endpointSource: NiriConnection.Environment/Explicit` | `endpointSourceChanged` |
+| 3 | `status` | `statusChanged`; Stopped, Connecting, Subscribing, Streaming, Backoff, Failed |
+| 4 | `isConnected: bool` | `connectedChanged`; physical stream socket connected, not necessarily subscribed |
+| 5 | `subscribed: bool` | `subscribedChanged`; accepted exact semantic `{"Ok":"Handled"}` acknowledgement |
+| 6 | `autoReconnect: bool` | `autoReconnectChanged`; retry policy; `reconnectScheduled(delayMs, attempt)` announces retries |
+| 7 | `errorString: string`, `error: var` | `errorChanged`; structured stream failure; empty on recovery |
+| 8 | `peerInfo: peerInfo` | `peerInfoChanged`; current socket peer metadata, cleared on retirement |
+
+Connection establishment and subscription acknowledgement have finite deadlines.
+Malformed/rejected acknowledgement, framing, parsing and impossible event
+sequences fail visibly and reset state. Retry follows `autoReconnect`, never
+an implicit switch to another compositor. Native `setMaxFrameBytes()` configures
+the next stream attempt; the default 64 MiB is a resource bound, not an upstream
+record limit. Requests capture their separately configurable frame limit.
+
+`peerInfo` exposes pid/uid/gid, credentialsAvailable/credentialsError,
+peerSecurityContext and securityContextAvailable/securityContextError.
+Credential and security-label availability are independent. Native
+peerSecurityContextBytes retains exact label bytes; the QML string is a UTF-8
+display projection. A missing label is not a fabricated identity.
+
+## Readiness and reset
+
+`NiriState.initialStateReceived` is false until the first `CastsChanged` after
+an accepted subscription is applied, including an empty casts list. It is true
+before that event's notifications. The released burst order is workspaces,
+windows, optional keyboard layouts, overview, config, casts. An absent keyboard
+layout part is valid. An empty ready desktop is not a disconnected desktop.
+
+Later casts replacements do not retrigger readiness. Disconnect, stop, endpoint
+replacement or subscription failure clears all parts, focus and readiness with
+notifications. Models remove rows; reactive trackers become invalid; the next
+burst repopulates the same consumers. Before readiness, values can be partial or
+default. Recheck upstream `state.rs` and `server.rs` on every release update.
+
+The selected newer `TouchpadToggled` part follows casts. `touchpadOn` is null
+until received, then bool, and resets to null. On a newer compositor,
+`initialStateReceived` can become true **one event before** `touchpadOn` leaves
+null. Consumers needing touchpad state bind to `touchpadOn`; null means unknown,
+false is a present value. This is the runtime toggle, not hardware/config
+disablement. Optional main extensions do not change released readiness; revisit
+the terminator when adopting a new supported release baseline.
+
+## IDs, nulls and typed values
+
+QML u64 IDs and wide integer counters/indices (`u64`, `usize`, `i64`) are decimal
+**strings**, even when small. Native C++ uses exact integers (IDs: quint64).
+Typed inputs also accept finite, integral Number values exactly representable
+by JavaScript and within the target range. They cannot detect/recover an integer
+already rounded before the call: use strings for arbitrary IDs, never
+`Number(id)`, numeric ID sorting or arithmetic on IDs. u32 and smaller remain
+numbers with checked width/range. Column/stack indices are not window IDs.
+
+An absent optional is real QML `null` / native `std::optional`, not 0, false,
+empty string, empty list or undefined. ID zero is valid. Missing optional receive
+fields and explicit null both decode as absence; present empty/zero values stay
+present. Required fields are validated. Complete replacements clear old optional
+values. Encoding emits explicit null slots; released required booleans do not
+inherit CLI or newer-main defaults.
+
+Records expose read-only camelCase fields and retained `extensions`. Enums and
+unions retain unknown received values (`raw`, wireName/tag); inactive payloads
+are null. `NiriArgs` factories or plain tagged objects construct typed arguments.
+Both wire and camelCase input aliases are accepted, but not both for one field.
+Invalid construction has `valid: false` and `error`, not a default success.
+Typed outbound calls reject unknown fields/variants; raw calls are the escape
+hatch. All details are in the [value/factory reference](docs/generated/IPC-API.md#niriargs-factories).
+
+## Requests, actions and replies
+
+All [requests](docs/generated/IPC-API.md#requests),
+[actions](docs/generated/IPC-API.md#actions) and output controls use one checked
+operation/encoder/completion path. A result completes exactly once, always
+queued after return, even for invalid input or an empty endpoint. Attaching
+`finished` in the same turn is safe. After a nested loop or for a late observer,
+check `completed` as well. Terminal fields are committed before `finished()`.
+
+Replies **do not auto-delete on finished**. Retain a QML reference while waiting
+or showing a result; dropping the last reference can collect it and cancel local
+waiting. `cancel()` completes pending work as Cancelled; terminal cancel is a
+no-op. Engine/facade teardown cancels its scoped operations. Native callers
+delete retained replies or use `sendWire(request, options, owner)` for explicit
+QObject ownership. Deletion inside a finished handler is supported.
+
+| # | Reply property | Contract |
+|---|---|---|
+| 1 | `completed`, `status` | Pending, Succeeded or Failed |
+| 2 | `isError`, `error` | Structured failure, not a fabricated acknowledgement |
+| 3 | `value` | Full raw Ok payload, or named typed convenience projection; Handled stays string `"Handled"` |
+| 4 | `document`, `json` | Whole Ok/Err envelope projection and original JSON text, retained on decode/protocol errors |
+| 5 | `responseKind` | Response discriminator, including unknown names |
+| 6 | `endpoint`, `endpointRevision`, `requestId` | Captured identity; revisions/IDs are strings |
+| 7 | `executionCertainty` | NotSent, MayHaveExecuted, ReplyReceived |
+| 8 | Generated subclass `result` | Typed native/QML result; success requires expected discriminator and complete valid payload |
+
+The [14 reply classes](docs/generated/IPC-API.md#typed-replies) are exported and
+uncreatable. Named actions return `NiriHandledReply`; its result is a
+`niriHandled` unit gadget with wireName `"Handled"`. Optional query results are
+null, never fabricated records. Wrong response kinds/fields fail Decode while
+preserving the envelope and `error.fieldPath`.
+
+Errors expose numeric code, category/message, certainty, identity, phase,
+fieldPath, byteOffset and socketError where applicable. Categories are
+Configuration, Transport, Timeout, Framing, Parse, Protocol, Server, Decode,
+Cancelled and EndpointChanged. Once bytes enter the socket send buffer, a
+failure conservatively reports MayHaveExecuted. A complete reply frame reports
+ReplyReceived, even if its envelope is rejected. NotSent means no send occurred.
+Cancellation, timeout and disconnect are **not rollback**; requests never retry.
+
+NiriRequests methods/raw calls and sequence entries accept trailing per-call
+options `{timeoutMs: 5000, connectTimeoutMs: 5000}`. Named NiriActions methods
+have only their documented schema arguments, not a trailing options parameter.
+`timeoutMs: -1` disables the total response deadline, not the connect deadline.
+Other negative, fractional or unknown options fail. Typed `pickWindow()` and
+`pickColor()` default to -1; raw picks need that option explicitly. Local cancel
+does not dismiss niri's picker UI.
+
+`eventStream()` observes the shared session's actual accepted acknowledgement,
+opens no one-shot request socket and leaves events streaming. Late observers
+reuse the current acknowledgement. Observer cancellation/deadline does not stop
+the session; explicit stop cancels pending observers. `returnError()` expects
+Err, through the common error contract; unexpected Ok is Decode.
+
+Existing helper argument order is preserved. Optional slots before required
+arguments need explicit null. For example:
+
+| # | Call | Meaning |
+|---|---|---|
+| 1 | `moveWindowToWorkspace(id, {Id: workspaceId}, false)` | Stable workspace ID, explicit required focus bool; wire key window_id |
+| 2 | `moveWindowToMonitor(null, "DP-1")` | Focused window; wire key id; unsupported focus parameter removed |
+| 3 | `setWindowWidth(id, {SetFixed: 800})` | Wire key id; also SetProportion, AdjustFixed, AdjustProportion |
+| 4 | `closeWindow(null)` | Focused window, not ID zero |
+
+Native typed overloads use quint64/std::optional and generated arguments.
+Legacy QVariant workspace/size conveniences remain native-only, with explicit
+workspace focus bool. Scalar workspace-name/index or size inference is not a
+QML typed-call contract.
+
+This complete component builds a stable-ID move without defaulting focus:
 
 ```qml
+import QtQml
 import Niri 1.0
+
+QtObject {
+    objectName: "actionCall"
+    property NiriHandledReply pending: null
+    function move(windowId, workspaceId) {
+        pending = NiriActions.moveWindowToWorkspace(
+            windowId, NiriArgs.workspaceReferenceArgId(workspaceId), false)
+    }
+}
 ```
 
----
+## Raw access and ordering
 
-## Singletons
+`NiriRequests.sendRaw("Version")` encodes a bare JSON string query, not source
+text. `sendRaw(object, options)` uses the same lossless encoder.
+`sendRawJson(text, options)` validates one complete JSON
+document and preserves numeric tokens; extra newline-delimited requests fail.
+`NiriRequests.number(text)` builds exact numbers in raw objects; invalid text
+returns undefined and sending it fails asynchronously. Unknown-field strings
+are never guessed to be numeric IDs.
 
-Available as global QML identifiers. No instantiation needed.
-All use `QML_SINGLETON` with `CppOwnership`.
+Raw integer tokens project to strings (including small integers); other numeric
+tokens project to `niriJsonNumber` with exact `text` and explicit `toNumber()`.
+Native `wireDocument()` retains the exact tree and frame bytes. Compatibility
+C++ send/sendJson and synthetic QVariant dispatch are explicitly lossy adapters,
+not the authoritative wire path.
+The legacy `NiriActions.sendAction` accepts QJsonObject through the shared
+operation path, but its QJson input bridge can already have rounded numbers.
+Use sendRaw/sendRawJson for exact unknown numeric fields, for example:
 
-### NiriConnection
+```qml
+import QtQml
+import Niri 1.0
 
-Wire protocol lifecycle. Connects to niri's Unix socket at `$NIRI_SOCKET`.
+QtObject {
+    objectName: "exactRawCall"
+    property NiriPendingReply pending: null
+    function focus(id) {
+        pending = NiriRequests.sendRaw({
+            Action: {FocusWindow: {id: NiriRequests.number(id)}}
+        })
+    }
+}
+```
 
-| Property | Type | Access | Notify |
-|---|---|---|---|
-| `isConnected` | `bool` | read | `connectedChanged` |
-| `socketPath` | `string` | read | `connectedChanged` |
-| `errorString` | `string` | read | `connectedChanged` |
+Independent calls have no cross-call ordering. Await replies before submitting
+dependent calls, or retain `NiriRequests.sequence()`. Its `request()`/`action()`
+entries share one persistent socket, without pipelining. Deadlines start when an
+entry activates, not while queued. Failure, cancel, endpoint change, connection
+loss or deleting pending entries stops the sequence; unsent entries are NotSent.
+A stopped lane never reconnects/resumes; create another deliberately. Retain
+the lane and desired replies. See the [sequence example](docs/REQUESTS.md).
+Neither ordering nor Handled means state convergence, animation completion,
+global FIFO, a compositor transaction or rollback.
 
-**Slots**
+## Events and current state
 
-| Signature | Description |
-|---|---|
-| `connectToSocket(path)` | Connect to given path or `$NIRI_SOCKET` env |
-| `disconnect()` | Close socket, disable auto-reconnect |
-| `setAutoReconnect(enabled)` | Enable/disable exponential backoff reconnect |
+All [typed signals](docs/generated/IPC-API.md#events) publish the same generated
+decoded value after reducer/model updates. Native `NiriEvents::nativeEvents()`
+(C++ only) uses exact integers/optionals; QML uses strings/null/gadgets. A stop
+or endpoint change during publication suppresses stale continuation.
 
-**Signals**
+`NiriEvents.rawEvent(name, payload)` covers known, unknown and malformed events.
+Unknown variants additionally emit unknownEvent; malformed known bodies emit
+decodeError(path, message, payload), with no default typed signal/state update.
+Bodies must be objects even for all-optional known records. Raw payload is var,
+not object-only: arrays, scalar/null bodies and future unit strings survive.
+Malformed JSON/framing is instead a stream error, not a decodable event.
+`NiriConnection.eventReceived` is an object-only compatibility projection; use
+NiriEvents.rawEvent for complete raw coverage.
 
-| Signal | Parameters |
-|---|---|
-| `connectedChanged()` | — |
-| `eventReceived(name, payload)` | `string name`, `var payload` |
-| `reconnectScheduled(delayMs, attempt)` | `int delayMs`, `int attempt` |
+Impossible decoded same-part sequences use ProtocolError/reset/reconnect;
+unknown-ID urgency/timestamp deltas are permitted no-ops. Cross-part dangling
+references remain valid and are not repaired by inference. Synthetic C++ event
+publication does not mutate production state.
 
-### NiriEvents
-
-All 19 released events have generated native C++ signals and QML projections.
-See the [complete signal and wire reference](docs/generated/IPC-API.md#events).
-The session decodes the exact parsed event once, applies its canonical reducer,
-then publishes that same typed value. Native C++ observes
-`NiriEvents::nativeEvents()` with quint64/std::optional and typed records/lists.
-QML observes string IDs, real nulls and typed gadgets. The native accessor is not
-invokable from QML. A stop/endpoint change suppresses stale continuation.
-
-**Current snapshots** (bootstrap late subscribers without a query)
-
-| # | Getter | Returns |
+| # | NiriState properties | Type / notification |
 |---|---|---|
-| 1 | `lastWindowsSnapshot()` | QML/native typed record list, numeric ID order |
-| 2 | `lastWorkspacesSnapshot()` | QML/native typed record list, numeric ID order |
-| 3 | `lastCastsSnapshot()` | QML/native typed record list, stream ID order |
-| 4 | `lastKeyboardLayouts()` | Native `std::optional<NiriKeyboardLayouts>` |
-| 5 | `qmlLastKeyboardLayouts()` | QML record or null |
-| 6 | `lastOverviewOpen()`, `lastConfigFailed()` | QML/native bool |
-| 7 | `lastFocusedWindowId()` | Native `std::optional<quint64>` |
-| 8 | `qmlLastFocusedWindowId()` | QML string or null |
+| 1 | focusedWindowId, focusedWorkspaceId | string/null; respective Changed |
+| 2 | focusedWindowTitle, focusedWindowAppId, activeOutput | string/null; respective Changed |
+| 3 | focusedWindow, focusedWorkspace | complete record/null; respective Changed |
+| 4 | windowCount, workspaceCount, castCount | int; respective Changed |
+| 5 | windowsById, workspacesById, castsByStreamId | string-keyed record maps; windowsChanged/workspacesChanged/castsChanged |
+| 6 | keyboardLayouts | record/null; keyboardLayoutsChanged |
+| 7 | overview, overviewOpen | niriOverview/bool; overviewOpenChanged |
+| 8 | configFailed, touchpadOn, initialStateReceived | bool, bool/null, bool; respective Changed |
 
-These aliases read current reducer values after every delta, not saved full
-payloads. They return value copies and do not fabricate global events. Empty
-replacements clear lists; absent layouts and null focus remain absent. Casts
-are keyed by stream ID, so stopping one stream preserves session siblings.
+`activeOutput` comes from the focused workspace, not an output metadata cache.
+Null keyboard focus is never inferred from its active window. Casts are keyed
+by stream ID; siblings sharing a session ID remain distinct.
 
-All existing QML signal names remain. The complete surface adds
-workspaceUrgencyChanged, windowUrgencyChanged, screenshotCaptured and castStopped.
-Layout changes carry named niriWindowLayoutChange entries (id/layout).
+Every property notifies only on observable change. `stateChanged()` aggregates
+actual exposed state changes, **not every event**. Equal snapshots and transient
+ScreenshotCaptured do not emit it. Use rawEvent for event traffic.
 
-| # | Diagnostic signal | Contract |
+QML-invokable `window(id)`, `workspace(id)`, `workspaceByName(name)`,
+`cast(streamId)` return complete records/null. `windowsSnapshot()`,
+`workspacesSnapshot()`, `castsSnapshot()` return copies in numeric-ID order.
+`snapshot()` copies all keyed maps, layouts, overview/open, configFailed,
+touchpadOn, readiness, focused IDs and activeOutput. Copies are not live objects.
+Native optional keyed getters are nativeWindow/nativeWorkspace/
+nativeWorkspaceByName/nativeCast; native snapshot getters have a native prefix.
+Native focus/layout/touchpad getters retain std::optional.
+
+NiriEvents snapshot aliases also read **current** reducer values after deltas:
+lastWindowsSnapshot/lastWorkspacesSnapshot/lastCastsSnapshot, lastOverviewOpen,
+lastConfigFailed are invokable in QML. Use qmlLastKeyboardLayouts and
+qmlLastFocusedWindowId for null/string projections; their unprefixed counterparts
+are native optional getters. These reads never emit fake global events.
+
+## Models, trackers and history
+
+Models sort by numeric ID without converting IDs through Number. Full snapshots
+use ID diffs; surviving persistent indexes remain valid. Exact role changes
+include the whole-record role. Equal replacements emit nothing. Reset removes
+rows with normal removal notifications, not an unconditional modelReset.
+
+| # | Model | QML roles |
 |---|---|---|
-| 1 | `rawEvent(name, payload)` | Every current event, including known, unknown and malformed variants |
-| 2 | `unknownEvent(name, payload)` | Unknown variant; no invented typed signal/state update |
-| 3 | `decodeError(path, message, payload)` | Malformed known variant; no default typed signal/state update |
+| 1 | NiriWindows | window, id, title, appId, pid, workspaceId, isFocused, isFloating, isUrgent, layout, focusTimestamp |
+| 2 | NiriWorkspaces | workspace, id, idx, name, output, isUrgent, isActive, isFocused, activeWindowId |
 
-Known event bodies must be objects before any field lookup, including variants
-whose fields are all optional. Diagnostic payloads are now QVariant/var instead
-of QVariantMap: ordinary bodies remain objects; scalar/array/null bodies are not
-discarded, and future unit variants retain their original string. Native
-callbacks that explicitly required QVariantMap must accept QVariant instead.
-The event log preserves the same raw value. A decoded impossible sequence
-(missing same-part target, or layout switch before layouts) instead reports one
-session ProtocolError and resets state, reconnecting only per connection policy.
-Urgency/timestamp events for unknown IDs remain no-ops. Cross-part dangling IDs
-are allowed. Synthetic C++ dispatch methods publish only; they do not write the
-session's state.
+Role types match the [generated record fields](docs/generated/IPC-API.md#records-and-variant-payloads).
+Use a delegate's `model.id` (not the QML declaration id). Models are not
+CppOwnership process singletons.
 
-### NiriState
+`NiriWindow { windowId: ... }` tracks an optional ID. `NiriWorkspace` selects
+by workspaceName and/or workspaceId. Nonempty name wins, including unmatched
+names; there is no ID fallback until name is cleared. Duplicate names choose
+the lowest numeric ID. Clearing ID preserves a name selection; null clears an
+ID selector, zero selects zero. Invalid input warns and leaves selection intact.
 
-Read-only projection of the session reducer. No facade, model or reactive
-keeps its own record cache or applies IPC events. Late creation needs no query.
+Trackers expose valid, complete window/workspace record (null when invalid),
+and all corresponding convenience fields. Fields notify via their own Changed
+signals; windowChanged/workspaceChanged are equality-suppressed aggregates.
+Selectors commit before notification, including reentrant changes. Reading a
+tracker never maintains a second event reducer.
+Notification comparison uses its last published selection/immutable entry
+identity, not a new read of already-committed state. Clearing or retargeting a
+selector from an earlier state/facade/tracker callback cannot suppress the
+record/valid notifications needed by bound consumers.
 
-| # | Property | QML type | Notify |
-|---|---|---|---|
-| 1 | `focusedWindowId`, `focusedWorkspaceId` | decimal string or null | respective `...Changed` |
-| 2 | `focusedWindowAppId`, `focusedWindowTitle`, `activeOutput` | string or null | respective `...Changed` |
-| 3 | `focusedWindow`, `focusedWorkspace` | complete generated record or null | respective `...Changed` |
-| 4 | `windowCount`, `workspaceCount`, `castCount` | int | respective `...Changed` |
-| 5 | `initialStateReceived` | bool | `initialStateReceivedChanged` |
-| 6 | `windowsById`, `workspacesById`, `castsByStreamId` | maps of complete records, keyed by decimal ID strings | `windowsChanged`, `workspacesChanged`, `castsChanged` |
-| 7 | `keyboardLayouts` | complete generated record or null | `keyboardLayoutsChanged` |
-| 8 | `overview`, `overviewOpen` | niriOverview, bool | `overviewOpenChanged` |
-| 9 | `configFailed` | bool | `configFailedChanged` |
-| 10 | `touchpadOn` (post-v26.04) | null until received, then bool | `touchpadOnChanged` |
-
-All six stream parts are readable from QML and C++. Native keyed access uses
-`nativeWindow(quint64)`, `nativeWorkspace(quint64)`, `nativeWorkspaceByName(name)`
-and `nativeCast(quint64)`, returning optional records. Native snapshot lists use
-`nativeWindowsSnapshot()`, `nativeWorkspacesSnapshot()`, `nativeCastsSnapshot()`.
-Native focus IDs and strings remain std::optional; IDs remain quint64.
-Native `touchpadOn()` returns std::optional<bool>.
-
-| # | QML-invokable getter | Returns |
+| # | Tracker | Properties in addition to valid and selectors |
 |---|---|---|
-| 1 | `window(id)`, `workspace(id)`, `workspaceByName(name)`, `cast(streamId)` | complete generated record or null |
-| 2 | `windowsSnapshot()`, `workspacesSnapshot()`, `castsSnapshot()` | complete record lists in numeric ID order |
-| 3 | `snapshot()` | value map with all three keyed maps, keyboardLayouts, overview/overviewOpen, configFailed, touchpadOn, initialStateReceived, focused IDs and activeOutput |
+| 1 | NiriWindow | window, id, title, appId, pid, workspaceId, isFocused, isFloating, isUrgent, layout, focusTimestamp |
+| 2 | NiriWorkspace | workspace, id, idx, name, output, isUrgent, isActive, isFocused, activeWindowId |
 
-Snapshots are frozen copies, not live objects. ID inputs accept exact numeric
-values or decimal strings; use strings for arbitrary u64 IDs. No output metadata
-map is invented: v26.04 provides that through queries, not stream events.
-`activeOutput` is the focused workspace's optional output name; null keyboard
-focus is never inferred from a workspace's active window.
+Each property has its matching `propertyNameChanged()` signal. IDs and optional
+fields are string/null as above; invalid tracker id/record is null. Nonoptional
+conveniences (bools, idx, layout) have default values when invalid; use valid or
+the nullable complete record to distinguish absence from a real default value.
 
-`initialStateReceived` is false until the first accepted `CastsChanged` has been
-applied, even if its list is empty. It is already true inside that event's
-handlers. Later casts replacements do not retrigger it. Disconnect, endpoint
-replacement and subscription failure clear readiness together with canonical
-state. A late-created NiriState reads the same readiness immediately.
+`NiriEventLog` retains raw name/payload roles, default capacity 500. Negative
+capacity normalizes to zero; zero clears/disables retention. Shrink/eviction
+announces every removal. Nested capacity/appends serialize outside row brackets.
+History survives stream reset and does not include snapshot reads.
 
-This rule follows niri v26.04's initial burst: workspaces, windows, optional
-keyboard layouts, overview, config, casts. Recheck upstream `state.rs` and
-`server.rs` when updating the supported release. Query replies never write
-stream state; before readiness, snapshot values may be partial/defaults.
+## Compositor limits and within-row moves
 
-The selected post-v26.04 surface is pinned to main `689c1e9`, not moving main.
-It includes optional `Output.maxBpc`, MaxBpc output control/enum, eight actions,
-two ext-image-copy cast kinds and TouchpadToggled. See the generated reference's
-selected-newer table and `schema/extensions.json` for every addition. Newer
-actions use the normal request path; older niri may return a compositor error.
-Main's touchpad event follows CastsChanged, so readiness does not imply touchpad
-availability. `touchpadOn` stays null until received, then reports the runtime
-toggle only, not hardware/config disablement; reset clears it to null.
-On a newer compositor, `initialStateReceived` can become true one event before
-`touchpadOn` leaves null. Consumers needing touchpad state bind to `touchpadOn`;
-null means unknown. Revisit the readiness terminator when adopting a newer
-supported release baseline, not when selecting optional main extensions.
+niri 26.04 has no atomic arbitrary-ID insertion into a destination column/stack,
+no stable column ID, and no output hotplug event. Outputs/configuration are query
+data; refresh deliberately. Layout positions/indices can change between calls.
+Ordinary bounded moves stay in the row; OrToWorkspace/OrToMonitor variants may
+leave it. Consume/expel/stack require tiled windows. There is no animate:false
+or silent-focus option; focus may switch workspace/output, scroll or warp.
 
-Reset clears all six parts, focused properties and readiness together. Models
-remove their rows and reactives become invalid, with the appropriate NOTIFYs;
-the next accepted burst repopulates the same objects. A state-only application
-starts the shared subscription, just like model/reactive-only applications.
-
-Each property notifies only when its observable value changes. `stateChanged()`
-is one aggregate notification for an actual exposed state change, not for every
-event. An equal snapshot or transient ScreenshotCaptured event does not emit it.
-
-### NiriActions
-
-All 141 released actions have generated methods with every wire field. See the
-[checked method/wire reference](docs/generated/IPC-API.md#actions). Each returns
-a retainable `NiriPendingReply`; success requires the released `Handled` reply.
-Local argument failures complete asynchronously as Configuration/NotSent and
-never open a request socket. Raw `sendAction(action)` remains unrestricted.
-
-| # | Existing helper | QML argument contract |
+| # | Primitive | Contract / proof |
 |---|---|---|
-| 1 | `spawn(command)` | String array |
-| 2 | `focusWindow(windowId)` | Required decimal ID string (exact number also accepted) |
-| 3 | `closeWindow(windowId)` | Decimal ID or null/omitted for focused window |
-| 4 | `moveWindowToWorkspace(windowId, reference, focus)` | ID or explicit null, WorkspaceReferenceArg, required bool |
-| 5 | `moveWindowToMonitor(windowId, output)` | ID or explicit null, output string; no monitor focus flag |
-| 6 | `setWindowWidth(windowId, change)` | ID or explicit null, SizeChange |
-| 7 | `setWindowHeight(windowId, change)` | ID or explicit null, SizeChange |
-| 8 | `moveColumnToIndex(index)` | Decimal usize string (exact number accepted) |
-| 9 | `toggleWindowFloating(windowId)` | Decimal ID or null/omitted for focused window |
+| 1 | FocusWindow then MoveColumnToIndex (1-based, clamped) | Whole source column, not arbitrary window insertion; representative real outcome tested |
+| 2 | ConsumeOrExpelWindowLeft/Right(optional ID) | Stacked source isolates on chosen side; singleton appends into neighbor and removes source column; no neighbor is no-op; preserves local active status, not global focus; explicit nonfocused ID outcomes tested |
+| 3 | FocusWindow then MoveWindowUp/Down | Adjacent swap in current column, bounded at edges; representative real outcome tested |
+| 4 | ConsumeWindowIntoColumn | Active destination takes topmost right-neighbor tile and appends; keeps destination active tile; source-audited inference, not live acceptance |
+| 5 | ExpelWindowFromColumn | Expels bottommost tile right, not necessarily focused; does not activate new column; source-audited inference |
+| 6 | SwapWindowLeft/Right | Swaps with neighbor active tile and follows source, not insertion; source-audited inference |
 
-Argument order is preserved. QML now uses explicit tagged values instead of
-guessing a workspace name/index or fixed/proportional size from a scalar.
-WorkspaceReferenceArg accepts `{Id: "456"}`, `{Index: 2}`, `{Name: "chat"}`
-or the matching `NiriArgs.workspaceReferenceArgId/Index/Name(...)` value.
-SizeChange supports all four alternatives: `{SetFixed: 800}`,
-`{SetProportion: 50.0}`, `{AdjustFixed: -10}`, `{AdjustProportion: -12.5}`,
-or `NiriArgs.sizeChangeSetFixed/SetProportion/AdjustFixed/AdjustProportion(...)`.
-Unknown fields/variants and invalid types/ranges are rejected by typed methods;
-use raw sending deliberately for future protocol extensions.
+The audited minimal recipes below are **inferences**, not blanket live-tested
+algorithms. Assume tiled W/current layout, semantic window-ID neighbors, and
+skip satisfied steps. Recalculate indices after removing W. j is the new
+1-based destination gap, r the insertion row, m the destination's old tile count.
+Explicit-ID consume/expel needs no prior global focus, even on a nonfocused
+workspace. FocusColumn(index) and FocusWindowInColumn(index) can prepare an
+active column/tile, with the same focus side effects as FocusWindow.
 
-The workspace move's `focus` bool is no longer defaulted. Optional ID slots
-before required arguments must be filled with null to target the focused item.
-Native C++ overloads use quint64/std::optional and generated argument values;
-the old QVariant workspace/size convenience adapters remain native-only and
-require an explicit workspace-move focus bool.
-
-### NiriRequests
-
-All 16 requests have generated methods. The
-[generated reference](docs/generated/IPC-API.md#requests) lists their complete
-argument/wire shapes, expected response and source citation. Each successful
-response kind has a named uncreatable reply subclass, such as NiriWindowsReply,
-with a typed `result` property and native C++ `result()` getter. They inherit
-NiriPendingReply retention, cancellation, raw envelope, identity and errors.
-`value` remains the QML convenience projection; NiriHandledReply.result is an
-explicit niriHandled unit value while its value remains the string "Handled".
-
-Methods accept trailing `{timeoutMs, connectTimeoutMs}` options. `pickWindow()`
-and `pickColor()` default to no response deadline; a caller can override it.
-`action(value)` accepts a generated NiriArgs Action value or a validated plain
-tagged object. `output(output, action)` accepts all nine released OutputAction
-variants as NiriArgs values or plain objects, with every field validated.
-
-`eventStream()` observes the shared session's actual acknowledgement and leaves
-its event socket open. Already-subscribed calls retain that same acknowledgement,
-without a second subscription. Cancelling/timing out one observer does not stop
-the shared stream. `returnError()` expects a server Err, reported through the
-normal error contract; an unexpected Ok is a Decode error.
-
-**Raw escape hatch**
-
-| Overload | Description |
-|---|---|
-| `sendRaw(query)` | `string` — bare-string query (e.g. `"Version"`) |
-| `sendRaw(request)` | `var` — full JSON object request |
-
----
-
-## Elements
-
-Creatable in QML via `QML_NAMED_ELEMENT`. Use directly in QML declarations.
-
-### NiriWindows (`NiriWindowsModel`)
-
-`QAbstractListModel` projecting all windows in numeric ID order. Rows contain
-only IDs; record access reads the reducer. Full snapshots use ID diffs, not
-resets: removals/insertions preserve surviving persistent indexes, and
-dataChanged contains the exact changed field roles plus WindowRole. Equal
-snapshots emit nothing. Reset removes all rows using the same row protocol.
-
-| Role | Type | QML access |
+| # | Drop | Minimal inferred sequence |
 |---|---|---|
-| `WindowRole` | `niriWindow` | `model.window` |
-| `IdRole` | `string` | `model.id` |
-| `TitleRole` | `string or null` | `model.title` |
-| `AppIdRole` | `string or null` | `model.appId` |
-| `PidRole` | `signed int or null` | `model.pid` |
-| `WorkspaceIdRole` | `string or null` | `model.workspaceId` |
-| `IsFocusedRole` | `bool` | `model.isFocused` |
-| `IsFloatingRole` | `bool` | `model.isFloating` |
-| `IsUrgentRole` | `bool` | `model.isUrgent` |
-| `LayoutRole` | `niriWindowLayout` | `model.layout` |
-| `FocusTimestampRole` | `niriTimestamp or null` | `model.focusTimestamp` |
+| 1 | Singleton between columns | Focus W if needed, MoveColumnToIndex(j); at most 2 actions, 0 for no change |
+| 2 | Stacked W between columns | ID consume/expel isolates; immediate gap needs only that action; otherwise focus W if needed, recalculate j, move column; at most 3 |
+| 3 | Within current column | Focus W if needed, repeat ordinary Up/Down by row difference |
+| 4 | Singleton into adjacent target | ID consume/expel toward target appends without prior focus; for nonappend focus W and repeat Up to r |
+| 5 | General cross-column insertion | Isolate stacked W; focus if needed; move singleton immediately right of target (index excludes W); ID consume left; repeat Up m+1-r times; at most 4 preparation/insertion actions before swaps |
 
-### NiriWorkspaces (`NiriWorkspacesModel`)
+Await each reply, re-read/revalidate state between dependent steps, then verify
+final workspaceId and layout.posInScrollingLayout. The owned live acceptance
+tests prove representative column, explicit-ID consume/expel and Up/Down
+outcomes, not all recipes or arbitrary interference. Handled only means handler
+execution. Disappearing IDs, focus changes and reordered columns can invalidate
+later steps; focus restoration is best effort. Atomic insertion without focus
+effects requires new compositor IPC, not a library promise.
 
-`QAbstractListModel` projecting all workspaces with the same ID ordering and
-exact row/role notification contract as NiriWindows.
-
-| Role | Type | QML access |
-|---|---|---|
-| `WorkspaceRole` | `niriWorkspace` | `model.workspace` |
-| `IdRole` | `string` | `model.id` |
-| `IdxRole` | `int` | `model.idx` |
-| `NameRole` | `string or null` | `model.name` |
-| `OutputRole` | `string or null` | `model.output` |
-| `IsUrgentRole` | `bool` | `model.isUrgent` |
-| `IsActiveRole` | `bool` | `model.isActive` |
-| `IsFocusedRole` | `bool` | `model.isFocused` |
-| `ActiveWindowIdRole` | `string or null` | `model.activeWindowId` |
-
-### NiriWindow (`NiriWindowReactive`)
-
-Reactive tracker for a single window, identified by optional `windowId`.
-Every getter resolves the current reducer; no event or bootstrap is needed.
-Null clears the selector, while ID zero selects record zero. Invalid input
-reports a warning without replacing the selector. `window` exposes the complete
-record or null; the convenience fields below read that same record.
-
-| Property | Type | Access | Notify |
-|---|---|---|---|
-| `windowId` | `string or null` | read/write | `windowIdChanged` |
-| `valid` | `bool` | read | `validChanged` |
-| `id` | `string or null` | read | `idChanged` |
-| `title` | `string or null` | read | `titleChanged` |
-| `appId` | `string or null` | read | `appIdChanged` |
-| `pid` | `signed int or null` | read | `pidChanged` |
-| `workspaceId` | `string or null` | read | `workspaceIdChanged` |
-| `isFocused` | `bool` | read | `isFocusedChanged` |
-| `isFloating` | `bool` | read | `isFloatingChanged` |
-| `isUrgent` | `bool` | read | `isUrgentChanged` |
-| `layout` | `niriWindowLayout` | read | `layoutChanged` |
-| `focusTimestamp` | `niriTimestamp or null` | read | `focusTimestampChanged` |
-| `window` | `niriWindow or null` | read | `windowChanged` |
-
-`windowChanged()` is an equality-suppressed aggregate record signal. A layout
-change does not notify title/appId. Selectors commit before any notification;
-reentrant selector changes cannot restore an obsolete selection.
-
-### NiriWorkspace (`NiriWorkspaceReactive`)
-
-Reactive tracker for a single workspace. Nonempty `workspaceName` always wins
-over `workspaceId`; an unmatched name is invalid, never an ID fallback. Clearing
-name immediately uses the retained ID. Clearing ID while name is set preserves
-the name selection. No selectors means invalid; zero is a valid ID. Duplicate
-names resolve deterministically to the lowest numeric ID. Construction, setters
-and live updates share the same resolver and coherent notification contract.
-
-| Property | Type | Access | Notify |
-|---|---|---|---|
-| `workspaceName` | `string` | read/write | `workspaceNameChanged` |
-| `workspaceId` | `string or null` | read/write | `workspaceIdChanged` |
-| `valid` | `bool` | read | `validChanged` |
-| `id` | `string or null` | read | `idChanged` |
-| `idx` | `int` | read | `idxChanged` |
-| `name` | `string or null` | read | `nameChanged` |
-| `output` | `string or null` | read | `outputChanged` |
-| `isUrgent` | `bool` | read | `isUrgentChanged` |
-| `isActive` | `bool` | read | `isActiveChanged` |
-| `isFocused` | `bool` | read | `isFocusedChanged` |
-| `activeWindowId` | `string or null` | read | `activeWindowIdChanged` |
-| `workspace` | `niriWorkspace or null` | read | `workspaceChanged` |
-
-**Signals:** `workspaceNameChanged()`, `workspaceIdChanged()`, `workspaceChanged()`
-
-### NiriEventLog
-
-Ring-buffer event log, `QAbstractListModel`.
-Default capacity is 500. Negative capacities normalize to zero; zero clears
-retained rows and disables retention. Shrink and eviction announce every removed
-row before insertion. Reentrant capacity/append writes are serialized outside
-active row brackets. Retained history survives stream reset; reading snapshots
-does not append synthetic history.
-
-| Property | Type | Access | Notify |
-|---|---|---|---|
-| `capacity` | `int` | read/write | `capacityChanged` |
-
-| Role | Type |
-|---|---|
-| `NameRole` | `string` |
-| `PayloadRole` | `var` |
-
----
-
-## Value Types
-
-`Q_GADGET` structs exposed via `QML_VALUE_TYPE`. Passable as typed QML
-properties. Decoded by `NiriUtils::jsonToGadget()` using Q_PROPERTY reflection
-(automatic `camelCase`↔`snake_case`, null-safe, extra-key-safe).
-
-### niriWindow
-
-| Field | Type | Default |
-|---|---|---|
-| `id` | `quint64` | 0 |
-| `title` | `string` | `""` |
-| `appId` | `string` | `""` |
-| `pid` | `quint32` | 0 |
-| `workspaceId` | `quint64` | 0 |
-| `isFocused` | `bool` | false |
-| `isFloating` | `bool` | false |
-| `isUrgent` | `bool` | false |
-| `layout` | `niriWindowLayout` | (default-constructed) |
-| `focusTimestamp` | `niriTimestamp` | (default-constructed) |
-
-### niriWorkspace
-
-| Field | Type | Default |
-|---|---|---|
-| `id` | `quint64` | 0 |
-| `idx` | `int` | 0 |
-| `name` | `string` | `""` |
-| `output` | `string` | `""` |
-| `isUrgent` | `bool` | false |
-| `isActive` | `bool` | false |
-| `isFocused` | `bool` | false |
-| `activeWindowId` | `quint64` | 0 |
-
-### niriOutput
-
-| Field | Type | Default |
-|---|---|---|
-| `name` | `string` | `""` |
-| `make` | `string` | `""` |
-| `model` | `string` | `""` |
-| `serial` | `string` | `""` |
-| `physicalSize` | `list<int>` | (empty) |
-| `modes` | `list<niriMode>` | (empty) |
-| `currentMode` | `int` | -1 |
-| `isCustomMode` | `bool` | false |
-| `vrrSupported` | `bool` | false |
-| `vrrEnabled` | `bool` | false |
-| `logical` | `niriLogicalOutput` | (default-constructed) |
-
-### niriMode
-
-| Field | Type | Default |
-|---|---|---|
-| `width` | `quint32` | 0 |
-| `height` | `quint32` | 0 |
-| `refreshRate` | `quint32` | 0 |
-| `isPreferred` | `bool` | false |
-
-### niriLogicalOutput
-
-| Field | Type | Default |
-|---|---|---|
-| `x` | `int` | 0 |
-| `y` | `int` | 0 |
-| `width` | `quint32` | 0 |
-| `height` | `quint32` | 0 |
-| `scale` | `double` | 1.0 |
-| `transform` | `string` | `""` |
-
-### niriWindowLayout
-
-| Field | Type | Default |
-|---|---|---|
-| `posInScrollingLayout` | `list<int>` | (empty) |
-| `tileSize` | `list<double>` | (empty) |
-| `windowSize` | `list<int>` | (empty) |
-| `tilePosInWorkspaceView` | `list<double>` | (empty) |
-| `windowOffsetInTile` | `list<double>` | (empty) |
-
-### niriTimestamp
-
-| Field | Type | Default |
-|---|---|---|
-| `secs` | `quint64` | 0 |
-| `nanos` | `quint32` | 0 |
-
-### niriKeyboardLayouts
-
-| Field | Type | Default |
-|---|---|---|
-| `names` | `stringlist` | (empty) |
-| `currentIdx` | `int` | 0 |
-
----
-
-## Non-creatable classes
-
-### NiriPendingReply
-
-Returned by `NiriActions` and `NiriRequests` methods.
-Exported by name, uncreatable, retainable and cancellable. See
-[request contracts](docs/REQUESTS.md) for the full shared API and migration notes.
-
-| Property | Type | Notify |
-|---|---|---|
-| `isError` | `bool` | `finished` |
-| `error` | `NiriError` | `finished` |
-| `value` | `var` | `finished` |
-
-**Signal:** `finished()`
-
-### NiriError
-
-Carries error details on a failed `NiriPendingReply`.
-
-| Field | Type |
-|---|---|
-| `code` | `int` |
-| `message` | `string` |
-
----
-
-## Notes
-
-- All singletons and models use `CppOwnership` to prevent QML engine
-  garbage-collection of objects needed by the C++ side at shutdown.
-- Value types are decoded via `NiriUtils::jsonToGadget()` using Q_PROPERTY
-  reflection — automatic `camelCase`↔`snake_case`, null-safe, extra-key-safe.
-- Every event has a `rawEvent(name, payload)` catchall signal for
-  forward-compatibility with future niri IPC extensions.
-
-## Maintenance
-
-When adding a new gadget field, Q_PROPERTY, signal, role, or Q_INVOKABLE,
-update the corresponding section here. This file is manually verified against
-the headers; autogen is tracked in `FutureDevelopment.md`.
+See [DESIGN.md](DESIGN.md) for release maintenance and
+[KNOWN_ISSUES.md](KNOWN_ISSUES.md) for verification limits.
