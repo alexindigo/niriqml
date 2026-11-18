@@ -35,7 +35,7 @@ public:
     Status status() const { return m_status; }
     bool isError() const { return m_status == Failed; }
     NiriError error() const { return m_error; }
-    QVariant value() const { return m_value; }
+    virtual QVariant value() const { return m_value; }
     QVariant document() const { return NiriWire::toQmlProjection(m_document.root); }
     QString json() const { return QString::fromUtf8(m_document.bytes); }
     const NiriWire::Document &wireDocument() const { return m_document; }
@@ -47,6 +47,9 @@ public:
     Q_INVOKABLE void cancel();
 signals:
     void finished();
+
+protected:
+    const QVariant &nativeValue() const { return m_value; }
 
 private:
     friend class NiriRequestOperation;

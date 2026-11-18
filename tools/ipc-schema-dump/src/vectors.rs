@@ -3,6 +3,9 @@ use niri_ipc::*;
 use serde_json::{json, Value};
 use std::io::{self, Write};
 
+#[path = "surface_vectors.rs"]
+mod surface;
+
 pub fn write_vectors() -> Result<(), Box<dyn std::error::Error>> {
     let mut vectors: Vec<Value> = Vec::new();
     macro_rules! sample {
@@ -86,6 +89,16 @@ pub fn write_vectors() -> Result<(), Box<dyn std::error::Error>> {
         pid: None,
         pw_node_id: None,
     };
+    let mut surface_vectors = Vec::new();
+    surface::extend(
+        &mut surface_vectors,
+        &window,
+        &output,
+        &workspace,
+        &layout,
+        &cast,
+        timestamp,
+    )?;
     sample!(Overview, "overview", Overview { is_open: true });
     sample!(
         PickedColor,
@@ -331,8 +344,7 @@ pub fn write_vectors() -> Result<(), Box<dyn std::error::Error>> {
         "target-window",
         CastTarget::Window { id: u64::MAX }
     );
-    let document =
-        json!({"source": {"release": "v26.04", "commit": super::COMMIT}, "vectors": vectors});
+    let document = json!({"source": {"release": "v26.04", "commit": super::COMMIT}, "vectors": vectors, "surfaceVectors": surface_vectors});
     let stdout = io::stdout();
     let mut output = io::BufWriter::new(stdout.lock());
     serde_json::to_writer_pretty(&mut output, &document)?;

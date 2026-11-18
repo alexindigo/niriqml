@@ -63,7 +63,8 @@ void TestLiveEvents::gadgetShape_workspace()
 
 void TestLiveEvents::keyboardLayoutsPopulated()
 {
-    NiriKeyboardLayouts kl = NiriEvents::instance()->lastKeyboardLayouts();
+    NiriKeyboardLayouts kl =
+            NiriEvents::instance()->lastKeyboardLayouts().value_or(NiriKeyboardLayouts{});
     QVERIFY(!kl.names.isEmpty());
 }
 

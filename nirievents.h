@@ -7,23 +7,9 @@
 #include <QtQml/qqmlregistration.h>
 
 #include "niritypes.h"
+#include "generated/niriipcevents_generated.h"
 
-// Native scalar channel. QML observes only the string/null projection below.
-// E6b generates the complete native event surface; this carries existing deltas.
-class NiriNativeEvents : public QObject
-{
-    Q_OBJECT
-public:
-    using QObject::QObject;
-signals:
-    void workspaceActivated(quint64 workspaceId, bool focused);
-    void workspaceActiveWindowChanged(quint64 workspaceId, std::optional<quint64> windowId);
-    void windowClosed(quint64 windowId);
-    void windowFocusChanged(std::optional<quint64> windowId);
-    void windowFocusTimestampChanged(quint64 windowId, std::optional<NiriTimestamp> timestamp);
-};
-
-class NiriEvents : public QObject
+class NiriEvents : public NiriIpcEvents
 {
     Q_OBJECT
     QML_SINGLETON
@@ -37,45 +23,31 @@ public:
     void dispatchEvent(const QString &name, const QVariantMap &payload, quint64 producingEpoch);
     void dispatchWireEvent(const QString &name, const NiriWire::WireValue &payload,
                            quint64 producingEpoch);
-    NiriNativeEvents *nativeEvents() { return m_source ? m_source->nativeEvents() : &m_native; }
+    void dispatchDocument(const NiriWire::Document &document, quint64 producingEpoch);
+    NiriNativeEvents *nativeEvents()
+    {
+        return m_source ? m_source->nativeEvents() : NiriIpcEvents::nativeEvents();
+    }
 
-    // Snapshot getters: last-known state from initial event burst.
-    // Consumers instantiated AFTER events fired can bootstrap from these.
-    QVariantList lastWindowsSnapshot() const;
-    QVariantList lastWorkspacesSnapshot() const;
-    NiriKeyboardLayouts lastKeyboardLayouts() const;
-    bool lastOverviewOpen() const;
+    // Compatibility aliases over CURRENT reducer state, not last full events.
+    Q_INVOKABLE QVariantList lastWindowsSnapshot() const;
+    Q_INVOKABLE QVariantList lastWorkspacesSnapshot() const;
+    std::optional<NiriKeyboardLayouts> lastKeyboardLayouts() const;
+    Q_INVOKABLE QVariant qmlLastKeyboardLayouts() const;
+    Q_INVOKABLE bool lastOverviewOpen() const;
     std::optional<quint64> lastFocusedWindowId() const;
+    Q_INVOKABLE QVariant qmlLastFocusedWindowId() const;
+    Q_INVOKABLE QVariantList lastCastsSnapshot() const;
+    Q_INVOKABLE bool lastConfigFailed() const;
 
 signals:
-    void workspacesChanged(const QVariantList &workspaces);
-    // Emitted when a workspace is activated on its output. `focused` indicates
-    // whether keyboard focus followed to the activated workspace.
-    void workspaceActivated(const QString &workspaceId, bool focused);
-    void workspaceActiveWindowChanged(const QString &workspaceId, const QVariant &windowId);
-    void windowsChanged(const QVariantList &windows);
-    void windowOpenedOrChanged(const NiriWindow &window);
-    void windowClosed(const QString &windowId);
-    void windowFocusChanged(const QVariant &windowId);
-    void windowLayoutsChanged(const QVariantList &changes);
-    void keyboardLayoutsChanged(const NiriKeyboardLayouts &layouts);
-    void keyboardLayoutSwitched(int idx);
-    void overviewOpenedOrClosed(bool isOpen);
-    void configLoaded(bool failed);
-    void castsChanged(const QVariantList &casts);
-    void castStartedOrChanged(const NiriCast &cast);
-    void windowFocusTimestampChanged(const QString &windowId, const QVariant &focusTimestamp);
-    void rawEvent(const QString &name, const QVariantMap &payload);
-    void decodeError(const QString &path, const QString &message, const QVariantMap &payload);
+    void rawEvent(const QString &name, const QVariant &payload);
+    void decodeError(const QString &path, const QString &message, const QVariant &payload);
+    void unknownEvent(const QString &name, const QVariant &payload);
 
 private:
     explicit NiriEvents(QObject *parent = nullptr, NiriEvents *source = nullptr);
+    void publishDecoded(const NiriWire::Document &document, const NiriEvent &event,
+                        const QString &errorPath, const QString &errorMessage, quint64 token);
     NiriEvents *m_source = nullptr;
-    NiriNativeEvents m_native;
-
-    QVariantList m_lastWindows;
-    QVariantList m_lastWorkspaces;
-    NiriKeyboardLayouts m_lastKeyboardLayouts;
-    bool m_lastOverviewOpen = false;
-    std::optional<quint64> m_lastFocusedWindowId;
 };
