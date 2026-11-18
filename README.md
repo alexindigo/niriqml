@@ -140,9 +140,9 @@ uses Qt 6.12; the minimum Qt runtime is not yet verified. Ordinary tests-off
 builds need no Rust, Python generator or network schema fetch. Test mode uses
 Python 3, Qt Test and QuickTest. Rust is a maintainer-only schema/vector tool.
 
-Arch packages are `qt6-niriqml` and `qt6-niriqml-git` on AUR. Published packages
-may precede this Unreleased API; consult their packaged version. Packaging uses
-the same CMake install targets as source installs.
+Arch packages are `qt6-niriqml` and `qt6-niriqml-git` on AUR; 0.3.0 is the
+first release with this API (0.2.0 and earlier used numeric IDs and the older
+contract). Packaging uses the same CMake install targets as source installs.
 
 ```sh
 yay -S qt6-niriqml      # release; use qt6-niriqml-git for git master
