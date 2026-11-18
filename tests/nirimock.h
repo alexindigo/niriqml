@@ -50,12 +50,15 @@ private:
         QByteArray input;
         qsizetype scan = 0;
         quint64 id = 0;
+        // Input stops immediately; broadcasts wait for the queued initial replication.
         bool stream = false;
+        bool broadcastReady = false;
     };
     void accept();
     void read(Client *client);
     void request(Client *client, const QByteArray &line);
-    void reply(Client *client, const QByteArray &bytes, const Fault &fault);
+    void reply(Client *client, const QByteArray &bytes, const Fault &fault,
+               bool activateStream = false);
     QByteArray initialBurst() const;
     static QByteArray line(const NiriWire::WireValue &value);
     static NiriWire::WireValue fixture(const QString &group, const QString &name);

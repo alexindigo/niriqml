@@ -275,6 +275,9 @@ if(BUILD_TEST_MODE)
     )
     add_test(NAME test_scripts COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_scripts.sh
         ${CMAKE_CURRENT_BINARY_DIR}/test_scripts_scratch)
+    add_test(NAME test_fixture_runner COMMAND bash
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_fixture_runner.sh
+        ${CMAKE_CURRENT_BINARY_DIR}/test_fixture_runner_scratch)
     get_property(_tests DIRECTORY PROPERTY TESTS)
     foreach(_test IN LISTS _tests)
         if(_test MATCHES "^test_live_")

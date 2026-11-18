@@ -109,7 +109,7 @@ void NiriMock::sendEvent(const QJsonObject &event)
 void NiriMock::sendEventBytes(const QByteArray &bytes)
 {
     for (auto client : m_clients)
-        if (client && client->stream && client->socket
+        if (client && client->broadcastReady && client->socket
             && client->socket->state() == QLocalSocket::ConnectedState)
             client->socket->write(bytes);
 }
@@ -117,7 +117,7 @@ int NiriMock::streamCount() const
 {
     int count = 0;
     for (auto client : m_clients)
-        if (client && client->stream && client->socket
+        if (client && client->broadcastReady && client->socket
             && client->socket->state() == QLocalSocket::ConnectedState)
             ++count;
     return count;
@@ -132,8 +132,8 @@ void NiriMock::accept()
         m_clients.append(client);
         connect(socket, &QLocalSocket::readyRead, client, [this, client] { read(client); });
         connect(socket, &QLocalSocket::disconnected, client, [this, client] {
-            const bool stream = client->stream;
-            client->stream = false;
+            const bool stream = client->broadcastReady;
+            client->broadcastReady = false;
             m_clients.removeAll(client);
             client->deleteLater();
             if (stream)
@@ -206,26 +206,35 @@ void NiriMock::request(Client *client, const QByteArray &bytes)
     } else {
         response = line(object("Err", WireValue("unknown request")));
     }
-    reply(client, fault.bytes.isEmpty() ? response : fault.bytes, fault);
-    if (client->stream)
-        emit connected();
+    reply(client, fault.bytes.isEmpty() ? response : fault.bytes, fault, kind == "EventStream");
 }
-void NiriMock::reply(Client *client, const QByteArray &bytes, const Fault &fault)
+void NiriMock::reply(Client *client, const QByteArray &bytes, const Fault &fault,
+                     bool activateStream)
 {
-    QTimer::singleShot(fault.delayMs, client, [client, bytes, fault] {
+    QTimer::singleShot(fault.delayMs, client, [this, client, bytes, fault, activateStream] {
         if (!client->socket || client->socket->state() != QLocalSocket::ConnectedState)
             return;
         if (!fault.drop) {
             qsizetype offset = 0;
             for (const auto size : fault.fragments) {
-                client->socket->write(bytes.mid(offset, size));
+                const auto fragment = bytes.mid(offset, size);
+                if (client->socket->write(fragment) != fragment.size())
+                    return;
                 client->socket->flush();
                 offset += size;
             }
-            client->socket->write(bytes.mid(offset));
+            const auto remaining = bytes.mid(offset);
+            if (client->socket->write(remaining) != remaining.size())
+                return;
         }
         // Released niri accepts further requests on the same connection.
-        if (fault.close)
+        if (fault.close) {
             client->socket->disconnectFromServer();
+            return;
+        }
+        if (activateStream && !fault.drop) {
+            client->broadcastReady = true;
+            emit connected();
+        }
     });
 }

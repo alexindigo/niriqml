@@ -152,6 +152,7 @@ private slots:
         if (layouts)
             expected << "KeyboardLayoutsChanged";
         expected << "OverviewOpenedOrClosed" << "ConfigLoaded" << "CastsChanged";
+        QCOMPARE(rows.size(), expected.size() + 1);
         for (int i = 1; i < rows.size(); ++i) {
             const auto document = parse(rows[i]);
             QCOMPARE(document->root.objectValue()->first().first, expected[i - 1]);
@@ -181,6 +182,77 @@ private slots:
         QTRY_COMPARE(mock.streamCount(), 0);
         QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
         mock.sendEventBytes("{\"ConfigLoaded\":{\"failed\":false}}\n");
+    }
+    void connectedBroadcast_data()
+    {
+        QTest::addColumn<int>("delayMs");
+        QTest::newRow("queued") << 0;
+        QTest::newRow("delayed-fragmented") << 100;
+    }
+    void connectedBroadcast()
+    {
+        QFETCH(int, delayMs);
+        NiriMock mock;
+        QVERIFY(mock.start());
+        NiriMock::Fault fault;
+        fault.delayMs = delayMs;
+        fault.fragments = {1, 2, 3};
+        mock.enqueueFault(fault);
+        QSignalSpy connected(&mock, &NiriMock::connected);
+        QSignalSpy requests(&mock, &NiriMock::requestLine);
+        const QByteArray event = "{\"ConfigLoaded\":{\"failed\":true}}\n";
+        connect(&mock, &NiriMock::connected, &mock, [&] { mock.sendEventBytes(event); });
+        QLocalSocket socket;
+        connectPeer(socket, mock);
+        socket.write("\"EventStream\"\n\"Version\"\n");
+        if (delayMs) {
+            QTRY_COMPARE(requests.count(), 1);
+            QCOMPARE(connected.count(), 0);
+            QCOMPARE(mock.streamCount(), 0);
+            mock.sendEventBytes("{\"WindowClosed\":{\"id\":7}}\n");
+            QTest::qWait(20);
+            QCOMPARE(socket.bytesAvailable(), 0);
+        }
+        const auto rows = receive(socket, 7).trimmed().split('\n');
+        QCOMPARE(rows.size(), 7);
+        QCOMPARE(rows.first(), QByteArray("{\"Ok\":\"Handled\"}"));
+        QCOMPARE(rows[5], QByteArray("{\"CastsChanged\":{\"casts\":[]}}"));
+        QCOMPARE(rows.last() + '\n', event);
+        QCOMPARE(connected.count(), 1);
+        QCOMPARE(mock.streamCount(), 1);
+        QCOMPARE(requests.count(), 1); // Suppress input while the subscription is pending too.
+    }
+    void inactiveStream_data()
+    {
+        QTest::addColumn<bool>("drop");
+        QTest::newRow("dropped") << true;
+        QTest::newRow("closed") << false;
+    }
+    void inactiveStream()
+    {
+        QFETCH(bool, drop);
+        NiriMock mock;
+        QVERIFY(mock.start());
+        NiriMock::Fault fault;
+        fault.drop = drop;
+        fault.close = !drop;
+        mock.enqueueFault(fault);
+        QSignalSpy connected(&mock, &NiriMock::connected);
+        QSignalSpy disconnected(&mock, &NiriMock::disconnected);
+        QLocalSocket socket;
+        connectPeer(socket, mock);
+        socket.write("\"EventStream\"\n");
+        QTest::qWait(100);
+        QCOMPARE(connected.count(), 0);
+        QCOMPARE(disconnected.count(), 0);
+        QCOMPARE(mock.streamCount(), 0);
+        if (drop) {
+            mock.sendEventBytes("{\"ConfigLoaded\":{\"failed\":true}}\n");
+            QTest::qWait(20);
+            QCOMPARE(socket.bytesAvailable(), 0);
+        } else {
+            QTRY_COMPARE(socket.state(), QLocalSocket::UnconnectedState);
+        }
     }
     void faults()
     {
