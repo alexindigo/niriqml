@@ -31,7 +31,9 @@ NiriRequestOperation::NiriRequestOperation(NiriPendingReply *reply, QObject *sco
       m_request(std::move(request)),
       m_options(options),
       m_decoder(std::move(decoder)),
-      m_channel(shared ? std::move(shared) : channel(options.maxFrameBytes)),
+      m_channel(options.observeEventStream ? Channel{}
+                        : shared           ? std::move(shared)
+                                           : channel(options.maxFrameBytes)),
       m_persistent(persistent),
       m_validationError(std::move(validationError))
 {
@@ -80,6 +82,10 @@ void NiriRequestOperation::begin()
     }
     if (m_endpoint.path.isEmpty()) {
         fail("Configuration", "No endpoint selected");
+        return;
+    }
+    if (m_options.observeEventStream) {
+        beginStream();
         return;
     }
     if (m_channel->retired) {
@@ -142,6 +148,54 @@ void NiriRequestOperation::write()
         m_phase = QStringLiteral("AwaitingReply");
 }
 
+void NiriRequestOperation::beginStream()
+{
+    if (!m_request.stringValue() || *m_request.stringValue() != QStringLiteral("EventStream")) {
+        fail("Configuration", "Only EventStream can observe the session subscription");
+        return;
+    }
+    auto *session = NiriSession::instance();
+    m_phase = QStringLiteral("AwaitingSubscription");
+    auto accepted = [this, session] {
+        if (m_terminal || session->currentEndpoint().revision != m_endpoint.revision)
+            return;
+        if (const auto reply = session->subscriptionReply())
+            consumeReply(*reply);
+    };
+    connect(session, &NiriSession::subscriptionAccepted, this, [accepted, session](quint64 epoch) {
+        if (epoch == session->epoch())
+            accepted();
+    });
+    connect(session, &NiriSession::statusChanged, this, [this, session] {
+        if (m_terminal)
+            return;
+        if (session->isConnected())
+            m_certainty = QStringLiteral("MayHaveExecuted");
+        if (session->status() == NiriSession::Stopped) {
+            cancel();
+            return;
+        }
+        if (session->status() == NiriSession::Failed || session->status() == NiriSession::Backoff) {
+            const auto detail = session->error();
+            const auto raw = detail.value(QStringLiteral("raw")).toByteArray();
+            if (!raw.isEmpty()) {
+                m_document.bytes = raw;
+                if (const auto parsed = NiriWire::parse(raw))
+                    m_document = *parsed;
+                m_certainty = QStringLiteral("ReplyReceived");
+            }
+            fail(detail.value(QStringLiteral("category"), "Transport").toString(),
+                 detail.value(QStringLiteral("message"), "Subscription failed").toString());
+        }
+    });
+    if (m_options.timeoutMs >= 0)
+        m_deadline.start(m_options.timeoutMs);
+    m_connectDeadline.start(m_options.connectTimeoutMs);
+    session->start();
+    if (!m_terminal)
+        accepted(); // Retain the actual current acknowledgement for late callers.
+}
+
 void NiriRequestOperation::drain(bool eof)
 {
     if (m_terminal || m_draining)
@@ -190,7 +244,16 @@ void NiriRequestOperation::frame(const QByteArray &bytes)
         fail("Parse", error.reason, -1, error.offset);
         return;
     }
-    m_document = *parsed;
+    consumeReply(*parsed);
+}
+
+void NiriRequestOperation::consumeReply(const Document &document)
+{
+    if (m_terminal)
+        return;
+    m_certainty = QStringLiteral("ReplyReceived");
+    m_phase = QStringLiteral("Reply");
+    m_document = document;
     const auto &root = m_document.root;
     const auto *members = root.objectValue();
     const auto *ok = root.lookup(QStringLiteral("Ok"));
@@ -252,10 +315,12 @@ void NiriRequestOperation::finish()
     m_terminal = true;
     m_deadline.stop();
     m_connectDeadline.stop();
-    auto *socket = m_channel->socket;
-    QObject::disconnect(socket, nullptr, this, nullptr);
-    if (!m_persistent || !m_error.category.isEmpty())
-        socket->abort();
+    if (m_channel) {
+        auto *socket = m_channel->socket;
+        QObject::disconnect(socket, nullptr, this, nullptr);
+        if (!m_persistent || !m_error.category.isEmpty())
+            socket->abort();
+    }
     // Commit once, then publish on a later turn, including cancel-before-start.
     QMetaObject::invokeMethod(
             this,

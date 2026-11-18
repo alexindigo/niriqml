@@ -1,0 +1,18 @@
+[package]
+name = "niriqml-ipc-schema-dump-main"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "niriqml-ipc-schema-dump-main"
+path = "../src/main.rs"
+
+[features]
+default = ["newer"]
+newer = []
+
+[dependencies]
+niri-ipc = { git = "https://github.com/niri-wm/niri", rev = "689c1e914a5af782a476e433b79c15554bf5a312", default-features = false, features = ["json-schema"] }
+schemars = "=1.2.2"
+serde_json = "=1.0.151"

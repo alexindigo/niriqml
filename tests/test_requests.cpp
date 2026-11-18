@@ -12,6 +12,7 @@
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QMetaMethod>
 #include <limits>
 
 using namespace NiriWire;
@@ -52,6 +53,22 @@ public:
 class TestRequests : public QObject
 {
     Q_OBJECT
+    static bool invokeTypedQuery(const QString &name, NiriPendingReply *&reply)
+    {
+        auto *requests = NiriRequests::instance();
+        const auto signature = name.toLatin1() + "()";
+        const auto index = requests->metaObject()->indexOfMethod(signature.constData());
+        if (index < 0)
+            return false;
+        const auto method = requests->metaObject()->method(index);
+        // Qt requires the exact declared return type, even for QObject pointers.
+        // Allocate correctly typed storage, then use Qt's safe pointer conversion.
+        QVariant result(method.returnMetaType());
+        if (!method.invoke(requests, QGenericReturnArgument(method.typeName(), result.data())))
+            return false;
+        reply = result.value<NiriPendingReply *>();
+        return reply != nullptr;
+    }
 private slots:
     void captureScopeReentrancy_data()
     {
@@ -215,8 +232,7 @@ private slots:
         server.response = "{\"Ok\":{\"" + kind.toUtf8() + "\":false}}\n";
         NiriSession::instance()->selectEndpoint(server.path());
         NiriPendingReply *raw = nullptr;
-        QVERIFY(QMetaObject::invokeMethod(NiriRequests::instance(), method.toLatin1().constData(),
-                                          Q_RETURN_ARG(NiriPendingReply *, raw)));
+        QVERIFY(invokeTypedQuery(method, raw));
         std::unique_ptr<NiriPendingReply> reply(raw);
         QTRY_VERIFY(reply->completed());
         QCOMPARE(reply->error().category, QString("Decode"));
@@ -414,8 +430,7 @@ private slots:
         server.response = "{\"Ok\":{\"Wrong\":null}}\n";
         NiriSession::instance()->selectEndpoint(server.path());
         NiriPendingReply *raw = nullptr;
-        QVERIFY(QMetaObject::invokeMethod(NiriRequests::instance(), method.toLatin1().constData(),
-                                          Q_RETURN_ARG(NiriPendingReply *, raw)));
+        QVERIFY(invokeTypedQuery(method, raw));
         std::unique_ptr<NiriPendingReply> reply(raw);
         QTRY_VERIFY(reply->completed());
         QCOMPARE(reply->error().category, QString("Decode"));
@@ -451,8 +466,7 @@ private slots:
         server.response = response;
         NiriSession::instance()->selectEndpoint(server.path());
         NiriPendingReply *raw = nullptr;
-        QVERIFY(QMetaObject::invokeMethod(NiriRequests::instance(), method.toLatin1().constData(),
-                                          Q_RETURN_ARG(NiriPendingReply *, raw)));
+        QVERIFY(invokeTypedQuery(method, raw));
         std::unique_ptr<NiriPendingReply> reply(raw);
         QTRY_VERIFY(reply->completed());
         QVERIFY2(!reply->isError(), qPrintable(reply->error().message));
@@ -718,7 +732,7 @@ private slots:
         else if (method == "closeWindow")
             raw = actions->closeWindow(id);
         else if (method == "moveWindowToWorkspace")
-            raw = actions->moveWindowToWorkspace(id, QString("main"));
+            raw = actions->moveWindowToWorkspace(id, QString("main"), true);
         else if (method == "moveWindowToMonitor")
             raw = actions->moveWindowToMonitor(id, "DP-2");
         else if (method == "setWindowWidth")

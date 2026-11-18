@@ -27,6 +27,7 @@ public:
         int timeoutMs = 5000; // -1 means no total deadline.
         int connectTimeoutMs = 5000;
         qsizetype maxFrameBytes = NiriLineBuffer::DefaultMaxFrameBytes;
+        bool observeEventStream = false; // Observe the session; never allocate a request socket.
     };
     using Decoder = std::function<bool(const NiriWire::WireValue &, QVariant &, NiriError &)>;
     using Channel = std::shared_ptr<NiriRequestChannel>;
@@ -45,6 +46,8 @@ private:
     void write();
     void drain(bool eof = false);
     void frame(const QByteArray &bytes);
+    void consumeReply(const NiriWire::Document &document);
+    void beginStream();
     void fail(const QString &category, const QString &message, int socketError = -1,
               qint64 offset = -1);
     void finish();

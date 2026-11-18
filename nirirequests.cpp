@@ -1,7 +1,7 @@
 #include "nirirequests.h"
 #include "nirirequestsequence.h"
 #include "niritypes.h"
-#include "niriutils.h"
+#include "generated/niriipccodec_generated.h"
 #include <QCoreApplication>
 #include <QJSValue>
 #include <QJsonArray>
@@ -38,7 +38,7 @@ NiriRequests *NiriRequests::instance()
     return self;
 }
 
-NiriRequests::NiriRequests(QObject *parent) : QObject(parent) { }
+NiriRequests::NiriRequests(QObject *parent) : NiriIpcRequests(parent) { }
 
 QVariant NiriRequests::number(const QString &text)
 {
@@ -149,7 +149,8 @@ NiriPendingReply *NiriRequests::dispatch(const WireValue &request, QObject *scop
                                          NiriRequestOperation::Decoder decoder,
                                          const QString &validationError,
                                          NiriRequestOperation::Channel channel, bool persistent,
-                                         bool start, NiriRequestOperation **operationOut)
+                                         bool start, NiriRequestOperation **operationOut,
+                                         std::function<NiriPendingReply *(QObject *)> replyFactory)
 {
     if (!NiriSession::checkThread(scope) || (owner && !NiriSession::checkThread(owner)))
         return nullptr;
@@ -161,7 +162,7 @@ NiriPendingReply *NiriRequests::dispatch(const WireValue &request, QObject *scop
     const auto endpoint = session->currentEndpoint();
     if (owner && !ownerGuard)
         return nullptr;
-    auto *reply = new NiriPendingReply(ownerGuard);
+    auto *reply = replyFactory ? replyFactory(ownerGuard) : new NiriPendingReply(ownerGuard);
     QJSEngine::setObjectOwnership(reply,
                                   owner ? QJSEngine::CppOwnership : QJSEngine::JavaScriptOwnership);
     auto *operation = new NiriRequestOperation(reply, scopeGuard, endpoint, request, options,
@@ -241,111 +242,34 @@ void NiriRequests::sendJson(const QJsonValue &request, Callback callback)
             });
 }
 
-// Transitional named decoders. E6 replaces these compatibility gadget
-// conversions with generated field/range validation; the response discriminator
-// and outer payload kind are checked here before any conversion can default.
-NiriPendingReply *NiriRequests::query(const QString &kind)
+NiriPendingReply *NiriRequests::dispatchTyped(const WireValue &request, QObject *scope,
+                                              NiriRequestOperation::Options opts,
+                                              const QString &expected,
+                                              const QString &validationError)
+{
+    return dispatch(
+            request, scope, opts, nullptr,
+            [expected](const WireValue &ok, QVariant &value, NiriError &error) {
+                return NiriIpc::decodeResponse(expected, ok, value, error);
+            },
+            validationError, {}, false, true, nullptr,
+            [expected](QObject *owner) { return NiriIpc::createReply(expected, owner); });
+}
+
+NiriPendingReply *NiriRequests::submitRequest(const WireValue &request, const QString &expected,
+                                              const QVariantMap &input, bool interactive,
+                                              bool eventStream, const QString &validationError)
 {
     if (!NiriSession::checkThread(this))
         return nullptr;
-    auto decode = [kind](const WireValue &ok, QVariant &value, NiriError &error) {
-        const auto *payload = ok.lookup(kind);
-        const bool list = kind == "Windows" || kind == "Workspaces";
-        const bool focused = kind == "FocusedWindow" || kind == "FocusedOutput";
-        bool valid = ok.objectValue() && ok.objectValue()->size() == 1 && payload;
-        if (valid) {
-            if (kind == "Version")
-                valid = payload->stringValue();
-            else if (list)
-                valid = payload->arrayValue();
-            else
-                valid = payload->objectValue()
-                        || (focused && payload->type() == WireValue::Type::Null);
-        }
-        if (!valid) {
-            error.message = QStringLiteral("Expected %1 response and payload type").arg(kind);
-            error.fieldPath = QStringLiteral("$.Ok.%1").arg(kind);
-            return false;
-        }
-        if (kind == "Version") {
-            value = *payload->stringValue();
-            return true;
-        }
-        if (payload->type() == WireValue::Type::Null) {
-            value = QVariant::fromValue(nullptr);
-            return true;
-        }
-        auto gadget = [&error, &kind](const WireValue &wire, QMetaType type) {
-            const auto json = toQJsonValueLossy(wire);
-            if (!json) {
-                error.message = QStringLiteral("Response cannot be projected to a legacy gadget");
-                error.fieldPath = QStringLiteral("$.Ok.%1").arg(kind);
-                return QVariant();
-            }
-            return jsonToGadget(json->toObject(), type);
-        };
-        const auto type = (kind == "Windows" || kind == "FocusedWindow")
-                ? QMetaType::fromType<NiriWindow>()
-                : kind == "Workspaces"      ? QMetaType::fromType<NiriWorkspace>()
-                : kind == "KeyboardLayouts" ? QMetaType::fromType<NiriKeyboardLayouts>()
-                                            : QMetaType::fromType<NiriOutput>();
-        if (list) {
-            QVariantList items;
-            for (const auto &item : *payload->arrayValue()) {
-                if (!item.objectValue()) {
-                    error.message = QStringLiteral("Expected record in response array");
-                    error.fieldPath = QStringLiteral("$.Ok.%1[%2]").arg(kind).arg(items.size());
-                    return false;
-                }
-                items.append(gadget(item, type));
-            }
-            value = items;
-        } else if (kind == "Outputs") {
-            QVariantMap items;
-            for (const auto &item : *payload->objectValue()) {
-                if (!item.second.objectValue()) {
-                    error.message = QStringLiteral("Expected output record");
-                    error.fieldPath = QStringLiteral("$.Ok.Outputs.%1").arg(item.first);
-                    return false;
-                }
-                items.insert(item.first, gadget(item.second, type));
-            }
-            value = items;
-        } else {
-            value = gadget(*payload, type);
-        }
-        return error.message.isEmpty();
-    };
-    return dispatch(WireValue(kind), this, options(), nullptr, std::move(decode));
-}
-
-NiriPendingReply *NiriRequests::windows()
-{
-    return query(QStringLiteral("Windows"));
-}
-NiriPendingReply *NiriRequests::workspaces()
-{
-    return query(QStringLiteral("Workspaces"));
-}
-NiriPendingReply *NiriRequests::outputs()
-{
-    return query(QStringLiteral("Outputs"));
-}
-NiriPendingReply *NiriRequests::focusedWindow()
-{
-    return query(QStringLiteral("FocusedWindow"));
-}
-NiriPendingReply *NiriRequests::focusedOutput()
-{
-    return query(QStringLiteral("FocusedOutput"));
-}
-NiriPendingReply *NiriRequests::keyboardLayouts()
-{
-    return query(QStringLiteral("KeyboardLayouts"));
-}
-NiriPendingReply *NiriRequests::version()
-{
-    return query(QStringLiteral("Version"));
+    auto opts = options();
+    if (interactive)
+        opts.timeoutMs = -1;
+    opts.observeEventStream = eventStream;
+    QString error = validationError;
+    if (error.isEmpty())
+        parseOptions(input, opts, error);
+    return dispatchTyped(request, this, opts, expected, error);
 }
 
 NiriRequestSequence *NiriRequests::sequence()

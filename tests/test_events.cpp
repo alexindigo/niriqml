@@ -25,6 +25,8 @@
 #include "nirirequests.h"
 #include "niritypes.h"
 #include "niriworkspacereactive.h"
+#include "ipcfixtures.h"
+#include "streamfixture.h"
 
 class TestEvents : public QObject
 {
@@ -36,13 +38,14 @@ private slots:
         QVERIFY(NiriEvents::instance());
         QVERIFY(NiriConnection::instance());
     }
+    void cleanup() { m_stream.reset(); }
 
     void windowsChangedDispatches()
     {
         QSignalSpy spy(NiriEvents::instance(), &NiriEvents::windowsChanged);
 
         QJsonArray windows;
-        QJsonObject w;
+        QJsonObject w = windowFixture();
         w["id"] = 1;
         w["title"] = "test";
         w["app_id"] = QStringLiteral("test.app");
@@ -63,7 +66,7 @@ private slots:
     void windowsChangedUpdatesSnapshot()
     {
         QJsonArray windows;
-        QJsonObject w;
+        QJsonObject w = windowFixture();
         w["id"] = 42;
         w["title"] = "snap";
         windows.append(w);
@@ -76,12 +79,16 @@ private slots:
 
     void workspaceActivatedDispatches()
     {
+        auto workspace = workspaceFixture();
+        workspace["id"] = 3;
+        emitEvent("WorkspacesChanged", {{"workspaces", QJsonArray{workspace}.toVariantList()}});
         QSignalSpy spy(NiriEvents::instance(), &NiriEvents::workspaceActivated);
 
         emitEvent("WorkspaceActivated", {{"id", 3}, {"focused", true}});
 
         QCOMPARE(spy.count(), 1);
-        QCOMPARE(spy.at(0).at(0).toULongLong(), quint64(3));
+        QCOMPARE(spy.at(0).at(0).metaType(), QMetaType::fromType<QString>());
+        QCOMPARE(spy.at(0).at(0).toString(), QStringLiteral("3"));
         QVERIFY(spy.at(0).at(1).toBool());
     }
 
@@ -89,7 +96,7 @@ private slots:
     {
         // Set up a window in the snapshot first
         QJsonArray windows;
-        QJsonObject w;
+        QJsonObject w = windowFixture();
         w["id"] = 99;
         w["is_focused"] = false;
         windows.append(w);
@@ -100,7 +107,8 @@ private slots:
         emitEvent("WindowFocusChanged", {{"id", 99}});
 
         QCOMPARE(spy.count(), 1);
-        QCOMPARE(spy.at(0).at(0).toULongLong(), quint64(99));
+        QCOMPARE(spy.at(0).at(0).metaType(), QMetaType::fromType<QString>());
+        QCOMPARE(spy.at(0).at(0).toString(), QStringLiteral("99"));
         QCOMPARE(NiriEvents::instance()->lastFocusedWindowId(), quint64(99));
 
         // Cache updated
@@ -119,7 +127,8 @@ private slots:
 
         QCOMPARE(spy.count(), 1);
         QStringList expected = {QStringLiteral("us"), QStringLiteral("fr")};
-        QCOMPARE(NiriEvents::instance()->lastKeyboardLayouts().names, expected);
+        QVERIFY(NiriEvents::instance()->lastKeyboardLayouts());
+        QCOMPARE(NiriEvents::instance()->lastKeyboardLayouts()->names, expected);
     }
 
     void overviewOpenedOrClosed()
@@ -150,7 +159,7 @@ private slots:
     {
         // Window appears
         QJsonArray windows;
-        QJsonObject w1, w2;
+        QJsonObject w1 = windowFixture(), w2 = windowFixture();
         w1["id"] = 1;
         w2["id"] = 2;
         windows.append(w1);
@@ -245,11 +254,14 @@ private slots:
         QVERIFY(server.listen(socketDir.filePath(QStringLiteral("socket"))));
         auto *connection = NiriConnection::instance();
         const auto oldLimit = connection->maxFrameBytes();
+        const auto oldPolicy = connection->autoReconnect();
         const auto restore = qScopeGuard([&]() {
             connection->disconnect();
             connection->setMaxFrameBytes(oldLimit);
+            connection->setAutoReconnect(oldPolicy);
         });
         connection->disconnect();
+        connection->setAutoReconnect(true);
         connection->setMaxFrameBytes(32);
         QSignalSpy retry(connection, &NiriConnection::reconnectScheduled);
         QSignalSpy events(connection, &NiriConnection::eventReceived);
@@ -319,9 +331,9 @@ private slots:
         peer->flush();
         QTRY_VERIFY_WITH_TIMEOUT(connection->subscribed(), 500);
         QSignalSpy events(connection, &NiriConnection::eventReceived);
-        QSignalSpy closed(NiriEvents::instance(), &NiriEvents::windowClosed);
+        QSignalSpy focused(NiriEvents::instance(), &NiriEvents::windowFocusChanged);
         const QByteArray complete =
-                "{\"WindowClosed\":{\"id\":1}}\n{\"WindowClosed\":{\"id\":2}}\n";
+                "{\"WindowFocusChanged\":{\"id\":1}}\n{\"WindowFocusChanged\":{\"id\":2}}\n";
         const QByteArray oversized(33, 'x');
         if (combined) {
             // One write/flush with no event-loop turn between the valid prefix and tail.
@@ -339,11 +351,12 @@ private slots:
         QVERIFY(!connection->isConnected());
         QTRY_COMPARE_WITH_TIMEOUT(peer->state(), QLocalSocket::UnconnectedState, 500);
         QCOMPARE(events.count(), 2);
-        QCOMPARE(closed.count(), 2);
+        QCOMPARE(focused.count(), 2);
         for (int i = 0; i < 2; ++i) {
-            QCOMPARE(events.at(i).at(0).toString(), QStringLiteral("WindowClosed"));
+            QCOMPARE(events.at(i).at(0).toString(), QStringLiteral("WindowFocusChanged"));
             QCOMPARE(events.at(i).at(1).toMap().value("id").toULongLong(), quint64(i + 1));
-            QCOMPARE(closed.at(i).at(0).toULongLong(), quint64(i + 1));
+            QCOMPARE(focused.at(i).at(0).metaType(), QMetaType::fromType<QString>());
+            QCOMPARE(focused.at(i).at(0).toString(), QString::number(i + 1));
         }
     }
 
@@ -468,7 +481,7 @@ private slots:
     {
         // Bootstrap two windows — id=1 focused, id=2 not
         QJsonArray windows;
-        QJsonObject w1, w2;
+        QJsonObject w1 = windowFixture(), w2 = windowFixture();
         w1["id"] = 1;
         w1["title"] = QStringLiteral("focused");
         w1["is_focused"] = true;
@@ -483,11 +496,12 @@ private slots:
 
         QSignalSpy spy(NiriEvents::instance(), &NiriEvents::windowFocusChanged);
 
-        // niri sends WindowFocusChanged { id: null } (JSON decodes as 0)
+        // niri sends WindowFocusChanged { id: null }, distinct from ID zero,
         // when focus clears — e.g. switching to an empty workspace.
-        emitEvent("WindowFocusChanged", {{"id", 0}});
+        emitEvent("WindowFocusChanged", {{"id", QVariant::fromValue(nullptr)}});
 
-        QCOMPARE(NiriEvents::instance()->lastFocusedWindowId(), quint64(0));
+        QVERIFY(!NiriEvents::instance()->lastFocusedWindowId());
+        QCOMPARE(spy.at(0).at(0).metaType(), QMetaType::fromType<std::nullptr_t>());
         QCOMPARE(spy.count(), 1);
         for (const QVariant &v : NiriEvents::instance()->lastWindowsSnapshot()) {
             NiriWindow w = v.value<NiriWindow>();
@@ -499,7 +513,7 @@ private slots:
     {
         // Bootstrap: send WorkspacesChanged with two workspaces
         QJsonArray wss;
-        QJsonObject ws1, ws2;
+        QJsonObject ws1 = workspaceFixture(), ws2 = workspaceFixture();
         ws1["id"] = 1;
         ws1["output"] = QStringLiteral("eDP-1");
         ws1["is_active"] = true;
@@ -527,11 +541,20 @@ private slots:
     }
 
 private:
+    std::unique_ptr<StateStreamFixture> m_stream;
     void emitEvent(const QString &name, const QVariantMap &payload)
     {
-        QMetaObject::invokeMethod(NiriSession::instance(), "eventReceived", Qt::DirectConnection,
-                                  Q_ARG(QString, name), Q_ARG(QVariantMap, payload),
-                                  Q_ARG(quint64, NiriSession::instance()->epoch()));
+        if (!m_stream || !NiriSession::instance()->subscribed()
+            || NiriSession::instance()->currentEndpoint().path
+                    != m_stream->server.fullServerName()) {
+            m_stream = std::make_unique<StateStreamFixture>();
+            QVERIFY(m_stream->start());
+        }
+        QSignalSpy raw(NiriEvents::instance(), &NiriEvents::rawEvent);
+        const auto value = NiriWire::fromQVariantLossy(payload);
+        QVERIFY(value);
+        m_stream->send(*NiriWire::encode(*NiriWire::WireValue::object({{name, *value}})));
+        QTRY_COMPARE(raw.size(), 1);
     }
 };
 

@@ -2,10 +2,11 @@
 
 #include "nirirequestoperation.h"
 #include "nirirequestsequence.h"
+#include "generated/niriipcrequests_generated.h"
 #include <QJsonObject>
 #include <QQmlEngine>
 
-class NiriRequests : public QObject
+class NiriRequests : public NiriIpcRequests
 {
     Q_OBJECT
     QML_SINGLETON
@@ -27,13 +28,6 @@ public:
     // Exact-number builder for structured raw input, including unknown fields.
     // Invalid text returns undefined; sending it produces a queued error.
     Q_INVOKABLE QVariant number(const QString &text);
-    Q_INVOKABLE NiriPendingReply *windows();
-    Q_INVOKABLE NiriPendingReply *workspaces();
-    Q_INVOKABLE NiriPendingReply *outputs();
-    Q_INVOKABLE NiriPendingReply *focusedWindow();
-    Q_INVOKABLE NiriPendingReply *focusedOutput();
-    Q_INVOKABLE NiriPendingReply *keyboardLayouts();
-    Q_INVOKABLE NiriPendingReply *version();
     void setRequestTimeoutMs(int ms)
     {
         if (NiriSession::checkThread(this))
@@ -54,7 +48,12 @@ public:
              NiriRequestOperation::Options options, QObject *owner = nullptr,
              NiriRequestOperation::Decoder decoder = {}, const QString &validationError = {},
              NiriRequestOperation::Channel channel = {}, bool persistent = false, bool start = true,
-             NiriRequestOperation **operationOut = nullptr);
+             NiriRequestOperation **operationOut = nullptr,
+             std::function<NiriPendingReply *(QObject *)> replyFactory = {});
+    static NiriPendingReply *dispatchTyped(const NiriWire::WireValue &request, QObject *scope,
+                                           NiriRequestOperation::Options options,
+                                           const QString &expected,
+                                           const QString &validationError = {});
     static std::optional<NiriWire::WireValue> wireValue(const QVariant &value, QString &error,
                                                         int depth = 0);
     static bool parseOptions(const QVariantMap &input, NiriRequestOperation::Options &options,
@@ -63,7 +62,9 @@ public:
 private:
     explicit NiriRequests(QObject *parent = nullptr);
     NiriRequestOperation::Options options() const;
-    NiriPendingReply *query(const QString &kind);
+    NiriPendingReply *submitRequest(const NiriWire::WireValue &request, const QString &expected,
+                                    const QVariantMap &options, bool interactive, bool eventStream,
+                                    const QString &validationError) override;
     int m_requestTimeoutMs = 5000;
     qsizetype m_maxFrameBytes = NiriLineBuffer::DefaultMaxFrameBytes;
 };

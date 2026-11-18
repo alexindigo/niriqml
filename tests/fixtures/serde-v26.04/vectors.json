@@ -1,0 +1,3110 @@
+{
+  "source": {
+    "commit": "8ed0da44d974c32c6877d2f4630c314da0717ecb",
+    "release": "v26.04"
+  },
+  "surfaceVectors": [
+    {
+      "name": "action-PowerOffMonitors",
+      "type": "Action",
+      "value": {
+        "PowerOffMonitors": {}
+      }
+    },
+    {
+      "name": "action-PowerOnMonitors",
+      "type": "Action",
+      "value": {
+        "PowerOnMonitors": {}
+      }
+    },
+    {
+      "name": "action-ToggleKeyboardShortcutsInhibit",
+      "type": "Action",
+      "value": {
+        "ToggleKeyboardShortcutsInhibit": {}
+      }
+    },
+    {
+      "name": "action-FocusWindowPrevious",
+      "type": "Action",
+      "value": {
+        "FocusWindowPrevious": {}
+      }
+    },
+    {
+      "name": "action-FocusColumnLeft",
+      "type": "Action",
+      "value": {
+        "FocusColumnLeft": {}
+      }
+    },
+    {
+      "name": "action-FocusColumnRight",
+      "type": "Action",
+      "value": {
+        "FocusColumnRight": {}
+      }
+    },
+    {
+      "name": "action-FocusColumnFirst",
+      "type": "Action",
+      "value": {
+        "FocusColumnFirst": {}
+      }
+    },
+    {
+      "name": "action-FocusColumnLast",
+      "type": "Action",
+      "value": {
+        "FocusColumnLast": {}
+      }
+    },
+    {
+      "name": "action-FocusColumnRightOrFirst",
+      "type": "Action",
+      "value": {
+        "FocusColumnRightOrFirst": {}
+      }
+    },
+    {
+      "name": "action-FocusColumnLeftOrLast",
+      "type": "Action",
+      "value": {
+        "FocusColumnLeftOrLast": {}
+      }
+    },
+    {
+      "name": "action-FocusWindowOrMonitorUp",
+      "type": "Action",
+      "value": {
+        "FocusWindowOrMonitorUp": {}
+      }
+    },
+    {
+      "name": "action-FocusWindowOrMonitorDown",
+      "type": "Action",
+      "value": {
+        "FocusWindowOrMonitorDown": {}
+      }
+    },
+    {
+      "name": "action-FocusColumnOrMonitorLeft",
+      "type": "Action",
+      "value": {
+        "FocusColumnOrMonitorLeft": {}
+      }
+    },
+    {
+      "name": "action-FocusColumnOrMonitorRight",
+      "type": "Action",
+      "value": {
+        "FocusColumnOrMonitorRight": {}
+      }
+    },
+    {
+      "name": "action-FocusWindowDown",
+      "type": "Action",
+      "value": {
+        "FocusWindowDown": {}
+      }
+    },
+    {
+      "name": "action-FocusWindowUp",
+      "type": "Action",
+      "value": {
+        "FocusWindowUp": {}
+      }
+    },
+    {
+      "name": "action-FocusWindowDownOrColumnLeft",
+      "type": "Action",
+      "value": {
+        "FocusWindowDownOrColumnLeft": {}
+      }
+    },
+    {
+      "name": "action-FocusWindowDownOrColumnRight",
+      "type": "Action",
+      "value": {
+        "FocusWindowDownOrColumnRight": {}
+      }
+    },
+    {
+      "name": "action-FocusWindowUpOrColumnLeft",
+      "type": "Action",
+      "value": {
+        "FocusWindowUpOrColumnLeft": {}
+      }
+    },
+    {
+      "name": "action-FocusWindowUpOrColumnRight",
+      "type": "Action",
+      "value": {
+        "FocusWindowUpOrColumnRight": {}
+      }
+    },
+    {
+      "name": "action-FocusWindowOrWorkspaceDown",
+      "type": "Action",
+      "value": {
+        "FocusWindowOrWorkspaceDown": {}
+      }
+    },
+    {
+      "name": "action-FocusWindowOrWorkspaceUp",
+      "type": "Action",
+      "value": {
+        "FocusWindowOrWorkspaceUp": {}
+      }
+    },
+    {
+      "name": "action-FocusWindowTop",
+      "type": "Action",
+      "value": {
+        "FocusWindowTop": {}
+      }
+    },
+    {
+      "name": "action-FocusWindowBottom",
+      "type": "Action",
+      "value": {
+        "FocusWindowBottom": {}
+      }
+    },
+    {
+      "name": "action-FocusWindowDownOrTop",
+      "type": "Action",
+      "value": {
+        "FocusWindowDownOrTop": {}
+      }
+    },
+    {
+      "name": "action-FocusWindowUpOrBottom",
+      "type": "Action",
+      "value": {
+        "FocusWindowUpOrBottom": {}
+      }
+    },
+    {
+      "name": "action-MoveColumnLeft",
+      "type": "Action",
+      "value": {
+        "MoveColumnLeft": {}
+      }
+    },
+    {
+      "name": "action-MoveColumnRight",
+      "type": "Action",
+      "value": {
+        "MoveColumnRight": {}
+      }
+    },
+    {
+      "name": "action-MoveColumnToFirst",
+      "type": "Action",
+      "value": {
+        "MoveColumnToFirst": {}
+      }
+    },
+    {
+      "name": "action-MoveColumnToLast",
+      "type": "Action",
+      "value": {
+        "MoveColumnToLast": {}
+      }
+    },
+    {
+      "name": "action-MoveColumnLeftOrToMonitorLeft",
+      "type": "Action",
+      "value": {
+        "MoveColumnLeftOrToMonitorLeft": {}
+      }
+    },
+    {
+      "name": "action-MoveColumnRightOrToMonitorRight",
+      "type": "Action",
+      "value": {
+        "MoveColumnRightOrToMonitorRight": {}
+      }
+    },
+    {
+      "name": "action-MoveWindowDown",
+      "type": "Action",
+      "value": {
+        "MoveWindowDown": {}
+      }
+    },
+    {
+      "name": "action-MoveWindowUp",
+      "type": "Action",
+      "value": {
+        "MoveWindowUp": {}
+      }
+    },
+    {
+      "name": "action-MoveWindowDownOrToWorkspaceDown",
+      "type": "Action",
+      "value": {
+        "MoveWindowDownOrToWorkspaceDown": {}
+      }
+    },
+    {
+      "name": "action-MoveWindowUpOrToWorkspaceUp",
+      "type": "Action",
+      "value": {
+        "MoveWindowUpOrToWorkspaceUp": {}
+      }
+    },
+    {
+      "name": "action-ConsumeWindowIntoColumn",
+      "type": "Action",
+      "value": {
+        "ConsumeWindowIntoColumn": {}
+      }
+    },
+    {
+      "name": "action-ExpelWindowFromColumn",
+      "type": "Action",
+      "value": {
+        "ExpelWindowFromColumn": {}
+      }
+    },
+    {
+      "name": "action-SwapWindowRight",
+      "type": "Action",
+      "value": {
+        "SwapWindowRight": {}
+      }
+    },
+    {
+      "name": "action-SwapWindowLeft",
+      "type": "Action",
+      "value": {
+        "SwapWindowLeft": {}
+      }
+    },
+    {
+      "name": "action-ToggleColumnTabbedDisplay",
+      "type": "Action",
+      "value": {
+        "ToggleColumnTabbedDisplay": {}
+      }
+    },
+    {
+      "name": "action-CenterColumn",
+      "type": "Action",
+      "value": {
+        "CenterColumn": {}
+      }
+    },
+    {
+      "name": "action-CenterVisibleColumns",
+      "type": "Action",
+      "value": {
+        "CenterVisibleColumns": {}
+      }
+    },
+    {
+      "name": "action-FocusWorkspaceDown",
+      "type": "Action",
+      "value": {
+        "FocusWorkspaceDown": {}
+      }
+    },
+    {
+      "name": "action-FocusWorkspaceUp",
+      "type": "Action",
+      "value": {
+        "FocusWorkspaceUp": {}
+      }
+    },
+    {
+      "name": "action-FocusWorkspacePrevious",
+      "type": "Action",
+      "value": {
+        "FocusWorkspacePrevious": {}
+      }
+    },
+    {
+      "name": "action-MoveWorkspaceDown",
+      "type": "Action",
+      "value": {
+        "MoveWorkspaceDown": {}
+      }
+    },
+    {
+      "name": "action-MoveWorkspaceUp",
+      "type": "Action",
+      "value": {
+        "MoveWorkspaceUp": {}
+      }
+    },
+    {
+      "name": "action-FocusMonitorLeft",
+      "type": "Action",
+      "value": {
+        "FocusMonitorLeft": {}
+      }
+    },
+    {
+      "name": "action-FocusMonitorRight",
+      "type": "Action",
+      "value": {
+        "FocusMonitorRight": {}
+      }
+    },
+    {
+      "name": "action-FocusMonitorDown",
+      "type": "Action",
+      "value": {
+        "FocusMonitorDown": {}
+      }
+    },
+    {
+      "name": "action-FocusMonitorUp",
+      "type": "Action",
+      "value": {
+        "FocusMonitorUp": {}
+      }
+    },
+    {
+      "name": "action-FocusMonitorPrevious",
+      "type": "Action",
+      "value": {
+        "FocusMonitorPrevious": {}
+      }
+    },
+    {
+      "name": "action-FocusMonitorNext",
+      "type": "Action",
+      "value": {
+        "FocusMonitorNext": {}
+      }
+    },
+    {
+      "name": "action-MoveWindowToMonitorLeft",
+      "type": "Action",
+      "value": {
+        "MoveWindowToMonitorLeft": {}
+      }
+    },
+    {
+      "name": "action-MoveWindowToMonitorRight",
+      "type": "Action",
+      "value": {
+        "MoveWindowToMonitorRight": {}
+      }
+    },
+    {
+      "name": "action-MoveWindowToMonitorDown",
+      "type": "Action",
+      "value": {
+        "MoveWindowToMonitorDown": {}
+      }
+    },
+    {
+      "name": "action-MoveWindowToMonitorUp",
+      "type": "Action",
+      "value": {
+        "MoveWindowToMonitorUp": {}
+      }
+    },
+    {
+      "name": "action-MoveWindowToMonitorPrevious",
+      "type": "Action",
+      "value": {
+        "MoveWindowToMonitorPrevious": {}
+      }
+    },
+    {
+      "name": "action-MoveWindowToMonitorNext",
+      "type": "Action",
+      "value": {
+        "MoveWindowToMonitorNext": {}
+      }
+    },
+    {
+      "name": "action-MoveColumnToMonitorLeft",
+      "type": "Action",
+      "value": {
+        "MoveColumnToMonitorLeft": {}
+      }
+    },
+    {
+      "name": "action-MoveColumnToMonitorRight",
+      "type": "Action",
+      "value": {
+        "MoveColumnToMonitorRight": {}
+      }
+    },
+    {
+      "name": "action-MoveColumnToMonitorDown",
+      "type": "Action",
+      "value": {
+        "MoveColumnToMonitorDown": {}
+      }
+    },
+    {
+      "name": "action-MoveColumnToMonitorUp",
+      "type": "Action",
+      "value": {
+        "MoveColumnToMonitorUp": {}
+      }
+    },
+    {
+      "name": "action-MoveColumnToMonitorPrevious",
+      "type": "Action",
+      "value": {
+        "MoveColumnToMonitorPrevious": {}
+      }
+    },
+    {
+      "name": "action-MoveColumnToMonitorNext",
+      "type": "Action",
+      "value": {
+        "MoveColumnToMonitorNext": {}
+      }
+    },
+    {
+      "name": "action-SwitchPresetColumnWidth",
+      "type": "Action",
+      "value": {
+        "SwitchPresetColumnWidth": {}
+      }
+    },
+    {
+      "name": "action-SwitchPresetColumnWidthBack",
+      "type": "Action",
+      "value": {
+        "SwitchPresetColumnWidthBack": {}
+      }
+    },
+    {
+      "name": "action-MaximizeColumn",
+      "type": "Action",
+      "value": {
+        "MaximizeColumn": {}
+      }
+    },
+    {
+      "name": "action-ExpandColumnToAvailableWidth",
+      "type": "Action",
+      "value": {
+        "ExpandColumnToAvailableWidth": {}
+      }
+    },
+    {
+      "name": "action-ShowHotkeyOverlay",
+      "type": "Action",
+      "value": {
+        "ShowHotkeyOverlay": {}
+      }
+    },
+    {
+      "name": "action-MoveWorkspaceToMonitorLeft",
+      "type": "Action",
+      "value": {
+        "MoveWorkspaceToMonitorLeft": {}
+      }
+    },
+    {
+      "name": "action-MoveWorkspaceToMonitorRight",
+      "type": "Action",
+      "value": {
+        "MoveWorkspaceToMonitorRight": {}
+      }
+    },
+    {
+      "name": "action-MoveWorkspaceToMonitorDown",
+      "type": "Action",
+      "value": {
+        "MoveWorkspaceToMonitorDown": {}
+      }
+    },
+    {
+      "name": "action-MoveWorkspaceToMonitorUp",
+      "type": "Action",
+      "value": {
+        "MoveWorkspaceToMonitorUp": {}
+      }
+    },
+    {
+      "name": "action-MoveWorkspaceToMonitorPrevious",
+      "type": "Action",
+      "value": {
+        "MoveWorkspaceToMonitorPrevious": {}
+      }
+    },
+    {
+      "name": "action-MoveWorkspaceToMonitorNext",
+      "type": "Action",
+      "value": {
+        "MoveWorkspaceToMonitorNext": {}
+      }
+    },
+    {
+      "name": "action-ToggleDebugTint",
+      "type": "Action",
+      "value": {
+        "ToggleDebugTint": {}
+      }
+    },
+    {
+      "name": "action-DebugToggleOpaqueRegions",
+      "type": "Action",
+      "value": {
+        "DebugToggleOpaqueRegions": {}
+      }
+    },
+    {
+      "name": "action-DebugToggleDamage",
+      "type": "Action",
+      "value": {
+        "DebugToggleDamage": {}
+      }
+    },
+    {
+      "name": "action-FocusFloating",
+      "type": "Action",
+      "value": {
+        "FocusFloating": {}
+      }
+    },
+    {
+      "name": "action-FocusTiling",
+      "type": "Action",
+      "value": {
+        "FocusTiling": {}
+      }
+    },
+    {
+      "name": "action-SwitchFocusBetweenFloatingAndTiling",
+      "type": "Action",
+      "value": {
+        "SwitchFocusBetweenFloatingAndTiling": {}
+      }
+    },
+    {
+      "name": "action-ClearDynamicCastTarget",
+      "type": "Action",
+      "value": {
+        "ClearDynamicCastTarget": {}
+      }
+    },
+    {
+      "name": "action-ToggleOverview",
+      "type": "Action",
+      "value": {
+        "ToggleOverview": {}
+      }
+    },
+    {
+      "name": "action-OpenOverview",
+      "type": "Action",
+      "value": {
+        "OpenOverview": {}
+      }
+    },
+    {
+      "name": "action-CloseOverview",
+      "type": "Action",
+      "value": {
+        "CloseOverview": {}
+      }
+    },
+    {
+      "name": "action-CloseWindow",
+      "type": "Action",
+      "value": {
+        "CloseWindow": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-CloseWindow-null",
+      "type": "Action",
+      "value": {
+        "CloseWindow": {
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "action-FullscreenWindow",
+      "type": "Action",
+      "value": {
+        "FullscreenWindow": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-FullscreenWindow-null",
+      "type": "Action",
+      "value": {
+        "FullscreenWindow": {
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "action-ToggleWindowedFullscreen",
+      "type": "Action",
+      "value": {
+        "ToggleWindowedFullscreen": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-ToggleWindowedFullscreen-null",
+      "type": "Action",
+      "value": {
+        "ToggleWindowedFullscreen": {
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "action-ConsumeOrExpelWindowLeft",
+      "type": "Action",
+      "value": {
+        "ConsumeOrExpelWindowLeft": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-ConsumeOrExpelWindowLeft-null",
+      "type": "Action",
+      "value": {
+        "ConsumeOrExpelWindowLeft": {
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "action-ConsumeOrExpelWindowRight",
+      "type": "Action",
+      "value": {
+        "ConsumeOrExpelWindowRight": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-ConsumeOrExpelWindowRight-null",
+      "type": "Action",
+      "value": {
+        "ConsumeOrExpelWindowRight": {
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "action-CenterWindow",
+      "type": "Action",
+      "value": {
+        "CenterWindow": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-CenterWindow-null",
+      "type": "Action",
+      "value": {
+        "CenterWindow": {
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "action-ResetWindowHeight",
+      "type": "Action",
+      "value": {
+        "ResetWindowHeight": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-ResetWindowHeight-null",
+      "type": "Action",
+      "value": {
+        "ResetWindowHeight": {
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "action-SwitchPresetWindowWidth",
+      "type": "Action",
+      "value": {
+        "SwitchPresetWindowWidth": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-SwitchPresetWindowWidth-null",
+      "type": "Action",
+      "value": {
+        "SwitchPresetWindowWidth": {
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "action-SwitchPresetWindowWidthBack",
+      "type": "Action",
+      "value": {
+        "SwitchPresetWindowWidthBack": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-SwitchPresetWindowWidthBack-null",
+      "type": "Action",
+      "value": {
+        "SwitchPresetWindowWidthBack": {
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "action-SwitchPresetWindowHeight",
+      "type": "Action",
+      "value": {
+        "SwitchPresetWindowHeight": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-SwitchPresetWindowHeight-null",
+      "type": "Action",
+      "value": {
+        "SwitchPresetWindowHeight": {
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "action-SwitchPresetWindowHeightBack",
+      "type": "Action",
+      "value": {
+        "SwitchPresetWindowHeightBack": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-SwitchPresetWindowHeightBack-null",
+      "type": "Action",
+      "value": {
+        "SwitchPresetWindowHeightBack": {
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "action-MaximizeWindowToEdges",
+      "type": "Action",
+      "value": {
+        "MaximizeWindowToEdges": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-MaximizeWindowToEdges-null",
+      "type": "Action",
+      "value": {
+        "MaximizeWindowToEdges": {
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "action-ToggleWindowFloating",
+      "type": "Action",
+      "value": {
+        "ToggleWindowFloating": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-ToggleWindowFloating-null",
+      "type": "Action",
+      "value": {
+        "ToggleWindowFloating": {
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "action-MoveWindowToFloating",
+      "type": "Action",
+      "value": {
+        "MoveWindowToFloating": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-MoveWindowToFloating-null",
+      "type": "Action",
+      "value": {
+        "MoveWindowToFloating": {
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "action-MoveWindowToTiling",
+      "type": "Action",
+      "value": {
+        "MoveWindowToTiling": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-MoveWindowToTiling-null",
+      "type": "Action",
+      "value": {
+        "MoveWindowToTiling": {
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "action-ToggleWindowRuleOpacity",
+      "type": "Action",
+      "value": {
+        "ToggleWindowRuleOpacity": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-ToggleWindowRuleOpacity-null",
+      "type": "Action",
+      "value": {
+        "ToggleWindowRuleOpacity": {
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "action-SetDynamicCastWindow",
+      "type": "Action",
+      "value": {
+        "SetDynamicCastWindow": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-SetDynamicCastWindow-null",
+      "type": "Action",
+      "value": {
+        "SetDynamicCastWindow": {
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "action-FocusWindow",
+      "type": "Action",
+      "value": {
+        "FocusWindow": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-ToggleWindowUrgent",
+      "type": "Action",
+      "value": {
+        "ToggleWindowUrgent": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-SetWindowUrgent",
+      "type": "Action",
+      "value": {
+        "SetWindowUrgent": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-UnsetWindowUrgent",
+      "type": "Action",
+      "value": {
+        "UnsetWindowUrgent": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-MoveWindowToWorkspaceDown",
+      "type": "Action",
+      "value": {
+        "MoveWindowToWorkspaceDown": {
+          "focus": false
+        }
+      }
+    },
+    {
+      "name": "action-MoveWindowToWorkspaceUp",
+      "type": "Action",
+      "value": {
+        "MoveWindowToWorkspaceUp": {
+          "focus": false
+        }
+      }
+    },
+    {
+      "name": "action-MoveColumnToWorkspaceDown",
+      "type": "Action",
+      "value": {
+        "MoveColumnToWorkspaceDown": {
+          "focus": false
+        }
+      }
+    },
+    {
+      "name": "action-MoveColumnToWorkspaceUp",
+      "type": "Action",
+      "value": {
+        "MoveColumnToWorkspaceUp": {
+          "focus": false
+        }
+      }
+    },
+    {
+      "name": "action-Quit",
+      "type": "Action",
+      "value": {
+        "Quit": {
+          "skip_confirmation": false
+        }
+      }
+    },
+    {
+      "name": "action-Spawn",
+      "type": "Action",
+      "value": {
+        "Spawn": {
+          "command": [
+            "printf",
+            "quote\"\\\n"
+          ]
+        }
+      }
+    },
+    {
+      "name": "action-SpawnSh",
+      "type": "Action",
+      "value": {
+        "SpawnSh": {
+          "command": "printf 'hello'\n"
+        }
+      }
+    },
+    {
+      "name": "action-DoScreenTransition",
+      "type": "Action",
+      "value": {
+        "DoScreenTransition": {
+          "delay_ms": 65535
+        }
+      }
+    },
+    {
+      "name": "action-Screenshot",
+      "type": "Action",
+      "value": {
+        "Screenshot": {
+          "path": "/screenshots/quote\"\\\n.png",
+          "show_pointer": false
+        }
+      }
+    },
+    {
+      "name": "action-ScreenshotScreen",
+      "type": "Action",
+      "value": {
+        "ScreenshotScreen": {
+          "path": null,
+          "show_pointer": true,
+          "write_to_disk": false
+        }
+      }
+    },
+    {
+      "name": "action-ScreenshotWindow",
+      "type": "Action",
+      "value": {
+        "ScreenshotWindow": {
+          "id": 18446744073709551615,
+          "path": null,
+          "show_pointer": false,
+          "write_to_disk": true
+        }
+      }
+    },
+    {
+      "name": "action-FocusWindowInColumn",
+      "type": "Action",
+      "value": {
+        "FocusWindowInColumn": {
+          "index": 255
+        }
+      }
+    },
+    {
+      "name": "action-FocusColumn",
+      "type": "Action",
+      "value": {
+        "FocusColumn": {
+          "index": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-MoveColumnToIndex",
+      "type": "Action",
+      "value": {
+        "MoveColumnToIndex": {
+          "index": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-SetColumnDisplay",
+      "type": "Action",
+      "value": {
+        "SetColumnDisplay": {
+          "display": "Tabbed"
+        }
+      }
+    },
+    {
+      "name": "action-FocusWorkspace",
+      "type": "Action",
+      "value": {
+        "FocusWorkspace": {
+          "reference": {
+            "Id": 18446744073709551615
+          }
+        }
+      }
+    },
+    {
+      "name": "action-MoveWindowToWorkspace",
+      "type": "Action",
+      "value": {
+        "MoveWindowToWorkspace": {
+          "focus": false,
+          "reference": {
+            "Id": 456
+          },
+          "window_id": 123
+        }
+      }
+    },
+    {
+      "name": "action-MoveColumnToWorkspace",
+      "type": "Action",
+      "value": {
+        "MoveColumnToWorkspace": {
+          "focus": false,
+          "reference": {
+            "Name": "chat"
+          }
+        }
+      }
+    },
+    {
+      "name": "action-MoveWorkspaceToIndex",
+      "type": "Action",
+      "value": {
+        "MoveWorkspaceToIndex": {
+          "index": 18446744073709551615,
+          "reference": {
+            "Id": 18446744073709551615
+          }
+        }
+      }
+    },
+    {
+      "name": "action-SetWorkspaceName",
+      "type": "Action",
+      "value": {
+        "SetWorkspaceName": {
+          "name": "quote\"\\\n",
+          "workspace": {
+            "Index": 255
+          }
+        }
+      }
+    },
+    {
+      "name": "action-UnsetWorkspaceName",
+      "type": "Action",
+      "value": {
+        "UnsetWorkspaceName": {
+          "reference": {
+            "Name": "chat"
+          }
+        }
+      }
+    },
+    {
+      "name": "action-FocusMonitor",
+      "type": "Action",
+      "value": {
+        "FocusMonitor": {
+          "output": "DP-1"
+        }
+      }
+    },
+    {
+      "name": "action-MoveWindowToMonitor",
+      "type": "Action",
+      "value": {
+        "MoveWindowToMonitor": {
+          "id": 18446744073709551615,
+          "output": "DP-1"
+        }
+      }
+    },
+    {
+      "name": "action-MoveColumnToMonitor",
+      "type": "Action",
+      "value": {
+        "MoveColumnToMonitor": {
+          "output": "DP-1"
+        }
+      }
+    },
+    {
+      "name": "action-SetWindowWidth",
+      "type": "Action",
+      "value": {
+        "SetWindowWidth": {
+          "change": {
+            "SetFixed": 2147483647
+          },
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-SetWindowHeight",
+      "type": "Action",
+      "value": {
+        "SetWindowHeight": {
+          "change": {
+            "AdjustProportion": -12.5
+          },
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-SetColumnWidth",
+      "type": "Action",
+      "value": {
+        "SetColumnWidth": {
+          "change": {
+            "SetProportion": 33.25
+          }
+        }
+      }
+    },
+    {
+      "name": "action-SwitchLayout",
+      "type": "Action",
+      "value": {
+        "SwitchLayout": {
+          "layout": {
+            "Index": 255
+          }
+        }
+      }
+    },
+    {
+      "name": "action-MoveWorkspaceToMonitor",
+      "type": "Action",
+      "value": {
+        "MoveWorkspaceToMonitor": {
+          "output": "DP-1",
+          "reference": {
+            "Id": 18446744073709551615
+          }
+        }
+      }
+    },
+    {
+      "name": "action-MoveFloatingWindow",
+      "type": "Action",
+      "value": {
+        "MoveFloatingWindow": {
+          "id": 18446744073709551615,
+          "x": {
+            "AdjustFixed": -12.5
+          },
+          "y": {
+            "SetProportion": 0.0
+          }
+        }
+      }
+    },
+    {
+      "name": "action-SetDynamicCastMonitor",
+      "type": "Action",
+      "value": {
+        "SetDynamicCastMonitor": {
+          "output": "DP-1"
+        }
+      }
+    },
+    {
+      "name": "action-StopCast",
+      "type": "Action",
+      "value": {
+        "StopCast": {
+          "session_id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "action-LoadConfigFile",
+      "type": "Action",
+      "value": {
+        "LoadConfigFile": {
+          "path": "/config/quote\"\\\n.kdl"
+        }
+      }
+    },
+    {
+      "name": "action-DoScreenTransition-null",
+      "type": "Action",
+      "value": {
+        "DoScreenTransition": {
+          "delay_ms": null
+        }
+      }
+    },
+    {
+      "name": "action-Screenshot-null",
+      "type": "Action",
+      "value": {
+        "Screenshot": {
+          "path": null,
+          "show_pointer": true
+        }
+      }
+    },
+    {
+      "name": "action-ScreenshotScreen-present",
+      "type": "Action",
+      "value": {
+        "ScreenshotScreen": {
+          "path": "",
+          "show_pointer": false,
+          "write_to_disk": true
+        }
+      }
+    },
+    {
+      "name": "action-ScreenshotWindow-null",
+      "type": "Action",
+      "value": {
+        "ScreenshotWindow": {
+          "id": null,
+          "path": "",
+          "show_pointer": true,
+          "write_to_disk": false
+        }
+      }
+    },
+    {
+      "name": "action-MoveWindowToWorkspace-null",
+      "type": "Action",
+      "value": {
+        "MoveWindowToWorkspace": {
+          "focus": false,
+          "reference": {
+            "Id": 18446744073709551615
+          },
+          "window_id": null
+        }
+      }
+    },
+    {
+      "name": "action-MoveWorkspaceToIndex-null",
+      "type": "Action",
+      "value": {
+        "MoveWorkspaceToIndex": {
+          "index": 0,
+          "reference": null
+        }
+      }
+    },
+    {
+      "name": "action-SetWorkspaceName-null",
+      "type": "Action",
+      "value": {
+        "SetWorkspaceName": {
+          "name": "",
+          "workspace": null
+        }
+      }
+    },
+    {
+      "name": "action-UnsetWorkspaceName-null",
+      "type": "Action",
+      "value": {
+        "UnsetWorkspaceName": {
+          "reference": null
+        }
+      }
+    },
+    {
+      "name": "action-MoveWindowToMonitor-null",
+      "type": "Action",
+      "value": {
+        "MoveWindowToMonitor": {
+          "id": null,
+          "output": "DP-1"
+        }
+      }
+    },
+    {
+      "name": "action-MoveWorkspaceToMonitor-null",
+      "type": "Action",
+      "value": {
+        "MoveWorkspaceToMonitor": {
+          "output": "DP-1",
+          "reference": null
+        }
+      }
+    },
+    {
+      "name": "action-MoveFloatingWindow-null",
+      "type": "Action",
+      "value": {
+        "MoveFloatingWindow": {
+          "id": null,
+          "x": {
+            "SetFixed": 0.0
+          },
+          "y": {
+            "AdjustProportion": -1.25
+          }
+        }
+      }
+    },
+    {
+      "name": "action-SetDynamicCastMonitor-null",
+      "type": "Action",
+      "value": {
+        "SetDynamicCastMonitor": {
+          "output": null
+        }
+      }
+    },
+    {
+      "name": "action-LoadConfigFile-null",
+      "type": "Action",
+      "value": {
+        "LoadConfigFile": {
+          "path": null
+        }
+      }
+    },
+    {
+      "name": "action-width-fixed",
+      "type": "Action",
+      "value": {
+        "SetWindowWidth": {
+          "change": {
+            "SetFixed": -2147483648
+          },
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "action-height-fixed",
+      "type": "Action",
+      "value": {
+        "SetWindowHeight": {
+          "change": {
+            "SetFixed": -2147483648
+          },
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "action-width-proportion",
+      "type": "Action",
+      "value": {
+        "SetWindowWidth": {
+          "change": {
+            "SetProportion": 33.25
+          },
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "action-height-proportion",
+      "type": "Action",
+      "value": {
+        "SetWindowHeight": {
+          "change": {
+            "SetProportion": 33.25
+          },
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "action-width-adjust-fixed",
+      "type": "Action",
+      "value": {
+        "SetWindowWidth": {
+          "change": {
+            "AdjustFixed": -10
+          },
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "action-height-adjust-fixed",
+      "type": "Action",
+      "value": {
+        "SetWindowHeight": {
+          "change": {
+            "AdjustFixed": -10
+          },
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "action-width-adjust-proportion",
+      "type": "Action",
+      "value": {
+        "SetWindowWidth": {
+          "change": {
+            "AdjustProportion": -12.5
+          },
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "action-height-adjust-proportion",
+      "type": "Action",
+      "value": {
+        "SetWindowHeight": {
+          "change": {
+            "AdjustProportion": -12.5
+          },
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "output-action-0",
+      "type": "OutputAction",
+      "value": "Off"
+    },
+    {
+      "name": "request-output-0",
+      "type": "Request",
+      "value": {
+        "Output": {
+          "action": "Off",
+          "output": "DP-1"
+        }
+      }
+    },
+    {
+      "name": "output-action-1",
+      "type": "OutputAction",
+      "value": "On"
+    },
+    {
+      "name": "request-output-1",
+      "type": "Request",
+      "value": {
+        "Output": {
+          "action": "On",
+          "output": "DP-1"
+        }
+      }
+    },
+    {
+      "name": "output-action-2",
+      "type": "OutputAction",
+      "value": {
+        "Mode": {
+          "mode": "Automatic"
+        }
+      }
+    },
+    {
+      "name": "request-output-2",
+      "type": "Request",
+      "value": {
+        "Output": {
+          "action": {
+            "Mode": {
+              "mode": "Automatic"
+            }
+          },
+          "output": "DP-1"
+        }
+      }
+    },
+    {
+      "name": "output-action-3",
+      "type": "OutputAction",
+      "value": {
+        "CustomMode": {
+          "mode": {
+            "height": 1080,
+            "refresh": 60.0,
+            "width": 1920
+          }
+        }
+      }
+    },
+    {
+      "name": "request-output-3",
+      "type": "Request",
+      "value": {
+        "Output": {
+          "action": {
+            "CustomMode": {
+              "mode": {
+                "height": 1080,
+                "refresh": 60.0,
+                "width": 1920
+              }
+            }
+          },
+          "output": "DP-1"
+        }
+      }
+    },
+    {
+      "name": "output-action-4",
+      "type": "OutputAction",
+      "value": {
+        "Modeline": {
+          "clock": 148.5,
+          "hdisplay": 1920,
+          "hsync_end": 2052,
+          "hsync_polarity": "PHSync",
+          "hsync_start": 2008,
+          "htotal": 2200,
+          "vdisplay": 1080,
+          "vsync_end": 1089,
+          "vsync_polarity": "NVSync",
+          "vsync_start": 1084,
+          "vtotal": 1125
+        }
+      }
+    },
+    {
+      "name": "request-output-4",
+      "type": "Request",
+      "value": {
+        "Output": {
+          "action": {
+            "Modeline": {
+              "clock": 148.5,
+              "hdisplay": 1920,
+              "hsync_end": 2052,
+              "hsync_polarity": "PHSync",
+              "hsync_start": 2008,
+              "htotal": 2200,
+              "vdisplay": 1080,
+              "vsync_end": 1089,
+              "vsync_polarity": "NVSync",
+              "vsync_start": 1084,
+              "vtotal": 1125
+            }
+          },
+          "output": "DP-1"
+        }
+      }
+    },
+    {
+      "name": "output-action-5",
+      "type": "OutputAction",
+      "value": {
+        "Scale": {
+          "scale": {
+            "Specific": 1.25
+          }
+        }
+      }
+    },
+    {
+      "name": "request-output-5",
+      "type": "Request",
+      "value": {
+        "Output": {
+          "action": {
+            "Scale": {
+              "scale": {
+                "Specific": 1.25
+              }
+            }
+          },
+          "output": "DP-1"
+        }
+      }
+    },
+    {
+      "name": "output-action-6",
+      "type": "OutputAction",
+      "value": {
+        "Transform": {
+          "transform": "270"
+        }
+      }
+    },
+    {
+      "name": "request-output-6",
+      "type": "Request",
+      "value": {
+        "Output": {
+          "action": {
+            "Transform": {
+              "transform": "270"
+            }
+          },
+          "output": "DP-1"
+        }
+      }
+    },
+    {
+      "name": "output-action-7",
+      "type": "OutputAction",
+      "value": {
+        "Position": {
+          "position": {
+            "Specific": {
+              "x": -1920,
+              "y": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "request-output-7",
+      "type": "Request",
+      "value": {
+        "Output": {
+          "action": {
+            "Position": {
+              "position": {
+                "Specific": {
+                  "x": -1920,
+                  "y": 0
+                }
+              }
+            }
+          },
+          "output": "DP-1"
+        }
+      }
+    },
+    {
+      "name": "output-action-8",
+      "type": "OutputAction",
+      "value": {
+        "Vrr": {
+          "vrr": {
+            "on_demand": false,
+            "vrr": true
+          }
+        }
+      }
+    },
+    {
+      "name": "request-output-8",
+      "type": "Request",
+      "value": {
+        "Output": {
+          "action": {
+            "Vrr": {
+              "vrr": {
+                "on_demand": false,
+                "vrr": true
+              }
+            }
+          },
+          "output": "DP-1"
+        }
+      }
+    },
+    {
+      "name": "request-Version",
+      "type": "Request",
+      "value": "Version"
+    },
+    {
+      "name": "request-Outputs",
+      "type": "Request",
+      "value": "Outputs"
+    },
+    {
+      "name": "request-Workspaces",
+      "type": "Request",
+      "value": "Workspaces"
+    },
+    {
+      "name": "request-Windows",
+      "type": "Request",
+      "value": "Windows"
+    },
+    {
+      "name": "request-Layers",
+      "type": "Request",
+      "value": "Layers"
+    },
+    {
+      "name": "request-KeyboardLayouts",
+      "type": "Request",
+      "value": "KeyboardLayouts"
+    },
+    {
+      "name": "request-FocusedOutput",
+      "type": "Request",
+      "value": "FocusedOutput"
+    },
+    {
+      "name": "request-FocusedWindow",
+      "type": "Request",
+      "value": "FocusedWindow"
+    },
+    {
+      "name": "request-PickWindow",
+      "type": "Request",
+      "value": "PickWindow"
+    },
+    {
+      "name": "request-PickColor",
+      "type": "Request",
+      "value": "PickColor"
+    },
+    {
+      "name": "request-EventStream",
+      "type": "Request",
+      "value": "EventStream"
+    },
+    {
+      "name": "request-ReturnError",
+      "type": "Request",
+      "value": "ReturnError"
+    },
+    {
+      "name": "request-OverviewState",
+      "type": "Request",
+      "value": "OverviewState"
+    },
+    {
+      "name": "request-Casts",
+      "type": "Request",
+      "value": "Casts"
+    },
+    {
+      "name": "request-action",
+      "type": "Request",
+      "value": {
+        "Action": {
+          "MoveWindowToWorkspace": {
+            "focus": false,
+            "reference": {
+              "Id": 456
+            },
+            "window_id": 123
+          }
+        }
+      }
+    },
+    {
+      "name": "response-0",
+      "type": "Response",
+      "value": "Handled"
+    },
+    {
+      "name": "response-1",
+      "type": "Response",
+      "value": {
+        "Version": "26.04\nquote\"\\"
+      }
+    },
+    {
+      "name": "response-2",
+      "type": "Response",
+      "value": {
+        "Outputs": {
+          "DP-1": {
+            "current_mode": null,
+            "is_custom_mode": false,
+            "logical": null,
+            "make": "make",
+            "model": "model",
+            "modes": [
+              {
+                "height": 0,
+                "is_preferred": false,
+                "refresh_rate": 4294967295,
+                "width": 65535
+              }
+            ],
+            "name": "DP-1",
+            "physical_size": null,
+            "serial": null,
+            "vrr_enabled": false,
+            "vrr_supported": true
+          }
+        }
+      }
+    },
+    {
+      "name": "response-3",
+      "type": "Response",
+      "value": {
+        "Workspaces": [
+          {
+            "active_window_id": null,
+            "id": 9007199254740993,
+            "idx": 255,
+            "is_active": false,
+            "is_focused": false,
+            "is_urgent": true,
+            "name": null,
+            "output": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "response-4",
+      "type": "Response",
+      "value": {
+        "Windows": [
+          {
+            "app_id": null,
+            "focus_timestamp": null,
+            "id": 18446744073709551615,
+            "is_floating": true,
+            "is_focused": false,
+            "is_urgent": false,
+            "layout": {
+              "pos_in_scrolling_layout": null,
+              "tile_pos_in_workspace_view": null,
+              "tile_size": [
+                1.25,
+                0.0
+              ],
+              "window_offset_in_tile": [
+                -0.5,
+                12.0
+              ],
+              "window_size": [
+                -2147483648,
+                2147483647
+              ]
+            },
+            "pid": null,
+            "title": null,
+            "workspace_id": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "response-5",
+      "type": "Response",
+      "value": {
+        "Layers": [
+          {
+            "keyboard_interactivity": "OnDemand",
+            "layer": "Top",
+            "namespace": "panel",
+            "output": "DP-1"
+          }
+        ]
+      }
+    },
+    {
+      "name": "response-6",
+      "type": "Response",
+      "value": {
+        "KeyboardLayouts": {
+          "current_idx": 1,
+          "names": [
+            "us",
+            "de"
+          ]
+        }
+      }
+    },
+    {
+      "name": "response-7",
+      "type": "Response",
+      "value": {
+        "FocusedOutput": {
+          "current_mode": null,
+          "is_custom_mode": false,
+          "logical": null,
+          "make": "make",
+          "model": "model",
+          "modes": [
+            {
+              "height": 0,
+              "is_preferred": false,
+              "refresh_rate": 4294967295,
+              "width": 65535
+            }
+          ],
+          "name": "DP-1",
+          "physical_size": null,
+          "serial": null,
+          "vrr_enabled": false,
+          "vrr_supported": true
+        }
+      }
+    },
+    {
+      "name": "response-8",
+      "type": "Response",
+      "value": {
+        "FocusedWindow": {
+          "app_id": null,
+          "focus_timestamp": null,
+          "id": 18446744073709551615,
+          "is_floating": true,
+          "is_focused": false,
+          "is_urgent": false,
+          "layout": {
+            "pos_in_scrolling_layout": null,
+            "tile_pos_in_workspace_view": null,
+            "tile_size": [
+              1.25,
+              0.0
+            ],
+            "window_offset_in_tile": [
+              -0.5,
+              12.0
+            ],
+            "window_size": [
+              -2147483648,
+              2147483647
+            ]
+          },
+          "pid": null,
+          "title": null,
+          "workspace_id": null
+        }
+      }
+    },
+    {
+      "name": "response-9",
+      "type": "Response",
+      "value": {
+        "PickedWindow": {
+          "app_id": null,
+          "focus_timestamp": null,
+          "id": 18446744073709551615,
+          "is_floating": true,
+          "is_focused": false,
+          "is_urgent": false,
+          "layout": {
+            "pos_in_scrolling_layout": null,
+            "tile_pos_in_workspace_view": null,
+            "tile_size": [
+              1.25,
+              0.0
+            ],
+            "window_offset_in_tile": [
+              -0.5,
+              12.0
+            ],
+            "window_size": [
+              -2147483648,
+              2147483647
+            ]
+          },
+          "pid": null,
+          "title": null,
+          "workspace_id": null
+        }
+      }
+    },
+    {
+      "name": "response-10",
+      "type": "Response",
+      "value": {
+        "PickedColor": {
+          "rgb": [
+            0.0,
+            0.5,
+            1.0
+          ]
+        }
+      }
+    },
+    {
+      "name": "response-11",
+      "type": "Response",
+      "value": {
+        "OutputConfigChanged": "Applied"
+      }
+    },
+    {
+      "name": "response-12",
+      "type": "Response",
+      "value": {
+        "OverviewState": {
+          "is_open": true
+        }
+      }
+    },
+    {
+      "name": "response-13",
+      "type": "Response",
+      "value": {
+        "Casts": [
+          {
+            "is_active": true,
+            "is_dynamic_target": false,
+            "kind": "PipeWire",
+            "pid": null,
+            "pw_node_id": null,
+            "session_id": 9007199254740993,
+            "stream_id": 18446744073709551615,
+            "target": {
+              "Nothing": {}
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "response-focused-output-null",
+      "type": "Response",
+      "value": {
+        "FocusedOutput": null
+      }
+    },
+    {
+      "name": "response-focused-window-null",
+      "type": "Response",
+      "value": {
+        "FocusedWindow": null
+      }
+    },
+    {
+      "name": "response-picked-window-null",
+      "type": "Response",
+      "value": {
+        "PickedWindow": null
+      }
+    },
+    {
+      "name": "response-picked-color-null",
+      "type": "Response",
+      "value": {
+        "PickedColor": null
+      }
+    },
+    {
+      "name": "response-output-missing",
+      "type": "Response",
+      "value": {
+        "OutputConfigChanged": "OutputWasMissing"
+      }
+    },
+    {
+      "name": "event-WorkspacesChanged",
+      "type": "Event",
+      "value": {
+        "WorkspacesChanged": {
+          "workspaces": [
+            {
+              "active_window_id": null,
+              "id": 9007199254740993,
+              "idx": 255,
+              "is_active": false,
+              "is_focused": false,
+              "is_urgent": true,
+              "name": null,
+              "output": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "event-WorkspaceUrgencyChanged",
+      "type": "Event",
+      "value": {
+        "WorkspaceUrgencyChanged": {
+          "id": 18446744073709551615,
+          "urgent": true
+        }
+      }
+    },
+    {
+      "name": "event-WorkspaceActivated",
+      "type": "Event",
+      "value": {
+        "WorkspaceActivated": {
+          "focused": false,
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "event-WorkspaceActiveWindowChanged",
+      "type": "Event",
+      "value": {
+        "WorkspaceActiveWindowChanged": {
+          "active_window_id": 0,
+          "workspace_id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "event-WindowsChanged",
+      "type": "Event",
+      "value": {
+        "WindowsChanged": {
+          "windows": [
+            {
+              "app_id": null,
+              "focus_timestamp": null,
+              "id": 18446744073709551615,
+              "is_floating": true,
+              "is_focused": false,
+              "is_urgent": false,
+              "layout": {
+                "pos_in_scrolling_layout": null,
+                "tile_pos_in_workspace_view": null,
+                "tile_size": [
+                  1.25,
+                  0.0
+                ],
+                "window_offset_in_tile": [
+                  -0.5,
+                  12.0
+                ],
+                "window_size": [
+                  -2147483648,
+                  2147483647
+                ]
+              },
+              "pid": null,
+              "title": null,
+              "workspace_id": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "event-WindowOpenedOrChanged",
+      "type": "Event",
+      "value": {
+        "WindowOpenedOrChanged": {
+          "window": {
+            "app_id": null,
+            "focus_timestamp": null,
+            "id": 18446744073709551615,
+            "is_floating": true,
+            "is_focused": false,
+            "is_urgent": false,
+            "layout": {
+              "pos_in_scrolling_layout": null,
+              "tile_pos_in_workspace_view": null,
+              "tile_size": [
+                1.25,
+                0.0
+              ],
+              "window_offset_in_tile": [
+                -0.5,
+                12.0
+              ],
+              "window_size": [
+                -2147483648,
+                2147483647
+              ]
+            },
+            "pid": null,
+            "title": null,
+            "workspace_id": null
+          }
+        }
+      }
+    },
+    {
+      "name": "event-WindowClosed",
+      "type": "Event",
+      "value": {
+        "WindowClosed": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "event-WindowFocusChanged",
+      "type": "Event",
+      "value": {
+        "WindowFocusChanged": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "event-WindowFocusTimestampChanged",
+      "type": "Event",
+      "value": {
+        "WindowFocusTimestampChanged": {
+          "focus_timestamp": {
+            "nanos": 4294967295,
+            "secs": 18446744073709551615
+          },
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "event-WindowUrgencyChanged",
+      "type": "Event",
+      "value": {
+        "WindowUrgencyChanged": {
+          "id": 18446744073709551615,
+          "urgent": false
+        }
+      }
+    },
+    {
+      "name": "event-WindowLayoutsChanged",
+      "type": "Event",
+      "value": {
+        "WindowLayoutsChanged": {
+          "changes": [
+            [
+              18446744073709551615,
+              {
+                "pos_in_scrolling_layout": null,
+                "tile_pos_in_workspace_view": null,
+                "tile_size": [
+                  1.25,
+                  0.0
+                ],
+                "window_offset_in_tile": [
+                  -0.5,
+                  12.0
+                ],
+                "window_size": [
+                  -2147483648,
+                  2147483647
+                ]
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "event-KeyboardLayoutsChanged",
+      "type": "Event",
+      "value": {
+        "KeyboardLayoutsChanged": {
+          "keyboard_layouts": {
+            "current_idx": 1,
+            "names": [
+              "us",
+              "de"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "event-KeyboardLayoutSwitched",
+      "type": "Event",
+      "value": {
+        "KeyboardLayoutSwitched": {
+          "idx": 255
+        }
+      }
+    },
+    {
+      "name": "event-OverviewOpenedOrClosed",
+      "type": "Event",
+      "value": {
+        "OverviewOpenedOrClosed": {
+          "is_open": true
+        }
+      }
+    },
+    {
+      "name": "event-ConfigLoaded",
+      "type": "Event",
+      "value": {
+        "ConfigLoaded": {
+          "failed": false
+        }
+      }
+    },
+    {
+      "name": "event-ScreenshotCaptured",
+      "type": "Event",
+      "value": {
+        "ScreenshotCaptured": {
+          "path": "quote\"\\\n.png"
+        }
+      }
+    },
+    {
+      "name": "event-CastsChanged",
+      "type": "Event",
+      "value": {
+        "CastsChanged": {
+          "casts": [
+            {
+              "is_active": true,
+              "is_dynamic_target": false,
+              "kind": "PipeWire",
+              "pid": null,
+              "pw_node_id": null,
+              "session_id": 9007199254740993,
+              "stream_id": 18446744073709551615,
+              "target": {
+                "Nothing": {}
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "event-CastStartedOrChanged",
+      "type": "Event",
+      "value": {
+        "CastStartedOrChanged": {
+          "cast": {
+            "is_active": true,
+            "is_dynamic_target": false,
+            "kind": "PipeWire",
+            "pid": null,
+            "pw_node_id": null,
+            "session_id": 9007199254740993,
+            "stream_id": 18446744073709551615,
+            "target": {
+              "Nothing": {}
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "event-CastStopped",
+      "type": "Event",
+      "value": {
+        "CastStopped": {
+          "stream_id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "event-workspace-window-null",
+      "type": "Event",
+      "value": {
+        "WorkspaceActiveWindowChanged": {
+          "active_window_id": null,
+          "workspace_id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "event-window-focus-null",
+      "type": "Event",
+      "value": {
+        "WindowFocusChanged": {
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "event-window-timestamp-null",
+      "type": "Event",
+      "value": {
+        "WindowFocusTimestampChanged": {
+          "focus_timestamp": null,
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "event-screenshot-null",
+      "type": "Event",
+      "value": {
+        "ScreenshotCaptured": {
+          "path": null
+        }
+      }
+    }
+  ],
+  "vectors": [
+    {
+      "name": "overview",
+      "type": "Overview",
+      "value": {
+        "is_open": true
+      }
+    },
+    {
+      "name": "picked-color",
+      "type": "PickedColor",
+      "value": {
+        "rgb": [
+          0.0,
+          0.5,
+          1.0
+        ]
+      }
+    },
+    {
+      "name": "configured-mode-null",
+      "type": "ConfiguredMode",
+      "value": {
+        "height": 65535,
+        "refresh": null,
+        "width": 0
+      }
+    },
+    {
+      "name": "configured-mode-present",
+      "type": "ConfiguredMode",
+      "value": {
+        "height": 1080,
+        "refresh": 0.0,
+        "width": 1920
+      }
+    },
+    {
+      "name": "configured-position",
+      "type": "ConfiguredPosition",
+      "value": {
+        "x": -2147483648,
+        "y": 2147483647
+      }
+    },
+    {
+      "name": "vrr-to-set",
+      "type": "VrrToSet",
+      "value": {
+        "on_demand": true,
+        "vrr": false
+      }
+    },
+    {
+      "name": "mode",
+      "type": "Mode",
+      "value": {
+        "height": 0,
+        "is_preferred": false,
+        "refresh_rate": 4294967295,
+        "width": 65535
+      }
+    },
+    {
+      "name": "timestamp",
+      "type": "Timestamp",
+      "value": {
+        "nanos": 4294967295,
+        "secs": 18446744073709551615
+      }
+    },
+    {
+      "name": "window-layout-null",
+      "type": "WindowLayout",
+      "value": {
+        "pos_in_scrolling_layout": null,
+        "tile_pos_in_workspace_view": null,
+        "tile_size": [
+          1.25,
+          0.0
+        ],
+        "window_offset_in_tile": [
+          -0.5,
+          12.0
+        ],
+        "window_size": [
+          -2147483648,
+          2147483647
+        ]
+      }
+    },
+    {
+      "name": "window-layout-present",
+      "type": "WindowLayout",
+      "value": {
+        "pos_in_scrolling_layout": [
+          9007199254740993,
+          18446744073709551615
+        ],
+        "tile_pos_in_workspace_view": [
+          0.0,
+          -0.5
+        ],
+        "tile_size": [
+          1.25,
+          0.0
+        ],
+        "window_offset_in_tile": [
+          -0.5,
+          12.0
+        ],
+        "window_size": [
+          -2147483648,
+          2147483647
+        ]
+      }
+    },
+    {
+      "name": "window-null",
+      "type": "Window",
+      "value": {
+        "app_id": null,
+        "focus_timestamp": null,
+        "id": 18446744073709551615,
+        "is_floating": true,
+        "is_focused": false,
+        "is_urgent": false,
+        "layout": {
+          "pos_in_scrolling_layout": null,
+          "tile_pos_in_workspace_view": null,
+          "tile_size": [
+            1.25,
+            0.0
+          ],
+          "window_offset_in_tile": [
+            -0.5,
+            12.0
+          ],
+          "window_size": [
+            -2147483648,
+            2147483647
+          ]
+        },
+        "pid": null,
+        "title": null,
+        "workspace_id": null
+      }
+    },
+    {
+      "name": "window-present",
+      "type": "Window",
+      "value": {
+        "app_id": "app\"\\\n",
+        "focus_timestamp": {
+          "nanos": 4294967295,
+          "secs": 18446744073709551615
+        },
+        "id": 0,
+        "is_floating": true,
+        "is_focused": false,
+        "is_urgent": false,
+        "layout": {
+          "pos_in_scrolling_layout": null,
+          "tile_pos_in_workspace_view": null,
+          "tile_size": [
+            1.25,
+            0.0
+          ],
+          "window_offset_in_tile": [
+            -0.5,
+            12.0
+          ],
+          "window_size": [
+            -2147483648,
+            2147483647
+          ]
+        },
+        "pid": -2147483648,
+        "title": "",
+        "workspace_id": 18446744073709551615
+      }
+    },
+    {
+      "name": "logical-output",
+      "type": "LogicalOutput",
+      "value": {
+        "height": 0,
+        "scale": 1.25,
+        "transform": "90",
+        "width": 4294967295,
+        "x": -2147483648,
+        "y": 2147483647
+      }
+    },
+    {
+      "name": "output-null",
+      "type": "Output",
+      "value": {
+        "current_mode": null,
+        "is_custom_mode": false,
+        "logical": null,
+        "make": "make",
+        "model": "model",
+        "modes": [
+          {
+            "height": 0,
+            "is_preferred": false,
+            "refresh_rate": 4294967295,
+            "width": 65535
+          }
+        ],
+        "name": "DP-1",
+        "physical_size": null,
+        "serial": null,
+        "vrr_enabled": false,
+        "vrr_supported": true
+      }
+    },
+    {
+      "name": "output-present",
+      "type": "Output",
+      "value": {
+        "current_mode": 18446744073709551615,
+        "is_custom_mode": false,
+        "logical": {
+          "height": 0,
+          "scale": 1.25,
+          "transform": "90",
+          "width": 4294967295,
+          "x": -2147483648,
+          "y": 2147483647
+        },
+        "make": "make",
+        "model": "model",
+        "modes": [
+          {
+            "height": 0,
+            "is_preferred": false,
+            "refresh_rate": 4294967295,
+            "width": 65535
+          }
+        ],
+        "name": "DP-1",
+        "physical_size": [
+          4294967295,
+          0
+        ],
+        "serial": "",
+        "vrr_enabled": false,
+        "vrr_supported": true
+      }
+    },
+    {
+      "name": "workspace-null",
+      "type": "Workspace",
+      "value": {
+        "active_window_id": null,
+        "id": 9007199254740993,
+        "idx": 255,
+        "is_active": false,
+        "is_focused": false,
+        "is_urgent": true,
+        "name": null,
+        "output": null
+      }
+    },
+    {
+      "name": "workspace-present",
+      "type": "Workspace",
+      "value": {
+        "active_window_id": 0,
+        "id": 9007199254740993,
+        "idx": 255,
+        "is_active": false,
+        "is_focused": false,
+        "is_urgent": true,
+        "name": "",
+        "output": ""
+      }
+    },
+    {
+      "name": "keyboard-layouts",
+      "type": "KeyboardLayouts",
+      "value": {
+        "current_idx": 255,
+        "names": [
+          "",
+          "English"
+        ]
+      }
+    },
+    {
+      "name": "layer-surface",
+      "type": "LayerSurface",
+      "value": {
+        "keyboard_interactivity": "OnDemand",
+        "layer": "Overlay",
+        "namespace": "namespace",
+        "output": "DP-1"
+      }
+    },
+    {
+      "name": "cast-null",
+      "type": "Cast",
+      "value": {
+        "is_active": true,
+        "is_dynamic_target": false,
+        "kind": "PipeWire",
+        "pid": null,
+        "pw_node_id": null,
+        "session_id": 9007199254740993,
+        "stream_id": 18446744073709551615,
+        "target": {
+          "Nothing": {}
+        }
+      }
+    },
+    {
+      "name": "cast-present",
+      "type": "Cast",
+      "value": {
+        "is_active": true,
+        "is_dynamic_target": false,
+        "kind": "PipeWire",
+        "pid": -2147483648,
+        "pw_node_id": 4294967295,
+        "session_id": 9007199254740993,
+        "stream_id": 18446744073709551615,
+        "target": {
+          "Window": {
+            "id": 18446744073709551615
+          }
+        }
+      }
+    },
+    {
+      "name": "size-fixed",
+      "type": "SizeChange",
+      "value": {
+        "SetFixed": -2147483648
+      }
+    },
+    {
+      "name": "size-proportion",
+      "type": "SizeChange",
+      "value": {
+        "SetProportion": 1.25
+      }
+    },
+    {
+      "name": "size-adjust-fixed",
+      "type": "SizeChange",
+      "value": {
+        "AdjustFixed": 2147483647
+      }
+    },
+    {
+      "name": "size-adjust-proportion",
+      "type": "SizeChange",
+      "value": {
+        "AdjustProportion": -0.5
+      }
+    },
+    {
+      "name": "position-fixed",
+      "type": "PositionChange",
+      "value": {
+        "SetFixed": 0.0
+      }
+    },
+    {
+      "name": "position-proportion",
+      "type": "PositionChange",
+      "value": {
+        "SetProportion": 1.25
+      }
+    },
+    {
+      "name": "position-adjust-fixed",
+      "type": "PositionChange",
+      "value": {
+        "AdjustFixed": -0.5
+      }
+    },
+    {
+      "name": "position-adjust-proportion",
+      "type": "PositionChange",
+      "value": {
+        "AdjustProportion": 1.25
+      }
+    },
+    {
+      "name": "workspace-id",
+      "type": "WorkspaceReferenceArg",
+      "value": {
+        "Id": 18446744073709551615
+      }
+    },
+    {
+      "name": "workspace-index",
+      "type": "WorkspaceReferenceArg",
+      "value": {
+        "Index": 255
+      }
+    },
+    {
+      "name": "workspace-name",
+      "type": "WorkspaceReferenceArg",
+      "value": {
+        "Name": ""
+      }
+    },
+    {
+      "name": "layout-next",
+      "type": "LayoutSwitchTarget",
+      "value": "Next"
+    },
+    {
+      "name": "layout-prev",
+      "type": "LayoutSwitchTarget",
+      "value": "Prev"
+    },
+    {
+      "name": "layout-index",
+      "type": "LayoutSwitchTarget",
+      "value": {
+        "Index": 255
+      }
+    },
+    {
+      "name": "column-normal",
+      "type": "ColumnDisplay",
+      "value": "Normal"
+    },
+    {
+      "name": "column-tabbed",
+      "type": "ColumnDisplay",
+      "value": "Tabbed"
+    },
+    {
+      "name": "mode-auto",
+      "type": "ModeToSet",
+      "value": "Automatic"
+    },
+    {
+      "name": "mode-specific",
+      "type": "ModeToSet",
+      "value": {
+        "Specific": {
+          "height": 0,
+          "refresh": null,
+          "width": 0
+        }
+      }
+    },
+    {
+      "name": "hsync-positive",
+      "type": "HSyncPolarity",
+      "value": "PHSync"
+    },
+    {
+      "name": "hsync-negative",
+      "type": "HSyncPolarity",
+      "value": "NHSync"
+    },
+    {
+      "name": "vsync-positive",
+      "type": "VSyncPolarity",
+      "value": "PVSync"
+    },
+    {
+      "name": "vsync-negative",
+      "type": "VSyncPolarity",
+      "value": "NVSync"
+    },
+    {
+      "name": "scale-auto",
+      "type": "ScaleToSet",
+      "value": "Automatic"
+    },
+    {
+      "name": "scale-specific",
+      "type": "ScaleToSet",
+      "value": {
+        "Specific": 1.25
+      }
+    },
+    {
+      "name": "position-auto",
+      "type": "PositionToSet",
+      "value": "Automatic"
+    },
+    {
+      "name": "position-specific",
+      "type": "PositionToSet",
+      "value": {
+        "Specific": {
+          "x": -1,
+          "y": 0
+        }
+      }
+    },
+    {
+      "name": "transform-normal",
+      "type": "Transform",
+      "value": "Normal"
+    },
+    {
+      "name": "transform-90",
+      "type": "Transform",
+      "value": "90"
+    },
+    {
+      "name": "transform-180",
+      "type": "Transform",
+      "value": "180"
+    },
+    {
+      "name": "transform-270",
+      "type": "Transform",
+      "value": "270"
+    },
+    {
+      "name": "transform-flipped",
+      "type": "Transform",
+      "value": "Flipped"
+    },
+    {
+      "name": "transform-flipped-90",
+      "type": "Transform",
+      "value": "Flipped90"
+    },
+    {
+      "name": "transform-flipped-180",
+      "type": "Transform",
+      "value": "Flipped180"
+    },
+    {
+      "name": "transform-flipped-270",
+      "type": "Transform",
+      "value": "Flipped270"
+    },
+    {
+      "name": "config-applied",
+      "type": "OutputConfigChanged",
+      "value": "Applied"
+    },
+    {
+      "name": "config-missing",
+      "type": "OutputConfigChanged",
+      "value": "OutputWasMissing"
+    },
+    {
+      "name": "layer-background",
+      "type": "Layer",
+      "value": "Background"
+    },
+    {
+      "name": "layer-bottom",
+      "type": "Layer",
+      "value": "Bottom"
+    },
+    {
+      "name": "layer-top",
+      "type": "Layer",
+      "value": "Top"
+    },
+    {
+      "name": "layer-overlay",
+      "type": "Layer",
+      "value": "Overlay"
+    },
+    {
+      "name": "interactivity-none",
+      "type": "LayerSurfaceKeyboardInteractivity",
+      "value": "None"
+    },
+    {
+      "name": "interactivity-exclusive",
+      "type": "LayerSurfaceKeyboardInteractivity",
+      "value": "Exclusive"
+    },
+    {
+      "name": "interactivity-demand",
+      "type": "LayerSurfaceKeyboardInteractivity",
+      "value": "OnDemand"
+    },
+    {
+      "name": "cast-pipewire",
+      "type": "CastKind",
+      "value": "PipeWire"
+    },
+    {
+      "name": "cast-screencopy",
+      "type": "CastKind",
+      "value": "WlrScreencopy"
+    },
+    {
+      "name": "target-nothing",
+      "type": "CastTarget",
+      "value": {
+        "Nothing": {}
+      }
+    },
+    {
+      "name": "target-output",
+      "type": "CastTarget",
+      "value": {
+        "Output": {
+          "name": ""
+        }
+      }
+    },
+    {
+      "name": "target-window",
+      "type": "CastTarget",
+      "value": {
+        "Window": {
+          "id": 18446744073709551615
+        }
+      }
+    }
+  ]
+}
