@@ -18,6 +18,8 @@
 #include "nirisession.h"
 #include "nirirequests.h"
 #include "niripendingreply.h"
+#include "streamfixture.h"
+#include "ipcsurfacefixtures.h"
 
 using namespace NiriWire;
 using namespace NiriIpc;
@@ -188,8 +190,112 @@ private slots:
         QVERIFY2(decodeNamed(type, wire, typed, error), qPrintable(error.path + error.message));
         const auto encoded = encodeVariant(typed, &error);
         QVERIFY2(encoded.has_value(), qPrintable(error.path + error.message));
-        QVERIFY2(equivalent(wire, *encoded),
+        // A selected newer optional is emitted as null when absent; every
+        // released field must still equal its independent v26.04 serde value.
+        const auto expected = type == "Output" ? replaced(wire, "max_bpc", WireValue()) : wire;
+        QVERIFY2(equivalent(expected, *encoded),
                  qPrintable(QString::fromUtf8(*NiriWire::encode(*encoded))));
+    }
+
+    void newerReferenceValues_data()
+    {
+        QTest::addColumn<QString>("name");
+        QTest::addColumn<QString>("type");
+        const auto document = NiriSurfaceTest::loadFixture(
+                QFINDTESTDATA("fixtures/serde-main-689c1e9/vectors.json"));
+        for (const auto &row : *document.lookup("vectors")->arrayValue()) {
+            const auto type = *row.lookup("type")->stringValue();
+            if (type == "Request")
+                continue; // Exact native/QML Request socket cases own these.
+            const auto name = *row.lookup("name")->stringValue();
+            QTest::newRow(qPrintable(name)) << name << type;
+        }
+    }
+    void newerReferenceValues()
+    {
+        QFETCH(QString, name);
+        QFETCH(QString, type);
+        const auto document = NiriSurfaceTest::loadFixture(
+                QFINDTESTDATA("fixtures/serde-main-689c1e9/vectors.json"));
+        for (const auto &row : *document.lookup("vectors")->arrayValue()) {
+            if (*row.lookup("name")->stringValue() != name)
+                continue;
+            const auto &wire = *row.lookup("value");
+            QVariant value;
+            DecodeError error;
+            QVERIFY2(decodeNamed(type, wire, value, error), qPrintable(error.path + error.message));
+            const auto encoded = encodeVariant(value, &error);
+            QVERIFY(encoded);
+            QVERIFY(equivalent(wire, *encoded));
+            if (type == "CastKind") {
+                const auto kind = value.value<NiriCastKind>();
+                QVERIFY(kind.known());
+                QCOMPARE(kind.wireName(), *wire.stringValue());
+            }
+        }
+    }
+    void newerOutputQuery_data()
+    {
+        QTest::addColumn<int>("maxBpc");
+        QTest::newRow("released-omitted") << -2;
+        QTest::newRow("newer-null") << -1;
+        QTest::newRow("newer-zero") << 0;
+        QTest::newRow("newer-ten") << 10;
+        QTest::newRow("newer-u8-max") << 255;
+    }
+    void newerOutputValidation()
+    {
+        for (const auto &json : {"256", "-1", "1.5", "\"10\"", "true", "{}"}) {
+            NiriOutput output;
+            output.maxBpc = 14;
+            DecodeError error;
+            const auto wire = replaced(fixture("output-present"), "max_bpc", parsed(json));
+            QVERIFY(!decode(wire, output, &error));
+            QCOMPARE(error.path, "$['max_bpc']");
+            QCOMPARE(output.maxBpc, std::optional<quint8>(14));
+        }
+    }
+    void newerOutputQuery()
+    {
+        QFETCH(int, maxBpc);
+        auto wire = fixture("output-present");
+        if (maxBpc >= -1)
+            wire = replaced(wire, "max_bpc",
+                            maxBpc < 0 ? WireValue() : WireValue(NumberToken::fromUInt64(maxBpc)));
+        NiriOutput output;
+        output.maxBpc = 14;
+        QVERIFY(decode(wire, output));
+        QCOMPARE(output.maxBpc, maxBpc < 0 ? std::nullopt : std::optional<quint8>(maxBpc));
+        CodecServer server;
+        QVERIFY(server.listen());
+        server.responses.insert("Outputs", *WireValue::object({{"DP-1", wire}}));
+        auto *session = NiriSession::instance();
+        session->stop();
+        session->selectEndpoint(server.server.fullServerName());
+        QQmlEngine engine;
+        engine.addImportPath(QCoreApplication::applicationDirPath());
+        QQmlComponent component(&engine);
+        component.setData(R"(
+            import QtQml
+            import Niri
+            QtObject {
+                property NiriOutputsReply reply: NiriRequests.outputs()
+                property var observed: reply.completed && !reply.isError ? reply.result["DP-1"].maxBpc : undefined
+            }
+        )",
+                          QUrl());
+        QScopedPointer<QObject> root(component.create());
+        QVERIFY2(root, qPrintable(component.errorString()));
+        auto *reply = root->property("reply").value<NiriOutputsReply *>();
+        QVERIFY(reply);
+        QTRY_VERIFY(reply->completed());
+        QVERIFY2(!reply->isError(), qPrintable(reply->error().message));
+        QCOMPARE(reply->result().value("DP-1").maxBpc, output.maxBpc);
+        if (maxBpc < 0)
+            QCOMPARE(root->property("observed").metaType(), QMetaType::fromType<std::nullptr_t>());
+        else
+            QCOMPARE(root->property("observed").toInt(), maxBpc);
+        session->stop();
     }
 
     void exactIds_data()
@@ -213,17 +319,16 @@ private slots:
         QCOMPARE(window.workspaceId, token->toUInt64());
         QCOMPARE(window.qmlId(), text);
         QCOMPARE(window.qmlWorkspaceId().toString(), text);
-        auto *events = NiriEvents::instance();
+        StateStreamFixture stream;
+        QVERIFY(stream.start());
         NiriWindowsModel model;
         NiriWindowReactive reactive;
         reactive.setWindowId(*token->toUInt64());
         auto *state = NiriState::instance();
-        NiriSession::instance()->stop();
-        events->dispatchWireEvent(
-                "WindowsChanged",
-                *WireValue::object({{"windows", WireValue(WireValue::Array{wire})}}),
-                NiriSession::instance()->epoch());
-        QCOMPARE(model.rowCount(), 1);
+        stream.send(*NiriWire::encode(*WireValue::object(
+                {{"WindowsChanged",
+                  *WireValue::object({{"windows", WireValue(WireValue::Array{wire})}})}})));
+        QTRY_COMPARE(model.rowCount(), 1);
         QCOMPARE(model.data(model.index(0, 0), NiriWindowsModel::IdRole).metaType(),
                  QMetaType::fromType<QString>());
         QCOMPARE(model.data(model.index(0, 0), NiriWindowsModel::IdRole).toString(), text);
@@ -255,17 +360,15 @@ private slots:
         auto cleared = replaced(wire, "title", WireValue());
         cleared = replaced(cleared, "workspace_id", WireValue());
         cleared = replaced(cleared, "pid", WireValue());
-        events->dispatchWireEvent("WindowOpenedOrChanged",
-                                  *WireValue::object({{"window", cleared}}),
-                                  NiriSession::instance()->epoch());
-        QVERIFY(!reactive.title());
+        stream.send(*NiriWire::encode(*WireValue::object(
+                {{"WindowOpenedOrChanged", *WireValue::object({{"window", cleared}})}})));
+        QTRY_VERIFY(!reactive.title());
         QVERIFY(!reactive.workspaceId());
         QCOMPARE(model.data(model.index(0, 0), NiriWindowsModel::TitleRole).metaType(),
                  QMetaType::fromType<std::nullptr_t>());
         QVERIFY(!state->focusedWindowTitle());
-        events->dispatchWireEvent("WindowFocusChanged", *WireValue::object({{"id", WireValue()}}),
-                                  NiriSession::instance()->epoch());
-        QVERIFY(!state->focusedWindowId());
+        stream.send("{\"WindowFocusChanged\":{\"id\":null}}");
+        QTRY_VERIFY(!state->focusedWindowId());
         QVERIFY(!reactive.isFocused());
     }
 
@@ -370,7 +473,7 @@ private slots:
         QVERIFY(decode(wire, extended));
         QVERIFY(original != extended);
         QCOMPARE(extended.extensions.size(), 1);
-        QVERIFY(equivalent(*NiriIpc::encode(extended), wire));
+        QVERIFY(equivalent(*NiriIpc::encode(extended), replaced(wire, "max_bpc", WireValue())));
         DecodeError error;
         QVERIFY(!decode(wire, extended, &error, "$", DecodeMode::Outbound));
         QCOMPARE(error.path, "$['future_field']");
@@ -670,16 +773,20 @@ private slots:
         QFETCH(QByteArray, json);
         auto *events = NiriEvents::instance();
         NiriSession::instance()->stop();
+        StateStreamFixture stream;
+        QVERIFY(stream.start());
         const auto epoch = NiriSession::instance()->epoch();
         auto window = replaced(fixture("window-present"), "is_focused", WireValue(true));
-        events->dispatchWireEvent(
-                "WindowsChanged",
-                *WireValue::object({{"windows", WireValue(WireValue::Array{window})}}), epoch);
-        events->dispatchWireEvent(
-                "WorkspacesChanged",
-                *WireValue::object({{"workspaces",
-                                     WireValue(WireValue::Array{fixture("workspace-present")})}}),
-                epoch);
+        stream.send(*NiriWire::encode(*WireValue::object(
+                {{"WindowsChanged",
+                  *WireValue::object({{"windows", WireValue(WireValue::Array{window})}})}})));
+        stream.send(*NiriWire::encode(*WireValue::object(
+                {{"WorkspacesChanged",
+                  *WireValue::object(
+                          {{"workspaces",
+                            WireValue(WireValue::Array{fixture("workspace-present")})}})}})));
+        QTRY_COMPARE(events->lastWindowsSnapshot().size(), 1);
+        QTRY_COMPARE(events->lastWorkspacesSnapshot().size(), 1);
         const auto windows = events->lastWindowsSnapshot();
         const auto workspaces = events->lastWorkspacesSnapshot();
         const auto focus = events->lastFocusedWindowId();

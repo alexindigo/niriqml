@@ -2,6 +2,8 @@
 
 #include <QAbstractListModel>
 #include <QList>
+#include <QQueue>
+#include <functional>
 #include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
 
@@ -42,4 +44,8 @@ private:
         QVariant payload;
     };
     QList<Event> m_events;
+    QQueue<std::function<void()>> m_pending;
+    bool m_mutating = false;
+    void enqueue(std::function<void()> operation);
+    void removeOldest(int count);
 };

@@ -11,10 +11,10 @@
 #include <QTest>
 
 static_assert(NiriIpcInventory::Request.size() == 16);
-static_assert(NiriIpcInventory::Action.size() == 141);
-static_assert(NiriIpcInventory::OutputAction.size() == 9);
+static_assert(NiriIpcInventory::Action.size() == 149);
+static_assert(NiriIpcInventory::OutputAction.size() == 10);
 static_assert(NiriIpcInventory::Response.size() == 14);
-static_assert(NiriIpcInventory::Event.size() == 19);
+static_assert(NiriIpcInventory::Event.size() == 20);
 
 template <std::size_t N>
 QSet<QString> names(const std::array<const char *, N> &values)
@@ -65,11 +65,26 @@ private slots:
     }
     void schemaInventory()
     {
+        // The released inventory remains a strict subset; explicit extension
+        // selections are checked against the second pinned source, not literals.
+        const auto released = defs;
+        QFile file(QFINDTESTDATA("../schema/niri-ipc-main-689c1e9.schema.json"));
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        defs = QJsonDocument::fromJson(file.readAll()).object()["$defs"].toObject();
         QCOMPARE(schemaTags("Request"), names(NiriIpcInventory::Request));
         QCOMPARE(schemaTags("Action"), names(NiriIpcInventory::Action));
         QCOMPARE(schemaTags("OutputAction"), names(NiriIpcInventory::OutputAction));
         QCOMPARE(schemaTags("Response"), names(NiriIpcInventory::Response));
         QCOMPARE(schemaTags("Event"), names(NiriIpcInventory::Event));
+        const auto newer = defs;
+        defs = released;
+        QCOMPARE(schemaTags("Action").size(), 141);
+        QCOMPARE(schemaTags("OutputAction").size(), 9);
+        QCOMPARE(schemaTags("Event").size(), 19);
+        QVERIFY(names(NiriIpcInventory::Action).contains(schemaTags("Action")));
+        QVERIFY(names(NiriIpcInventory::OutputAction).contains(schemaTags("OutputAction")));
+        QVERIFY(names(NiriIpcInventory::Event).contains(schemaTags("Event")));
+        defs = newer;
     }
     void callableAndSignalSurface()
     {
@@ -79,9 +94,9 @@ private slots:
         QCOMPARE(methods(NiriNativeEvents::staticMetaObject),
                  names(NiriIpcInventory::EventSignals));
         QCOMPARE(methods(NiriIpcEvents::staticMetaObject), names(NiriIpcInventory::EventSignals));
-        QCOMPARE(NiriAction::staticMetaObject.enumerator(0).keyCount() - 2, 141);
-        QCOMPARE(NiriOutputAction::staticMetaObject.enumerator(0).keyCount() - 2, 9);
-        QCOMPARE(NiriEvent::staticMetaObject.enumerator(0).keyCount() - 2, 19);
+        QCOMPARE(NiriAction::staticMetaObject.enumerator(0).keyCount() - 2, 149);
+        QCOMPARE(NiriOutputAction::staticMetaObject.enumerator(0).keyCount() - 2, 10);
+        QCOMPARE(NiriEvent::staticMetaObject.enumerator(0).keyCount() - 2, 20);
     }
     void typedReplySurface()
     {

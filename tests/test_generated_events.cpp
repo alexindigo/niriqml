@@ -2,6 +2,7 @@
 #include "nirieventlog.h"
 #include "nirisession.h"
 #include "ipcsurfacefixtures.h"
+#include "streamfixture.h"
 #include <QGuiApplication>
 #include <QLocalServer>
 #include <QLocalSocket>
@@ -91,6 +92,7 @@ QtObject {
     property int rawCount: 0
     property bool observed: false
     property bool expectNull: false
+    property bool expectedOn: false
     property string expectedPath: ""
     function accept(name, a) {
         root.count++;
@@ -114,6 +116,7 @@ QtObject {
         case "castsChanged": root.observed = a[0].length === 1 && a[0][0].streamId === "18446744073709551615"; break;
         case "castStartedOrChanged": root.observed = a[0].streamId === "18446744073709551615"; break;
         case "castStopped": root.observed = a[0] === "18446744073709551615"; break;
+        case "touchpadToggled": root.observed = a[0] === root.expectedOn; break;
         }
     }
     property Connections listener: Connections {
@@ -134,6 +137,8 @@ QtObject {
             }
             if (const auto *path = payload.lookup("path"); path && path->stringValue())
                 root->setProperty("expectedPath", *path->stringValue());
+            if (const auto *on = payload.lookup("on"); on && on->boolValue())
+                root->setProperty("expectedOn", *on->boolValue());
         }
         return root;
     }
@@ -169,6 +174,9 @@ QtObject {
             QCOMPARE(actual,
                      payload.lookup("id")->numberValue() ? std::optional<quint64>(Max)
                                                          : std::nullopt);
+        } else if (tag == "TouchpadToggled") {
+            QCOMPARE(args[0].metaType(), QMetaType::fromType<bool>());
+            QCOMPARE(args[0].toBool(), *payload.lookup("on")->boolValue());
         } else if (tag == "OverviewOpenedOrClosed" || tag == "ConfigLoaded") {
             QCOMPARE(args[0].metaType(), QMetaType::fromType<bool>());
             QCOMPARE(args[0].toBool(), tag == "OverviewOpenedOrClosed");
@@ -197,6 +205,8 @@ private slots:
     void initTestCase()
     {
         fixtures = loadFixture(QFINDTESTDATA("fixtures/serde-v26.04/vectors.json"));
+        fixtures = withNewerSurface(
+                fixtures, loadFixture(QFINDTESTDATA("fixtures/serde-main-689c1e9/vectors.json")));
         manifest = loadFixture(QFINDTESTDATA("../generated/ipc-events.json"));
     }
     void init()
@@ -228,10 +238,26 @@ private slots:
         const auto encoded = NiriIpc::encode(event);
         QVERIFY(encoded);
         QCOMPARE(NiriWire::encode(canonical(*encoded)), NiriWire::encode(canonical(wire)));
-        EventServer server;
-        QVERIFY(server.listen());
-        server.event = *NiriWire::encode(wire);
-        NiriSession::instance()->selectEndpoint(server.server.fullServerName());
+        StateStreamFixture server;
+        QVERIFY(server.start());
+        // Typed publication tests use valid stream preconditions, not isolated
+        // strict deltas that upstream's state helper would panic on.
+        NiriEventStreamState initial;
+        NiriWindow win;
+        win.id = Max;
+        NiriWorkspace ws;
+        ws.id = Max;
+        NiriCast cast;
+        cast.streamId = Max;
+        cast.kind = NiriCastKind(NiriCastKind::PipeWire);
+        cast.target = NiriCastTarget::fromNothing({});
+        initial.apply(NiriEvent::fromWindowsChanged({{win}, {}}), 0);
+        initial.apply(NiriEvent::fromWorkspacesChanged({{ws}, {}}), 0);
+        initial.apply(NiriEvent::fromKeyboardLayoutsChanged({{}, {}}), 0);
+        initial.apply(NiriEvent::fromCastsChanged({{cast}, {}}), 0);
+        for (const auto &part : initial.replicate())
+            server.send(*NiriWire::encode(*NiriIpc::encode(part)));
+        QTRY_VERIFY(NiriSession::instance()->state().initialStateReceived());
         auto *events = NiriEvents::instance();
         const auto method = entry.lookup("signal")->stringValue()->toLatin1();
         QSignalSpy native(events->nativeEvents(),
@@ -244,7 +270,7 @@ private slots:
         QQmlEngine engine;
         auto root = consumer(engine, entry, member.second);
         QVERIFY(root);
-        NiriSession::instance()->start();
+        server.send(*NiriWire::encode(wire));
         QTRY_COMPARE(root->property("count").toInt(), 1);
         QVERIFY(root->property("observed").toBool());
         QCOMPARE(root->property("rawCount").toInt(), 1);
@@ -253,7 +279,7 @@ private slots:
         QCOMPARE(raw.size(), 1);
         QCOMPARE(errors.size(), 0);
         checkNative(member.first, native.first(), member.second);
-        QCOMPARE(server.arrivals, QList<QByteArray>{QByteArray("\"EventStream\"")});
+        QCOMPARE(server.request, QByteArray("\"EventStream\"\n"));
     }
     void nativeEpochStop_data() { everyEvent_data(); }
     void nativeEpochStop()
@@ -361,6 +387,8 @@ private slots:
     }
     void commitBeforeNative()
     {
+        StateStreamFixture server;
+        QVERIFY(server.start());
         auto *events = NiriEvents::instance();
         bool observed = false;
         const auto connection =
@@ -371,7 +399,8 @@ private slots:
                                             == windows.first().id;
                         });
         const auto &wire = fixture("event-WindowsChanged");
-        events->dispatchDocument(Document{{}, wire}, NiriSession::instance()->epoch());
+        server.send(*NiriWire::encode(wire));
+        QTRY_VERIFY(observed);
         disconnect(connection);
         QVERIFY(observed);
     }

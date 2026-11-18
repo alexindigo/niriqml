@@ -18,6 +18,23 @@ inline WireValue loadFixture(const QString &path)
     return document->root;
 }
 
+inline WireValue withNewerSurface(const WireValue &released, const WireValue &newer)
+{
+    auto members = *released.objectValue();
+    for (auto &member : members) {
+        if (member.first != "surfaceVectors")
+            continue;
+        auto rows = *member.second.arrayValue();
+        for (const auto &row : *newer.lookup("vectors")->arrayValue()) {
+            const auto type = *row.lookup("type")->stringValue();
+            if (type == "Action" || type == "OutputAction" || type == "Request" || type == "Event")
+                rows.append(row);
+        }
+        member.second = WireValue(rows);
+    }
+    return *WireValue::object(members);
+}
+
 // Preserve arbitrary u64s before entering JS; small numeric inputs stay numeric.
 inline QVariant jsInput(const WireValue &wire)
 {

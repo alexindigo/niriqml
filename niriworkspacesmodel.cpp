@@ -1,44 +1,46 @@
 #include "niriworkspacesmodel.h"
-
-#include "nirievents.h"
 #include "nirisession.h"
 
-NiriWorkspacesModel::NiriWorkspacesModel(QObject *parent) : QAbstractListModel(parent)
+NiriWorkspacesModel::NiriWorkspacesModel(QObject *parent) : NiriRecordModel(parent)
 {
-    NiriEvents *events = NiriEvents::instance();
-    if (!events)
+    auto *session = NiriSession::instance();
+    if (!session)
         return;
-    connect(events, &NiriEvents::workspacesChanged, this,
-            &NiriWorkspacesModel::onWorkspacesChanged);
-    connect(events->nativeEvents(), &NiriNativeEvents::workspaceActivated, this,
-            &NiriWorkspacesModel::onWorkspaceActivated);
-    connect(events->nativeEvents(), &NiriNativeEvents::workspaceActiveWindowChanged, this,
-            &NiriWorkspacesModel::onWorkspaceActiveWindowChanged);
-
-    // Bootstrap from cached snapshot for late subscribers
-    QVariantList snapshot = events->lastWorkspacesSnapshot();
-    if (!snapshot.isEmpty())
-        onWorkspacesChanged(snapshot);
-    NiriSession::instance()->ensureStarted();
+    m_rows = session->state().workspaceIds();
+    m_revision = session->state().revision();
+    connect(session, &NiriSession::stateProject, this, [this](const auto &c) {
+        reconcile(c.workspaces, c.revision, [](quint64 fields) {
+            QList<int> roles{WorkspaceRole};
+            using S = NiriEventStreamState;
+            for (const auto &pair :
+                 {qMakePair(S::Index, IdxRole), qMakePair(S::Name, NameRole),
+                  qMakePair(S::Output, OutputRole), qMakePair(S::WorkspaceUrgent, IsUrgentRole),
+                  qMakePair(S::Active, IsActiveRole), qMakePair(S::WorkspaceFocused, IsFocusedRole),
+                  qMakePair(S::ActiveWindowId, ActiveWindowIdRole)}) {
+                if (fields & pair.first)
+                    roles.append(pair.second);
+            }
+            return roles;
+        });
+    });
+    session->ensureStarted();
 }
 
 int NiriWorkspacesModel::rowCount(const QModelIndex &parent) const
 {
-    if (!NiriSession::checkThread(this))
-        return 0;
-    if (parent.isValid())
-        return 0;
-    return m_workspaces.size();
+    return NiriSession::checkThread(this) && !parent.isValid() ? m_rows.size() : 0;
 }
 
 QVariant NiriWorkspacesModel::data(const QModelIndex &index, int role) const
 {
-    if (!NiriSession::checkThread(this))
+    if (!NiriSession::checkThread(this) || !index.isValid() || index.model() != this
+        || index.column() != 0 || index.row() < 0 || index.row() >= m_rows.size())
         return {};
-    if (!index.isValid() || index.row() < 0 || index.row() >= m_workspaces.size())
+    const auto entry = rowEntry(
+            index.row(), [](quint64 id) { return NiriSession::instance()->state().workspace(id); });
+    if (!entry)
         return {};
-
-    const NiriWorkspace &w = m_workspaces.at(index.row());
+    const auto &w = *entry;
     switch (role) {
     case WorkspaceRole:
         return QVariant::fromValue(w);
@@ -65,8 +67,7 @@ QVariant NiriWorkspacesModel::data(const QModelIndex &index, int role) const
 
 QHash<int, QByteArray> NiriWorkspacesModel::roleNames() const
 {
-    return {
-            {WorkspaceRole, "workspace"},
+    return {{WorkspaceRole, "workspace"},
             {IdRole, "id"},
             {IdxRole, "idx"},
             {NameRole, "name"},
@@ -74,73 +75,5 @@ QHash<int, QByteArray> NiriWorkspacesModel::roleNames() const
             {IsUrgentRole, "isUrgent"},
             {IsActiveRole, "isActive"},
             {IsFocusedRole, "isFocused"},
-            {ActiveWindowIdRole, "activeWindowId"},
-    };
-}
-
-void NiriWorkspacesModel::rebuildIndex()
-{
-    m_idToRow.clear();
-    for (int i = 0; i < m_workspaces.size(); ++i)
-        m_idToRow[m_workspaces[i].id] = i;
-}
-
-void NiriWorkspacesModel::onWorkspacesChanged(const QVariantList &workspaces)
-{
-    beginResetModel();
-    m_workspaces.clear();
-    m_workspaces.reserve(workspaces.size());
-    for (const QVariant &v : workspaces)
-        m_workspaces.append(v.value<NiriWorkspace>());
-    rebuildIndex();
-    endResetModel();
-}
-
-void NiriWorkspacesModel::onWorkspaceActivated(quint64 workspaceId, bool focused)
-{
-    // Look up the target workspace to find its output
-    auto it = m_idToRow.constFind(workspaceId);
-    if (it == m_idToRow.constEnd())
-        return;
-    const auto targetOutput = m_workspaces.at(*it).output;
-
-    // Update isActive: on the target output, exactly one workspace is active.
-    // If `focused`, also update isFocused so the model reflects focus state.
-    for (int i = 0; i < m_workspaces.size(); ++i) {
-        NiriWorkspace &w = m_workspaces[i];
-        if (w.output != targetOutput)
-            continue;
-
-        bool wasActive = w.isActive;
-        bool nowActive = (w.id == workspaceId);
-        bool wasFocused = w.isFocused;
-        bool nowFocused = focused ? (w.id == workspaceId) : wasFocused;
-
-        QList<int> changedRoles;
-        if (wasActive != nowActive) {
-            w.isActive = nowActive;
-            changedRoles << IsActiveRole;
-        }
-        if (wasFocused != nowFocused) {
-            w.isFocused = nowFocused;
-            changedRoles << IsFocusedRole;
-        }
-        if (!changedRoles.isEmpty()) {
-            changedRoles << WorkspaceRole;
-            QModelIndex idx = index(i);
-            emit dataChanged(idx, idx, changedRoles);
-        }
-    }
-}
-
-void NiriWorkspacesModel::onWorkspaceActiveWindowChanged(quint64 workspaceId,
-                                                         std::optional<quint64> windowId)
-{
-    auto it = m_idToRow.constFind(workspaceId);
-    if (it == m_idToRow.constEnd())
-        return;
-    int row = *it;
-    m_workspaces[row].activeWindowId = windowId;
-    QModelIndex idx = index(row);
-    emit dataChanged(idx, idx, {ActiveWindowIdRole, WorkspaceRole});
+            {ActiveWindowIdRole, "activeWindowId"}};
 }
