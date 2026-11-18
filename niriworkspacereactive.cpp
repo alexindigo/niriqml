@@ -10,14 +10,13 @@ NiriWorkspaceReactive::NiriWorkspaceReactive(QObject *parent) : QObject(parent)
     if (!session)
         return;
     m_revision = session->state().revision();
-    connect(session, &NiriSession::stateUpdated, this, [this, session](const auto &c) {
+    connect(session, &NiriSession::stateUpdated, this, [this](const auto &c) {
         if (c.revision <= m_revision)
             return;
         m_revision = c.revision;
         if ((!m_selectorName.isEmpty() && !c.workspaces.isEmpty())
             || (m_selectorId && c.workspaces.contains(*m_selectorId)))
-            notify(values(
-                    NiriSelectors::workspace(session->state(), m_selectorName, m_selectorId, &c)));
+            notify();
     });
     session->ensureStarted();
 }
@@ -42,17 +41,15 @@ void NiriWorkspaceReactive::setWorkspaceName(const QString &name)
 {
     if (!NiriSession::checkThread(this) || name == m_selectorName)
         return;
-    auto before = values(selected());
     m_selectorName = name;
-    notify(std::move(before));
+    notify();
 }
 void NiriWorkspaceReactive::setWorkspaceId(std::optional<quint64> id)
 {
     if (!NiriSession::checkThread(this) || id == m_selectorId)
         return;
-    auto before = values(selected());
     m_selectorId = id;
-    notify(std::move(before));
+    notify();
 }
 void NiriWorkspaceReactive::setQmlWorkspaceId(const QVariant &id)
 {
@@ -66,11 +63,12 @@ void NiriWorkspaceReactive::setQmlWorkspaceId(const QVariant &id)
         qmlWarning(this) << error.path << error.message;
 }
 
-NiriProjectionNotifications::Values NiriWorkspaceReactive::values(const Entry &entry) const
+NiriProjectionNotifications::Values NiriWorkspaceReactive::values(const Selection &selection)
 {
+    const auto &entry = selection.record;
     const auto w = entry ? *entry : NiriWorkspace{};
-    return {m_selectorName,
-            qmlWorkspaceId(),
+    return {selection.name,
+            NiriIpc::qmlValue(selection.id),
             bool(entry),
             entry ? w.qmlId() : QVariant::fromValue(nullptr),
             w.idx,
@@ -82,10 +80,11 @@ NiriProjectionNotifications::Values NiriWorkspaceReactive::values(const Entry &e
             w.qmlActiveWindowId(),
             entry ? QVariant::fromValue(w) : QVariant::fromValue(nullptr)};
 }
-void NiriWorkspaceReactive::notify(NiriProjectionNotifications::Values before)
+void NiriWorkspaceReactive::notify()
 {
     m_notifications.flush(
-            this, std::move(before), [this] { return values(selected()); },
+            this, m_announced,
+            [this] { return Selection{m_selectorName, m_selectorId, selected()}; }, values,
             {[this] { emit workspaceNameChanged(); }, [this] { emit workspaceIdChanged(); },
              [this] { emit validChanged(); }, [this] { emit idChanged(); },
              [this] { emit idxChanged(); }, [this] { emit nameChanged(); },

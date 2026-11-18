@@ -67,10 +67,16 @@ signals:
 
 private:
     using Entry = NiriEventStreamState::Entry<NiriWindow>;
+    struct Selection
+    {
+        std::optional<quint64> id;
+        Entry record;
+    };
     Entry selected() const;
-    NiriProjectionNotifications::Values values(const Entry &entry) const;
-    void notify(NiriProjectionNotifications::Values before);
+    static NiriProjectionNotifications::Values values(const Selection &selection);
+    void notify();
     std::optional<quint64> m_windowId;
+    Selection m_announced;
     quint64 m_revision = 0;
     NiriProjectionNotifications m_notifications;
 };

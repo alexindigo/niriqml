@@ -82,28 +82,34 @@ protected:
     }
 };
 
-// Notification before-values exist only on the active stack. Nested setters
-// commit their selectors and let this owner reconcile against current getters.
-// No stale argument or record is ever written back after a callback.
+// Persistent publication state contains selectors and an immutable reducer entry
+// identity, not copied records or getter authority. Per-property before-values
+// exist only on the active stack. Nested setters commit their selectors and let
+// this owner reconcile against current getters, independent of receiver order.
 class NiriProjectionNotifications
 {
 public:
     using Values = QList<QVariant>;
     using Signal = std::function<void()>;
-    void flush(QObject *object, Values before, const std::function<Values()> &read,
+    template <typename Snapshot, typename Capture, typename Project>
+    void flush(QObject *object, Snapshot &announced, Capture capture, Project project,
                const QList<Signal> &notifications)
     {
         if (m_flushing)
             return;
         m_flushing = true;
         QPointer<QObject> guard(object);
+        auto before = project(announced);
         for (;;) {
-            const auto now = read();
+            auto current = capture();
+            const auto now = project(current);
             int i = 0;
             while (i < now.size() && before[i] == now[i])
                 ++i;
-            if (i == now.size())
+            if (i == now.size()) {
+                announced = std::move(current);
                 break;
+            }
             before[i] = now[i];
             notifications[i]();
             if (!guard)
