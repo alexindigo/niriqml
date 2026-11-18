@@ -95,12 +95,16 @@ QtObject {
     id: root
     objectName: "versionQuery"
     property NiriVersionReply pending: null
+    property int queryGeneration: 0
     property string version: ""
     property string failure: ""
     function refresh() {
+        const generation = ++queryGeneration
         const reply = NiriRequests.version()
         pending = reply
         reply.finished.connect(function() {
+            if (generation !== root.queryGeneration)
+                return
             if (reply.isError)
                 root.failure = reply.error.message
             else

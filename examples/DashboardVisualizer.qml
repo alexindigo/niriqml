@@ -28,6 +28,7 @@ ApplicationWindow {
     readonly property var selectedWorkspace: workspaceTracker.workspace
     property NiriOutputsReply outputsReply: null
     property NiriVersionReply versionReply: null
+    property int queryGeneration: 0
     property var outputs: ({})
     property string niriVersion: ""
     property string lastAction: ""
@@ -76,16 +77,17 @@ ApplicationWindow {
         })
     }
     function refreshQueries() {
+        const generation = ++queryGeneration
         const out = NiriRequests.outputs()
         outputsReply = out
         out.finished.connect(function() {
-            if (!out.isError)
+            if (generation === root.queryGeneration && !out.isError)
                 root.outputs = out.result
         })
         const version = NiriRequests.version()
         versionReply = version
         version.finished.connect(function() {
-            if (!version.isError)
+            if (generation === root.queryGeneration && !version.isError)
                 root.niriVersion = version.result
         })
     }
@@ -95,6 +97,7 @@ ApplicationWindow {
             if (NiriConnection.subscribed)
                 root.refreshQueries()
             else {
+                root.queryGeneration++
                 root.outputs = ({})
                 root.niriVersion = ""
             }
@@ -327,11 +330,12 @@ ApplicationWindow {
                         Button { text: "Refresh"; onClicked: root.refreshQueries() }
                     }
                     Repeater {
-                        model: Object.keys(root.outputs)
+                        objectName: "dashboardOutputs"
+                        model: Object.entries(root.outputs)
                         delegate: Label {
-                            required property string modelData
-                            readonly property var output: root.outputs[modelData]
-                            text: modelData + ": " + output.make + " " + output.model
+                            required property var modelData
+                            readonly property var output: modelData[1]
+                            text: modelData[0] + ": " + output.make + " " + output.model
                                   + " / " + output.modes.length + " modes / VRR " + output.vrrEnabled
                             color: "#cdd6f4"
                             elide: Text.ElideRight

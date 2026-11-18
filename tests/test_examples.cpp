@@ -13,10 +13,33 @@ class ExampleSetup : public QObject
     Q_PROPERTY(QStringList warnings READ warnings NOTIFY warningsChanged)
     Q_PROPERTY(int actionCount READ actionCount NOTIFY actionCountChanged)
     Q_PROPERTY(QString lastActionJson READ lastActionJson NOTIFY actionCountChanged)
+    Q_PROPERTY(int queryCount READ queryCount NOTIFY queryCountChanged)
 public:
     QStringList warnings() const { return m_warnings; }
     int actionCount() const { return m_actionCount; }
     QString lastActionJson() const { return m_lastActionJson; }
+    int queryCount() const { return m_queryCount; }
+    Q_INVOKABLE void delayNextReplies(int count)
+    {
+        NiriMock::Fault fault;
+        fault.delayMs = 1000;
+        for (int i = 0; i < count; ++i)
+            m_mock->enqueueFault(fault);
+    }
+    Q_INVOKABLE void setQueryResults(const QString &value)
+    {
+        auto output = serdeRecordFixture("output-null");
+        output["name"] = value;
+        const QJsonObject outputs{{"Outputs", QJsonObject{{value, output}}}};
+        const QJsonObject version{{"Version", value}};
+        for (const auto &entry : {qMakePair(QStringLiteral("Outputs"), outputs),
+                                  qMakePair(QStringLiteral("Version"), version)}) {
+            const auto parsed = NiriWire::parse(QJsonDocument(entry.second).toJson());
+            if (!parsed)
+                qFatal("Invalid query fixture");
+            m_mock->setResponse(entry.first, parsed->root);
+        }
+    }
     Q_INVOKABLE void removeWorkspace()
     {
         m_mock->sendEvent({{"WorkspacesChanged", QJsonObject{{"workspaces", QJsonArray{}}}}});
@@ -58,11 +81,7 @@ public slots:
         workspace["active_window_id"] = 7;
         m_mock->setWindows({window});
         m_mock->setWorkspaces({workspace});
-        using NiriWire::WireValue;
-        const auto version = WireValue::object({{"Version", WireValue("mock-26.04")}});
-        if (!version)
-            qFatal("Invalid version fixture");
-        m_mock->setResponse("Version", *version);
+        setQueryResults("mock-26.04");
         if (!m_mock->start())
             qFatal("Cannot start example mock");
         connect(m_mock, &NiriMock::requestLine, this, [this](quint64, const QByteArray &line) {
@@ -71,6 +90,12 @@ public slots:
                 ++m_actionCount;
                 m_lastActionJson = QString::fromUtf8(line);
                 emit actionCountChanged();
+            }
+            if (parsed && parsed->root.stringValue()
+                && (*parsed->root.stringValue() == "Outputs"
+                    || *parsed->root.stringValue() == "Version")) {
+                ++m_queryCount;
+                emit queryCountChanged();
             }
         });
         qputenv("NIRI_SOCKET", m_mock->socketPath().toUtf8());
@@ -108,11 +133,13 @@ public slots:
 signals:
     void warningsChanged();
     void actionCountChanged();
+    void queryCountChanged();
 
 private:
     NiriMock *m_mock = nullptr;
     QStringList m_warnings;
     int m_actionCount = 0;
+    int m_queryCount = 0;
     QString m_lastActionJson;
 };
 

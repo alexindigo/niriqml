@@ -15,12 +15,14 @@ QtObject {
     id: root
     objectName: "rawQuery"
     property NiriPendingReply pending: null
+    property int queryGeneration: 0
     property string version: ""
     function refresh() {
+        const generation = ++queryGeneration
         const reply = NiriRequests.sendRaw("Version")
         pending = reply
         reply.finished.connect(function() {
-            if (!reply.isError)
+            if (generation === root.queryGeneration && !reply.isError)
                 root.version = reply.value.Version
         })
     }
@@ -35,8 +37,12 @@ strings; decimal tokens have exact text/toNumber(). Use number(text) or
 sendRawJson for exact outbound numeric tokens, not guessed numeric strings.
 
 The local `reply` capture is intentional: replacing pending in a later refresh
-must not make an earlier handler read the wrong reply. Retain all replies whose
-outcomes matter. They are JavaScript-owned, not auto-deleted on finished.
+must not make an earlier handler read the wrong reply. The generation also keeps
+an older completion from overwriting a newer refresh. If a consumer clears query
+data on readiness/subscription loss, invalidate its generation there too: one-shot
+requests are independent of the subscription and can still succeed afterwards.
+Retain all replies whose outcomes matter. They are JavaScript-owned, not
+auto-deleted on finished.
 completed handles late observers. cancel/timeout/GC/engine teardown only cancel
 local waiting and are not rollback. Native callers delete replies or pass an
 explicit owner to sendWire. Every completion, including validation errors, is

@@ -18,6 +18,8 @@ TestCase {
         compare(NiriState.windowCount, 1)
     }
     function cleanup() {
+        examplePeer.setQueryResults("mock-26.04")
+        NiriConnection.start()
         compare(examplePeer.warnings.length, 0, "QML engine warnings: " + examplePeer.warnings.join("\n"))
     }
     function test_documentation_data() {
@@ -63,6 +65,100 @@ TestCase {
         } else {
             fail("Missing consumer assertion for " + row.tag)
         }
+    }
+    function test_dashboardLateQueryAfterSubscriptionLoss() {
+        const item = createTemporaryObject(dashboard, tests)
+        verify(item !== null)
+        tryCompare(item, "niriVersion", "mock-26.04")
+        tryCompare(item.outputsReply, "completed", true)
+        verify(Object.keys(item.outputs).length > 0)
+        const rows = findChild(item, "dashboardOutputs")
+        verify(rows !== null)
+        tryCompare(rows, "count", 1)
+        compare(rows.itemAt(0).text, "mock-26.04: make model / 1 modes / VRR false")
+        const heading = findChild(item, "panel-heading-Outputs (query snapshot) / niri mock-26.04")
+        verify(heading !== null)
+
+        examplePeer.delayNextReplies(2)
+        const before = examplePeer.queryCount
+        item.refreshQueries()
+        const outputs = item.outputsReply
+        const version = item.versionReply
+        tryCompare(examplePeer, "queryCount", before + 2)
+        verify(!outputs.completed && !version.completed, "Both queries must still be pending")
+        NiriConnection.stop()
+        compare(NiriConnection.subscribed, false)
+        compare(Object.keys(item.outputs).length, 0)
+        compare(item.niriVersion, "")
+        compare(rows.count, 0)
+        compare(heading.text, "Outputs (query snapshot) / niri ")
+
+        tryCompare(outputs, "completed", true)
+        tryCompare(version, "completed", true)
+        verify(!outputs.isError && !version.isError, "One-shot queries survive subscription loss")
+        verify(Object.keys(outputs.result).length > 0)
+        compare(version.result, "mock-26.04")
+        compare(Object.keys(item.outputs).length, 0, "Late outputs must not restore cleared displays")
+        compare(item.niriVersion, "", "Late version must not restore the cleared display")
+        compare(rows.count, 0)
+        compare(heading.text, "Outputs (query snapshot) / niri ")
+
+        NiriConnection.start()
+        tryCompare(NiriState, "initialStateReceived", true)
+        tryCompare(item, "niriVersion", "mock-26.04")
+        tryCompare(item.outputsReply, "completed", true)
+        verify(Object.keys(item.outputs).length > 0, "A fresh subscription must repopulate outputs")
+        tryCompare(rows, "count", 1)
+        compare(rows.itemAt(0).text, "mock-26.04: make model / 1 modes / VRR false")
+        compare(heading.text, "Outputs (query snapshot) / niri mock-26.04")
+    }
+    function test_dashboardSupersededQueries() {
+        const item = createTemporaryObject(dashboard, tests)
+        tryCompare(item, "niriVersion", "mock-26.04")
+        tryCompare(item.outputsReply, "completed", true)
+        const rows = findChild(item, "dashboardOutputs")
+        verify(rows !== null)
+        examplePeer.delayNextReplies(2)
+        const before = examplePeer.queryCount
+        item.refreshQueries()
+        const oldOutputs = item.outputsReply
+        const oldVersion = item.versionReply
+        tryCompare(examplePeer, "queryCount", before + 2)
+        verify(!oldOutputs.completed && !oldVersion.completed)
+        examplePeer.setQueryResults("new-version")
+        item.refreshQueries()
+        tryCompare(item, "niriVersion", "new-version")
+        tryCompare(item.outputsReply, "completed", true)
+        compare(Object.keys(item.outputs).join(), "new-version")
+        tryCompare(rows, "count", 1)
+        compare(rows.itemAt(0).text, "new-version: make model / 1 modes / VRR false")
+        tryCompare(oldOutputs, "completed", true)
+        tryCompare(oldVersion, "completed", true)
+        verify(!oldOutputs.isError && !oldVersion.isError)
+        compare(item.niriVersion, "new-version", "Older refresh must not replace newer results")
+        compare(Object.keys(item.outputs).join(), "new-version")
+        compare(rows.itemAt(0).text, "new-version: make model / 1 modes / VRR false")
+    }
+    function test_documentationSupersededQueries_data() {
+        return documentationSnippets.filter(function(row) {
+            return row.source.includes('objectName: "versionQuery"')
+                    || row.source.includes('objectName: "rawQuery"')
+        })
+    }
+    function test_documentationSupersededQueries(row) {
+        examplePeer.delayNextReplies(1)
+        const before = examplePeer.queryCount
+        const item = createTemporaryQmlObject(row.source, tests, row.path)
+        verify(item !== null)
+        const old = item.pending
+        tryCompare(examplePeer, "queryCount", before + 1)
+        verify(!old.completed)
+        examplePeer.setQueryResults("new-version")
+        item.refresh()
+        tryCompare(item, "version", "new-version")
+        tryCompare(old, "completed", true)
+        verify(!old.isError)
+        compare(item.version, "new-version", "A captured old reply must not overwrite current data")
     }
     function test_windowList() {
         const item = createTemporaryObject(windowList, tests)
