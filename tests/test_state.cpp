@@ -57,6 +57,133 @@ class TestState : public QObject
 private slots:
     void init() { NiriSession::instance()->stop(); }
     void cleanup() { NiriSession::instance()->stop(); }
+    void optionalTouchpadState()
+    {
+        State s;
+        QVERIFY(!s.touchpadOn());
+        QVERIFY(!s.initialStateReceived());
+        const auto baseline = s.replicate();
+        QCOMPARE(baseline.last().kind(), NiriEvent::CastsChanged);
+        const auto off = NiriEvent::fromTouchpadToggled({false, {}});
+        auto result = s.apply(off, 0);
+        QVERIFY(result.changes.touchpad && result.changes.changed());
+        QCOMPARE(s.touchpadOn(), std::optional<bool>(false));
+        QVERIFY(!s.initialStateReceived());
+        QVERIFY(!s.apply(off, 0).changes.changed());
+        const auto replica = s.replicate();
+        QCOMPARE(replica[replica.size() - 2].kind(), NiriEvent::CastsChanged);
+        QCOMPARE(replica.last().kind(), NiriEvent::TouchpadToggled);
+        State restored;
+        for (const auto &event : replica)
+            restored.apply(event, 0);
+        QCOMPARE(restored.touchpadOn(), s.touchpadOn());
+        QVERIFY(restored.initialStateReceived());
+        QVERIFY(s.reset(1, "replacement").touchpad);
+        QVERIFY(!s.touchpadOn());
+        QCOMPARE(s.apply(off, 0).status, State::ApplyResult::StaleEpoch);
+        QVERIFY(!s.touchpadOn());
+    }
+    void touchpadConsumerReadinessAndReset()
+    {
+        StateStreamFixture stream;
+        QVERIFY(stream.start());
+        auto *state = NiriState::instance();
+        auto *events = NiriEvents::instance();
+        QSignalSpy changed(state, &NiriState::touchpadOnChanged);
+        QSignalSpy ready(state, &NiriState::initialStateReceivedChanged);
+        QQmlEngine engine;
+        engine.addImportPath(QCoreApplication::applicationDirPath());
+        QQmlComponent component(&engine);
+        component.setData(R"(
+            import QtQml
+            import Niri
+            QtObject {
+                property var on: NiriState.touchpadOn
+                property bool ready: NiriState.initialStateReceived
+            }
+        )",
+                          QUrl());
+        QScopedPointer<QObject> root(component.create());
+        QVERIFY2(root, qPrintable(component.errorString()));
+        QCOMPARE(root->property("on").metaType(), QMetaType::fromType<std::nullptr_t>());
+        State empty;
+        for (const auto &event : empty.replicate())
+            stream.send(encoded(event));
+        QTRY_VERIFY(root->property("ready").toBool());
+        QCOMPARE(ready.size(), 1);
+        QCOMPARE(changed.size(), 0);
+        QVERIFY(!state->touchpadOn());
+        QCOMPARE(root->property("on").metaType(), QMetaType::fromType<std::nullptr_t>());
+        bool committedBeforeEvent = false;
+        QObject observerContext;
+        const auto observer =
+                connect(events, &NiriEvents::touchpadToggled, &observerContext,
+                        [&](bool on) { committedBeforeEvent = state->touchpadOn() == on; });
+        stream.send("{\"TouchpadToggled\":{\"on\":false}}");
+        QTRY_COMPARE(changed.size(), 1);
+        QVERIFY(committedBeforeEvent);
+        QCOMPARE(root->property("on").metaType(), QMetaType::fromType<bool>());
+        QCOMPARE(root->property("on").toBool(), false);
+        QCOMPARE(state->snapshot()["touchpadOn"].toBool(), false);
+        QScopedPointer<NiriState> late(NiriState::create(&engine, &engine));
+        QCOMPARE(late->touchpadOn(), std::optional<bool>(false));
+        stream.send("{\"TouchpadToggled\":{\"on\":true}}");
+        QTRY_COMPARE(changed.size(), 2);
+        QCOMPARE(root->property("on").toBool(), true);
+        QCOMPARE(late->touchpadOn(), std::optional<bool>(true));
+        stream.send("{\"TouchpadToggled\":{\"on\":true}}");
+        QTest::qWait(20);
+        QCOMPARE(changed.size(), 2);
+        QCOMPARE(ready.size(), 1);
+        NiriSession::instance()->stop();
+        QCOMPARE(changed.size(), 3);
+        QVERIFY(!late->touchpadOn());
+        QCOMPARE(root->property("on").metaType(), QMetaType::fromType<std::nullptr_t>());
+        QVERIFY(!root->property("ready").toBool());
+        disconnect(observer);
+    }
+    void newerCastsRemainDistinct()
+    {
+        State s;
+        NiriCast a, b;
+        a.streamId = 1;
+        b.streamId = 2;
+        a.sessionId = b.sessionId = 99;
+        a.kind = NiriCastKind(NiriCastKind::ExtImageCopyCapture);
+        b.kind = NiriCastKind(NiriCastKind::ExtImageCopyCaptureCursor);
+        a.target = b.target = NiriCastTarget::fromNothing({});
+        s.apply(NiriEvent::fromCastsChanged({{a, b}, {}}), 0);
+        QCOMPARE(s.castCount(), 2);
+        QCOMPARE(s.cast(1)->kind.kind(), NiriCastKind::ExtImageCopyCapture);
+        QCOMPARE(s.cast(2)->kind.kind(), NiriCastKind::ExtImageCopyCaptureCursor);
+        StateStreamFixture stream;
+        QVERIFY(stream.start());
+        stream.send(encoded(NiriEvent::fromCastsChanged({{a, b}, {}})));
+        auto *state = NiriState::instance();
+        QTRY_COMPARE(state->castCount(), 2);
+        QCOMPARE(state->nativeCast(1)->kind.kind(), NiriCastKind::ExtImageCopyCapture);
+        QCOMPARE(state->nativeCast(2)->kind.kind(), NiriCastKind::ExtImageCopyCaptureCursor);
+        QQmlEngine engine;
+        engine.addImportPath(QCoreApplication::applicationDirPath());
+        QQmlComponent component(&engine);
+        component.setData(R"(
+            import QtQml
+            import Niri
+            QtObject {
+                property bool observed: NiriState.castsByStreamId["1"].kind.known
+                    && NiriState.castsByStreamId["1"].kind.kind === NiriCastKind.ExtImageCopyCapture
+                    && NiriState.castsByStreamId["2"].kind.kind === NiriCastKind.ExtImageCopyCaptureCursor
+                    && NiriState.castsByStreamId["1"].sessionId === NiriState.castsByStreamId["2"].sessionId
+            }
+        )",
+                          QUrl());
+        QScopedPointer<QObject> root(component.create());
+        QVERIFY2(root, qPrintable(component.errorString()));
+        QVERIFY(root->property("observed").toBool());
+        s.apply(NiriEvent::fromCastStopped({1, {}}), 0);
+        QVERIFY(!s.cast(1));
+        QVERIFY(s.cast(2));
+    }
     void focusMatrix()
     {
         State s;

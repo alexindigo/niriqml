@@ -122,6 +122,19 @@
   {
     "arguments": [
       {
+        "name": "on",
+        "type": {
+          "kind": "boolean"
+        },
+        "wire": "on"
+      }
+    ],
+    "signal": "touchpadToggled",
+    "variant": "TouchpadToggled"
+  },
+  {
+    "arguments": [
+      {
         "name": "windowId",
         "type": {
           "format": "uint64",

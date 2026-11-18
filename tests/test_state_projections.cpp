@@ -15,6 +15,7 @@
 #include <QQmlComponent>
 #include <QSignalSpy>
 #include <limits>
+#include <type_traits>
 
 namespace {
 using S = NiriEventStreamState;
@@ -86,6 +87,137 @@ QSet<int> roles(const QSignalSpy &spy, int row)
 {
     const auto list = spy.at(row).at(2).value<QList<int>>();
     return QSet<int>(list.cbegin(), list.cend());
+}
+
+template <typename Tracker>
+void selectorPublicationCase(const QString &boundary, bool earlier, const QString &update,
+                             bool retarget, bool named)
+{
+    constexpr bool workspace = std::is_same_v<Tracker, NiriWorkspaceReactive>;
+    StateStreamFixture stream;
+    QVERIFY(stream.start());
+    QObject scope;
+    QQmlEngine engine;
+    std::unique_ptr<Tracker> target, peer;
+    auto select = [named](Tracker &tracker, bool second) {
+        if constexpr (workspace) {
+            if (named) {
+                tracker.setWorkspaceName(second ? "two" : "one");
+                return;
+            }
+            tracker.setWorkspaceId(second ? 2 : 1);
+        } else {
+            tracker.setWindowId(second ? 2 : 1);
+        }
+    };
+    auto changeSelector = [&] {
+        if constexpr (workspace) {
+            if (named)
+                target->setWorkspaceName(retarget ? "two" : "");
+            else
+                target->setWorkspaceId(retarget ? std::optional<quint64>(2) : std::nullopt);
+        } else {
+            target->setWindowId(retarget ? std::optional<quint64>(2) : std::nullopt);
+        }
+    };
+    bool armed = false, triggered = false;
+    auto callback = [&] {
+        if (armed && !triggered) {
+            triggered = true;
+            changeSelector();
+        }
+    };
+    const QByteArray recordName = workspace ? "workspace" : "window";
+    const QByteArray fieldName = workspace ? "output" : "title";
+    const QByteArray selectorName =
+            workspace ? (named ? "workspaceName" : "workspaceId") : "windowId";
+    auto signal = [](QObject *object, const QByteArray &property) {
+        return object->metaObject()
+                ->property(object->metaObject()->indexOfProperty(property))
+                .notifySignal();
+    };
+    auto installCallback = [&] {
+        if (boundary == "session") {
+            QObject::connect(NiriSession::instance(), &NiriSession::stateUpdated, &scope,
+                             [&](const auto &) { callback(); });
+        } else if (boundary == "state") {
+            auto *state = NiriState::create(&engine, &engine);
+            if constexpr (workspace)
+                QObject::connect(state, &NiriState::workspacesChanged, &scope, callback);
+            else
+                QObject::connect(state, &NiriState::windowsChanged, &scope, callback);
+        } else {
+            peer = std::make_unique<Tracker>();
+            select(*peer, false);
+            if constexpr (workspace)
+                QObject::connect(peer.get(), &NiriWorkspaceReactive::workspaceChanged, &scope,
+                                 callback);
+            else
+                QObject::connect(peer.get(), &NiriWindowReactive::windowChanged, &scope, callback);
+        }
+    };
+    if (earlier)
+        installCallback();
+    target = std::make_unique<Tracker>();
+    select(*target, false);
+    if (!earlier)
+        installCallback();
+    auto firstWindow = win(1), secondWindow = win(2);
+    auto firstWorkspace = ws(1, "one", QString("one"));
+    auto secondWorkspace = ws(2, "two", QString("two"));
+    if constexpr (workspace)
+        QVERIFY(send(stream,
+                     NiriEvent::fromWorkspacesChanged({{firstWorkspace, secondWorkspace}, {}})));
+    else
+        QVERIFY(send(stream, NiriEvent::fromWindowsChanged({{firstWindow, secondWindow}, {}})));
+    QVERIFY(target->valid());
+    QSignalSpy record(target.get(), signal(target.get(), recordName));
+    QSignalSpy field(target.get(), signal(target.get(), fieldName));
+    QSignalSpy valid(target.get(), signal(target.get(), "valid"));
+    QSignalSpy id(target.get(), signal(target.get(), "id"));
+    QSignalSpy selector(target.get(), signal(target.get(), selectorName));
+    QQmlComponent component(&engine);
+    component.setData("import QtQml\nQtObject { required property QtObject tracker; "
+                      "property var record: tracker."
+                              + recordName
+                              + "; "
+                                "property string seenId: record === null ? 'none' : record.id; "
+                                "property string seenField: record === null ? 'none' : record."
+                              + fieldName + "; }",
+                      QUrl());
+    QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+    QScopedPointer<QObject> consumer(component.createWithInitialProperties(
+            {{"tracker", QVariant::fromValue(target.get())}}));
+    QVERIFY2(consumer, qPrintable(component.errorString()));
+    QCOMPARE(consumer->property("seenId").toString(), "1");
+    armed = true;
+    if (update == "reset") {
+        NiriSession::instance()->stop();
+    } else if constexpr (workspace) {
+        firstWorkspace.output = "changed";
+        const QList<NiriWorkspace> records = update == "change"
+                ? QList<NiriWorkspace>{firstWorkspace, secondWorkspace}
+                : QList<NiriWorkspace>{secondWorkspace};
+        QVERIFY(send(stream, NiriEvent::fromWorkspacesChanged({records, {}})));
+    } else {
+        firstWindow.title = "changed";
+        const QList<NiriWindow> records = update == "change"
+                ? QList<NiriWindow>{firstWindow, secondWindow}
+                : QList<NiriWindow>{secondWindow};
+        QVERIFY(send(stream, NiriEvent::fromWindowsChanged({records, {}})));
+    }
+    QVERIFY(triggered);
+    const bool present = retarget && update != "reset";
+    const bool intermediate = !earlier && (update == "change" || (update == "remove" && retarget));
+    QCOMPARE(record.size(), intermediate ? 2 : 1);
+    QCOMPARE(field.size(), intermediate ? 2 : 1);
+    QCOMPARE(selector.size(), 1);
+    QCOMPARE(valid.size(), present ? (!earlier && update == "remove" ? 2 : 0) : 1);
+    QCOMPARE(id.size(), present && !earlier && update == "remove" ? 2 : 1);
+    QCOMPARE(target->valid(), present);
+    QCOMPARE(consumer->property("seenId").toString(), present ? "2" : "none");
+    QCOMPARE(consumer->property("seenField").toString(),
+             present ? (workspace ? "two" : "2") : "none");
 }
 } // namespace
 
@@ -517,6 +649,54 @@ private slots:
         QCOMPARE(workspaces.rowCount(), 0);
         QCOMPARE(late->rowCount(), 0);
         QVERIFY(!NiriState::instance()->initialStateReceived());
+    }
+
+    void selectorPublication_data()
+    {
+        QTest::addColumn<bool>("workspace");
+        QTest::addColumn<bool>("named");
+        QTest::addColumn<QString>("boundary");
+        QTest::addColumn<bool>("earlier");
+        QTest::addColumn<QString>("update");
+        QTest::addColumn<bool>("retarget");
+        for (bool workspace : {false, true}) {
+            for (bool named : {false, true}) {
+                if (named && !workspace)
+                    continue;
+                for (const QString &boundary :
+                     {QString("session"), QString("state"), QString("peer")}) {
+                    for (bool earlier : {false, true}) {
+                        for (const QString &update :
+                             {QString("change"), QString("remove"), QString("reset")}) {
+                            for (bool retarget : {false, true}) {
+                                const QString name =
+                                        QString("%1-%2-%3-%4-%5-%6")
+                                                .arg(workspace ? "workspace" : "window",
+                                                     named ? "name" : "id", boundary,
+                                                     earlier ? "before" : "after", update,
+                                                     retarget ? "retarget" : "clear");
+                                QTest::newRow(qPrintable(name)) << workspace << named << boundary
+                                                                << earlier << update << retarget;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    void selectorPublication()
+    {
+        QFETCH(bool, workspace);
+        QFETCH(bool, named);
+        QFETCH(QString, boundary);
+        QFETCH(bool, earlier);
+        QFETCH(QString, update);
+        QFETCH(bool, retarget);
+        if (workspace)
+            selectorPublicationCase<NiriWorkspaceReactive>(boundary, earlier, update, retarget,
+                                                           named);
+        else
+            selectorPublicationCase<NiriWindowReactive>(boundary, earlier, update, retarget, false);
     }
 
     void qmlLateLoader()

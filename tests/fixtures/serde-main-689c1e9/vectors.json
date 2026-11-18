@@ -1,0 +1,424 @@
+{
+  "newerDefaultExamples": [
+    {
+      "Quit": {
+        "skip_confirmation": false
+      }
+    },
+    {
+      "Screenshot": {
+        "path": null,
+        "show_pointer": true
+      }
+    },
+    {
+      "MoveFloatingWindow": {
+        "id": null,
+        "x": {
+          "AdjustFixed": 0.0
+        },
+        "y": {
+          "AdjustFixed": 0.0
+        }
+      }
+    }
+  ],
+  "source": {
+    "commit": "689c1e914a5af782a476e433b79c15554bf5a312",
+    "release": "main-689c1e9"
+  },
+  "vectors": [
+    {
+      "name": "Action.ChangeVt.0",
+      "type": "Action",
+      "value": {
+        "ChangeVt": {
+          "vt": 2
+        }
+      }
+    },
+    {
+      "name": "Action.ToggleTouchpad.1",
+      "type": "Action",
+      "value": {
+        "ToggleTouchpad": {}
+      }
+    },
+    {
+      "name": "Action.SetWindowFullscreen.2",
+      "type": "Action",
+      "value": {
+        "SetWindowFullscreen": {
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "Action.UnsetWindowFullscreen.3",
+      "type": "Action",
+      "value": {
+        "UnsetWindowFullscreen": {
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "Action.SetWindowMaximizedToEdges.4",
+      "type": "Action",
+      "value": {
+        "SetWindowMaximizedToEdges": {
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "Action.UnsetWindowMaximizedToEdges.5",
+      "type": "Action",
+      "value": {
+        "UnsetWindowMaximizedToEdges": {
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "Action.SetWindowedFullscreen.6",
+      "type": "Action",
+      "value": {
+        "SetWindowedFullscreen": {
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "Action.UnsetWindowedFullscreen.7",
+      "type": "Action",
+      "value": {
+        "UnsetWindowedFullscreen": {
+          "id": null
+        }
+      }
+    },
+    {
+      "name": "Action.SetWindowFullscreen.8",
+      "type": "Action",
+      "value": {
+        "SetWindowFullscreen": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "Action.UnsetWindowFullscreen.9",
+      "type": "Action",
+      "value": {
+        "UnsetWindowFullscreen": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "Action.SetWindowMaximizedToEdges.10",
+      "type": "Action",
+      "value": {
+        "SetWindowMaximizedToEdges": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "Action.UnsetWindowMaximizedToEdges.11",
+      "type": "Action",
+      "value": {
+        "UnsetWindowMaximizedToEdges": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "Action.SetWindowedFullscreen.12",
+      "type": "Action",
+      "value": {
+        "SetWindowedFullscreen": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "Action.UnsetWindowedFullscreen.13",
+      "type": "Action",
+      "value": {
+        "UnsetWindowedFullscreen": {
+          "id": 18446744073709551615
+        }
+      }
+    },
+    {
+      "name": "MaxBpc.6",
+      "type": "MaxBpc",
+      "value": "6"
+    },
+    {
+      "name": "OutputAction.MaxBpc.6",
+      "type": "OutputAction",
+      "value": {
+        "MaxBpc": {
+          "max_bpc": "6"
+        }
+      }
+    },
+    {
+      "name": "Request.MaxBpc.6",
+      "type": "Request",
+      "value": {
+        "Output": {
+          "action": {
+            "MaxBpc": {
+              "max_bpc": "6"
+            }
+          },
+          "output": "DP-1"
+        }
+      }
+    },
+    {
+      "name": "MaxBpc.8",
+      "type": "MaxBpc",
+      "value": "8"
+    },
+    {
+      "name": "OutputAction.MaxBpc.8",
+      "type": "OutputAction",
+      "value": {
+        "MaxBpc": {
+          "max_bpc": "8"
+        }
+      }
+    },
+    {
+      "name": "Request.MaxBpc.8",
+      "type": "Request",
+      "value": {
+        "Output": {
+          "action": {
+            "MaxBpc": {
+              "max_bpc": "8"
+            }
+          },
+          "output": "DP-1"
+        }
+      }
+    },
+    {
+      "name": "MaxBpc.10",
+      "type": "MaxBpc",
+      "value": "10"
+    },
+    {
+      "name": "OutputAction.MaxBpc.10",
+      "type": "OutputAction",
+      "value": {
+        "MaxBpc": {
+          "max_bpc": "10"
+        }
+      }
+    },
+    {
+      "name": "Request.MaxBpc.10",
+      "type": "Request",
+      "value": {
+        "Output": {
+          "action": {
+            "MaxBpc": {
+              "max_bpc": "10"
+            }
+          },
+          "output": "DP-1"
+        }
+      }
+    },
+    {
+      "name": "MaxBpc.12",
+      "type": "MaxBpc",
+      "value": "12"
+    },
+    {
+      "name": "OutputAction.MaxBpc.12",
+      "type": "OutputAction",
+      "value": {
+        "MaxBpc": {
+          "max_bpc": "12"
+        }
+      }
+    },
+    {
+      "name": "Request.MaxBpc.12",
+      "type": "Request",
+      "value": {
+        "Output": {
+          "action": {
+            "MaxBpc": {
+              "max_bpc": "12"
+            }
+          },
+          "output": "DP-1"
+        }
+      }
+    },
+    {
+      "name": "MaxBpc.14",
+      "type": "MaxBpc",
+      "value": "14"
+    },
+    {
+      "name": "OutputAction.MaxBpc.14",
+      "type": "OutputAction",
+      "value": {
+        "MaxBpc": {
+          "max_bpc": "14"
+        }
+      }
+    },
+    {
+      "name": "Request.MaxBpc.14",
+      "type": "Request",
+      "value": {
+        "Output": {
+          "action": {
+            "MaxBpc": {
+              "max_bpc": "14"
+            }
+          },
+          "output": "DP-1"
+        }
+      }
+    },
+    {
+      "name": "MaxBpc.16",
+      "type": "MaxBpc",
+      "value": "16"
+    },
+    {
+      "name": "OutputAction.MaxBpc.16",
+      "type": "OutputAction",
+      "value": {
+        "MaxBpc": {
+          "max_bpc": "16"
+        }
+      }
+    },
+    {
+      "name": "Request.MaxBpc.16",
+      "type": "Request",
+      "value": {
+        "Output": {
+          "action": {
+            "MaxBpc": {
+              "max_bpc": "16"
+            }
+          },
+          "output": "DP-1"
+        }
+      }
+    },
+    {
+      "name": "CastKind.ExtImageCopyCapture",
+      "type": "CastKind",
+      "value": "ExtImageCopyCapture"
+    },
+    {
+      "name": "CastKind.ExtImageCopyCaptureCursor",
+      "type": "CastKind",
+      "value": "ExtImageCopyCaptureCursor"
+    },
+    {
+      "name": "Event.TouchpadToggled.false",
+      "type": "Event",
+      "value": {
+        "TouchpadToggled": {
+          "on": false
+        }
+      }
+    },
+    {
+      "name": "Event.TouchpadToggled.true",
+      "type": "Event",
+      "value": {
+        "TouchpadToggled": {
+          "on": true
+        }
+      }
+    },
+    {
+      "name": "Output.None",
+      "type": "Output",
+      "value": {
+        "current_mode": null,
+        "is_custom_mode": false,
+        "logical": null,
+        "make": "make",
+        "max_bpc": null,
+        "model": "model",
+        "modes": [],
+        "name": "DP-1",
+        "physical_size": null,
+        "serial": null,
+        "vrr_enabled": false,
+        "vrr_supported": false
+      }
+    },
+    {
+      "name": "Output.Some(10)",
+      "type": "Output",
+      "value": {
+        "current_mode": null,
+        "is_custom_mode": false,
+        "logical": null,
+        "make": "make",
+        "max_bpc": 10,
+        "model": "model",
+        "modes": [],
+        "name": "DP-1",
+        "physical_size": null,
+        "serial": null,
+        "vrr_enabled": false,
+        "vrr_supported": false
+      }
+    },
+    {
+      "name": "Output.Some(0)",
+      "type": "Output",
+      "value": {
+        "current_mode": null,
+        "is_custom_mode": false,
+        "logical": null,
+        "make": "make",
+        "max_bpc": 0,
+        "model": "model",
+        "modes": [],
+        "name": "DP-1",
+        "physical_size": null,
+        "serial": null,
+        "vrr_enabled": false,
+        "vrr_supported": false
+      }
+    },
+    {
+      "name": "Output.Some(255)",
+      "type": "Output",
+      "value": {
+        "current_mode": null,
+        "is_custom_mode": false,
+        "logical": null,
+        "make": "make",
+        "max_bpc": 255,
+        "model": "model",
+        "modes": [],
+        "name": "DP-1",
+        "physical_size": null,
+        "serial": null,
+        "vrr_enabled": false,
+        "vrr_supported": false
+      }
+    }
+  ]
+}

@@ -122,7 +122,7 @@ QList<T> ordered(const QMap<quint64, State::Entry<T>> &map)
 bool State::Changes::changed() const
 {
     return !windows.isEmpty() || !workspaces.isEmpty() || !casts.isEmpty() || keyboardLayouts
-            || overview || config || readiness;
+            || overview || config || readiness || touchpad;
 }
 
 State::ApplyResult State::apply(const NiriEvent &event, quint64 token)
@@ -325,6 +325,12 @@ State::ApplyResult State::apply(const NiriEvent &event, quint64 token)
         put(m_casts, c.casts, p.streamId, Entry<NiriCast>{});
         break;
     }
+    case NiriEvent::TouchpadToggled: {
+        PAYLOAD(TouchpadToggled);
+        c.touchpad = m_touchpad != p.on;
+        m_touchpad = p.on;
+        break;
+    }
     case NiriEvent::ScreenshotCaptured:
     case NiriEvent::Unknown:
     case NiriEvent::Invalid:
@@ -352,7 +358,9 @@ State::Changes State::reset(quint64 token, const QString &reason)
     c.overview = m_overview;
     c.config = m_config;
     c.readiness = m_ready;
+    c.touchpad = m_touchpad.has_value();
     m_layouts.reset();
+    m_touchpad.reset();
     m_overview = m_config = m_ready = false;
     m_epoch = token;
     updateIndexes(c);
@@ -361,7 +369,9 @@ State::Changes State::reset(quint64 token, const QString &reason)
 
 QList<NiriEvent> State::replicate() const
 {
-    // state.rs:97-105,240-247: layouts optional, casts always last.
+    // v26.04 state.rs:97-105: casts ends the released six-part burst.
+    // Pinned main appends touchpad after casts (state.rs:120). Do not invent
+    // a touchpad value when this optional extension has not been received.
     QList<NiriEvent> result{NiriEvent::fromWorkspacesChanged({workspacesSnapshot(), {}}),
                             NiriEvent::fromWindowsChanged({windowsSnapshot(), {}})};
     if (m_layouts)
@@ -369,6 +379,8 @@ QList<NiriEvent> State::replicate() const
     result.append(NiriEvent::fromOverviewOpenedOrClosed({m_overview, {}}));
     result.append(NiriEvent::fromConfigLoaded({m_config, {}}));
     result.append(NiriEvent::fromCastsChanged({castsSnapshot(), {}}));
+    if (m_touchpad)
+        result.append(NiriEvent::fromTouchpadToggled({*m_touchpad, {}}));
     return result;
 }
 

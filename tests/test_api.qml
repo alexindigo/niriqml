@@ -3,7 +3,40 @@ import QtQuick
 import QtTest
 
 TestCase {
+    id: root
     name: "NiriModule"
+
+    property string observedTitle: NiriState.focusedWindowTitle || ""
+    property var pending: null
+    property bool replyFinished: false
+    property var result: null
+
+    function test_behavioralConsumers() {
+        tryCompare(NiriState, "initialStateReceived", true)
+        compare(NiriState.windowCount, 1)
+        compare(NiriState.focusedWindowId, "7")
+        compare(observedTitle, "Mock title")
+        pending = NiriRequests.windows()
+        // Attach after return, retaining the exact reply in the closure.
+        const reply = pending
+        reply.finished.connect(function() {
+            root.result = reply.result
+            root.replyFinished = true
+        })
+        tryCompare(root, "replyFinished", true)
+        verify(!reply.isError)
+        compare(result.length, 1)
+        compare(result[0].id, "7")
+        compare(result[0].title, "Mock title")
+        compare(result[0].appId, null)
+        replyFinished = false
+        pending = NiriActions.focusWindow("7")
+        const action = pending
+        action.finished.connect(function() { root.replyFinished = true })
+        tryCompare(root, "replyFinished", true)
+        verify(!action.isError)
+        compare(action.result.wireName, "Handled")
+    }
 
     function test_singletonsResolvable() {
         verify(NiriConnection, "NiriConnection singleton not found")

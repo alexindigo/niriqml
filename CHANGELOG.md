@@ -1,26 +1,66 @@
 # Changelog
 
+## Unreleased
+
+### Breaking changes and migration
+
+| # | Change | Migration |
+|---|---|---|
+| 1 | QML IDs and wide integer counters/indices are decimal strings | Keep IDs as strings, including model roles/event arguments; use string equality and never Number(id). Native IDs remain quint64; exact numeric typed inputs are accepted. |
+| 2 | Optional values are real null | Replace zero/empty/default sentinels with null checks. ID zero is valid; false/empty/zero are present values. Full replacements clear absent fields. |
+| 3 | Replies no longer auto-delete on finished | Retain QML references while waiting/displaying; native callers delete retained replies or supply sendWire ownership. cancel is local only. Completion is always queued; inspect completed for late observers. |
+| 4 | Monitor move focus parameter removed | Use moveWindowToMonitor(windowId, output); wire target is id, as for width/height. Workspace moves retain window_id and require explicit focus bool. |
+| 5 | Typed helper arguments no longer infer workspace/size variants from scalars | Use NiriArgs values or tagged objects such as {Id: workspaceId}, {SetFixed: 800}; use explicit null slots before required arguments. |
+| 6 | NiriState.stateChanged means exposed state changed | Use NiriEvents.rawEvent to count traffic, including equal/transient events. Narrow property/role notifications suppress irrelevant changes. |
+| 7 | Any consumer starts the shared session | No Connection/Events bootstrap or query seeding needed. Explicit stop persists through later consumer creation; start resumes. Endpoint selection never falls back based on liveness. |
+| 8 | Installation is target-based with a backing library and exported package | Use cmake --install, not copied build products. Select NIRIQML_INSTALL_QMLDIR without /Niri; private prefixes need the import root on QML_IMPORT_PATH. Link niriqml::niriqml from the installed CMake package. |
+| 9 | Raw diagnostic payload is var, not object-only | Native rawEvent/decodeError callbacks accept QVariant, preserving future scalar/array/null/unit bodies. Legacy QJson callbacks are explicitly lossy adapters. |
+
+### Features and corrections
+
+The pinned release-derived generator covers all 16 requests, 141 actions, nine
+output controls, 14 typed reply kinds and 19 events with every field. An explicit
+second pinned schema adds eight actions, MaxBpc control/enum, optional maxBpc,
+two cast kinds and TouchpadToggled without relaxing released required fields.
+Newer operations may fail on older niri. touchpadOn is null until its event;
+readiness still covers the six released parts at CastsChanged.
+
+Lossless raw JSON/envelopes, exact IDs, structured errors/delivery certainty,
+deadlines, cancellation and ordered sequences share one operation path. One
+canonical reducer drives current state, models, trackers and snapshots through
+reconnect/reset; queries never seed it. Peer metadata and opt-in logging remain
+available. Event history handles zero/negative capacity and every row removal.
+
+The protocol-faithful mock, independent native serde vectors, real QML consumer
+lane and isolated headless niri harness verify wire, state and representative
+action outcomes. Examples and extracted documentation use exported QML names;
+dashboard workspace clicks select a local detail view, not compositor focus.
+Generated API/schema/mapping docs have a deterministic staleness check. See
+[API.md](API.md), [DESIGN.md](DESIGN.md) and [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+Historical entries below describe their original implementation, not the current
+ID/null/lifetime or completeness contract. No release version is assigned here.
+
 ## 2026-08-07
 
 ### Feature
 
-- `NiriConnection.peerInfo` — returns a `PeerInfo` gadget (pid, uid, gid,
+- `NiriConnection.peerInfo` - returns a `PeerInfo` gadget (pid, uid, gid,
   peerSecurityContext) with the compositor's identity via
-  `SO_PEERCRED`/`getsockopt`. Kernel-authoritative — no /proc scanning
+  `SO_PEERCRED`/`getsockopt`. Kernel-authoritative - no /proc scanning
   needed. Unblocks Atmosphera's session-config feature (`4aa88d1`)
 
 ### Fix
 
-- Dropped `peerSocketPath` from `PeerInfo` — `SO_PEERNAME` is not a valid
+- Dropped `peerSocketPath` from `PeerInfo` - `SO_PEERNAME` is not a valid
   socket option on Linux, and the value is redundant with the existing
   `socketPath` property (`b071699`)
-- `connectToSocket()` now guards against an empty socket path — no more
+- `connectToSocket()` now guards against an empty socket path - no more
   `QLocalSocket::connectToServer: Invalid name` warning when `NIRI_SOCKET`
   is unset (`ccaa478`)
 
 ### Docs
 
-- `KNOWN_ISSUES.md` — documents niri 26.04 "error writing reply" / Broken
+- `KNOWN_ISSUES.md` - documents niri 26.04 "error writing reply" / Broken
   pipe WARN. Confirmed as a niri-side bug (missing `BrokenPipe` guard in
   `handle_client()`). Fix submitted upstream via mailing list patch
   (`3a42d97`)
@@ -34,14 +74,14 @@
   workspace; the old code silently dropped `id==0`, keeping the last
   focused window's state stale forever (`11ce8b0`, `b219c86`)
 - NiriConnection shutdown SIGSEGV: the implicit destructor called
-  `~QLocalSocket() → disconnectFromHost()` which started a QTimer while
+  `~QLocalSocket() -> disconnectFromHost()` which started a QTimer while
   Qt's event dispatcher was half-gone. Explicit destructor now calls
   `abort()` (immediate close) and stops the reconnect timer first
   (`4bc7b95`)
 - NiriRequests timeout timer upgraded from `killTimer()` to `QTimer*`
   with context-bound connection. When a reply arrives before the
   timeout fires, `deleteLater` on the timer severs the connection
-  automatically — prevents use-after-free from a late/spurious timeout
+  automatically - prevents use-after-free from a late/spurious timeout
   lambda dereferencing freed `PendingRequest` (`d41eb31`)
 
 All three found and validated in Atmosphera integration testing.
@@ -75,7 +115,7 @@ regression test verified to fail on pre-fix code.
 
 ### Feature
 
-Initial public release of niriqml — typed, reactive QML bindings for the niri
+Initial public release of niriqml - typed, reactive QML bindings for the niri
 Wayland compositor IPC. The library provides a full QML-native API surface:
 zero JSON parsing in QML, no polling, auto-reconnect with cached snapshots for
 late subscribers. Tested against niri 26.04.
@@ -86,7 +126,7 @@ late subscribers. Tested against niri 26.04.
   NiriOutput, NiriKeyboardLayouts, etc.) with QML_VALUE_TYPE registration and
   operator== for Q_PROPERTY change detection (`a7b47f1`)
 - Dynamic JSON-to-gadget converter using Q_PROPERTY reflection, auto
-  camelCase↔snake_case, null-safe and extra-key-safe (`a35b26d`)
+  camelCase/snake_case, null-safe and extra-key-safe (`a35b26d`)
 - Typed event dispatch: 14 signals (one per niri event) plus rawEvent
   catchall; cached snapshots bootstrap late subscribers with consistent
   isFocused state (`374abbd`)
