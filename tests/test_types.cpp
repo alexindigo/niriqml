@@ -17,8 +17,8 @@ void TestTypes::niriWindowDefaults()
 {
     NiriWindow w;
     QCOMPARE(w.id, 0u);
-    QVERIFY(w.title.isEmpty());
-    QVERIFY(w.appId.isEmpty());
+    QVERIFY(!w.title.has_value());
+    QVERIFY(!w.appId.has_value());
 }
 
 QTEST_MAIN(TestTypes)

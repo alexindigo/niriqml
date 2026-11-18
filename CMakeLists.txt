@@ -29,6 +29,8 @@ set(NIRIQML_SOURCES
     niriconnection.h
     nirisession.cpp
     nirisession.h
+    nirieventstreamstate.cpp
+    nirieventstreamstate.h
     niripeerinfo.cpp
     niripeerinfo.h
     nirilogging.cpp
@@ -39,6 +41,10 @@ set(NIRIQML_SOURCES
     niriactions.h
     nirirequests.cpp
     nirirequests.h
+    nirirequestoperation.cpp
+    nirirequestoperation.h
+    nirirequestsequence.cpp
+    nirirequestsequence.h
     niriwindowsmodel.cpp
     niriwindowsmodel.h
     niriworkspacesmodel.cpp
@@ -49,6 +55,9 @@ set(NIRIQML_SOURCES
     niriworkspacereactive.h
     niristate.cpp
     niristate.h
+    niristateprojection.h
+    niriselectors.h
+    niriselectors.cpp
     niritypes.cpp
     niritypes.h
     niripendingreply.cpp
@@ -64,6 +73,9 @@ set(NIRIQML_SOURCES
     niriwire.cpp
     niriwire.h
 )
+
+include(generated/ipc-generated.cmake)
+list(APPEND NIRIQML_SOURCES ${NIRIQML_GENERATED_SOURCES})
 
 add_library(niriqml SHARED)
 add_library(niriqml::niriqml ALIAS niriqml)
@@ -118,11 +130,16 @@ install(FILES
 install(FILES
     niriconnection.h
     nirisession.h
+    nirieventstreamstate.h
+    niristateprojection.h
+    niriselectors.h
     niripeerinfo.h
     nirilogging.h
     nirievents.h
     niriactions.h
     nirirequests.h
+    nirirequestoperation.h
+    nirirequestsequence.h
     niriwindowsmodel.h
     niriworkspacesmodel.h
     niriwindowreactive.h
@@ -137,6 +154,8 @@ install(FILES
     niriwire.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/niriqml
 )
+install(FILES ${NIRIQML_GENERATED_HEADERS}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/niriqml/generated)
 
 configure_package_config_file(cmake/niriqmlConfig.cmake.in
     ${CMAKE_CURRENT_BINARY_DIR}/niriqmlConfig.cmake
@@ -160,6 +179,16 @@ option(BUILD_TEST_MODE "Build C++ test executables" ON)
 
 if(BUILD_TEST_MODE)
     find_package(Qt6 REQUIRED COMPONENTS QuickTest Test)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    add_library(nirimock STATIC tests/nirimock.cpp tests/nirimock.h)
+    target_link_libraries(nirimock PUBLIC niriqml Qt6::Network)
+    target_compile_definitions(nirimock PRIVATE
+        NIRIQML_TEST_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
+    enable_testing()
+    add_test(NAME test_generated_staleness
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/generate-ipc.py --check)
+    add_test(NAME test_generator
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_generator.py)
 
     macro(add_niriqml_test NAME)
         add_executable(${NAME} tests/${NAME}.cpp)
@@ -168,7 +197,13 @@ if(BUILD_TEST_MODE)
             Qt6::Core Qt6::Quick Qt6::Test Qt6::Network niriqml
         )
         enable_testing()
-        add_test(NAME ${NAME} COMMAND ${NAME})
+        if("${NAME}" MATCHES "^test_live_")
+            add_test(NAME ${NAME} COMMAND bash
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/live/run-live.sh --suite $<TARGET_FILE:${NAME}>)
+            set_tests_properties(${NAME} PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 200)
+        else()
+            add_test(NAME ${NAME} COMMAND ${NAME})
+        endif()
         set_tests_properties(${NAME} PROPERTIES
             ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
         )
@@ -183,20 +218,35 @@ if(BUILD_TEST_MODE)
     add_niriqml_test(test_wire)
     add_niriqml_test(test_session)
     add_niriqml_test(test_session_review)
+    add_niriqml_test(test_requests)
+    add_niriqml_test(test_codec)
+    add_niriqml_test(test_generated_actions)
+    add_niriqml_test(test_generated_requests)
+    add_niriqml_test(test_generated_events)
+    add_niriqml_test(test_state)
+    add_niriqml_test(test_state_projections)
+    add_niriqml_test(test_projection_reset)
+    add_niriqml_test(test_eventlog)
+    add_niriqml_test(test_ipc_inventory)
     add_niriqml_test(test_types)
     add_niriqml_test(test_converter)
     add_niriqml_test(test_events)
+    add_niriqml_test(test_mock)
+    target_link_libraries(test_mock PRIVATE nirimock)
     add_niriqml_test(test_live_wire)
     add_niriqml_test(test_live_events)
     add_niriqml_test(test_live_layer2)
     add_niriqml_test(test_live_write)
+    add_niriqml_test(test_live_acceptance)
+    target_compile_definitions(test_live_acceptance PRIVATE
+        NIRIQML_LIVE_SOURCE="${CMAKE_CURRENT_SOURCE_DIR}/tests/live")
 
     add_executable(test_api
         tests/test_api.cpp
     )
     target_include_directories(test_api PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(test_api PRIVATE
-        Qt6::Core Qt6::Quick Qt6::QuickTest Qt6::Network niriqml
+        Qt6::Core Qt6::Quick Qt6::QuickTest Qt6::Network niriqml nirimock
     )
     enable_testing()
     add_test(NAME test_api
@@ -206,6 +256,21 @@ if(BUILD_TEST_MODE)
     set_tests_properties(test_api PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QML_IMPORT_PATH=${CMAKE_CURRENT_BINARY_DIR}"
     )
+    add_executable(test_examples tests/test_examples.cpp)
+    target_link_libraries(test_examples PRIVATE
+        Qt6::Core Qt6::Quick Qt6::QuickTest Qt6::Network niriqml nirimock)
+    target_compile_definitions(test_examples PRIVATE
+        NIRIQML_EXAMPLE_SOURCE="${CMAKE_CURRENT_SOURCE_DIR}")
+    add_test(NAME test_examples COMMAND test_examples
+        -input ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_examples.qml)
+    set_tests_properties(test_examples PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QML_IMPORT_PATH=${CMAKE_CURRENT_BINARY_DIR}"
+        TIMEOUT 120)
+    add_test(NAME test_examples_qmllint COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_qml_examples.py
+        --qmllint $<TARGET_FILE:Qt6::qmllint>
+        --imports ${CMAKE_CURRENT_BINARY_DIR}
+        --output ${CMAKE_CURRENT_BINARY_DIR}/documentation-snippets)
     if(ENABLE_COVERAGE)
         target_compile_options(test_api PRIVATE --coverage -fprofile-abs-path)
         target_link_options(test_api PRIVATE --coverage -fprofile-abs-path)
@@ -213,12 +278,10 @@ if(BUILD_TEST_MODE)
 
     add_executable(test_connection
         tests/test_connection.cpp
-        tests/nirimock.h
-        tests/nirimock.cpp
     )
     target_include_directories(test_connection PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(test_connection PRIVATE
-        Qt6::Core Qt6::Quick Qt6::Test Qt6::Network niriqml
+        Qt6::Core Qt6::Quick Qt6::Test Qt6::Network niriqml nirimock
     )
     enable_testing()
     add_test(NAME test_connection COMMAND test_connection)
@@ -227,6 +290,22 @@ if(BUILD_TEST_MODE)
     )
     add_test(NAME test_scripts COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_scripts.sh
         ${CMAKE_CURRENT_BINARY_DIR}/test_scripts_scratch)
+    add_test(NAME test_fixture_runner COMMAND bash
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_fixture_runner.sh
+        ${CMAKE_CURRENT_BINARY_DIR}/test_fixture_runner_scratch)
+    get_property(_tests DIRECTORY PROPERTY TESTS)
+    foreach(_test IN LISTS _tests)
+        if(_test MATCHES "^test_live_")
+            set_tests_properties(${_test} PROPERTIES LABELS live RUN_SERIAL TRUE)
+        elseif(_test STREQUAL "test_api" OR _test MATCHES "^test_examples")
+            set_tests_properties(${_test} PROPERTIES LABELS qml)
+        else()
+            set_tests_properties(${_test} PROPERTIES LABELS unit)
+        endif()
+    endforeach()
+    set_property(TEST test_session test_session_review test_requests test_codec
+        test_generated_actions test_generated_requests test_generated_events test_state
+        test_state_projections test_projection_reset APPEND PROPERTY LABELS qml)
     if(ENABLE_COVERAGE)
         target_compile_options(test_connection PRIVATE --coverage -fprofile-abs-path)
         target_link_options(test_connection PRIVATE --coverage -fprofile-abs-path)

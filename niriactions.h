@@ -8,8 +8,9 @@
 #include <QtQml/qqmlregistration.h>
 
 #include "niripendingreply.h"
+#include "generated/niriipcactions_generated.h"
 
-class NiriActions : public QObject
+class NiriActions : public NiriIpcActions
 {
     Q_OBJECT
     QML_SINGLETON
@@ -23,18 +24,18 @@ public:
     // The `action` object is what goes inside {"Action": ...}.
     Q_INVOKABLE NiriPendingReply *sendAction(const QJsonObject &action);
 
-    Q_INVOKABLE NiriPendingReply *spawn(const QStringList &command);
-    Q_INVOKABLE NiriPendingReply *focusWindow(quint64 windowId);
-    Q_INVOKABLE NiriPendingReply *closeWindow(quint64 windowId);
-    Q_INVOKABLE NiriPendingReply *moveWindowToWorkspace(quint64 windowId, const QVariant &reference,
-                                                        bool followFocus = true);
-    Q_INVOKABLE NiriPendingReply *moveWindowToMonitor(quint64 windowId, const QString &output,
-                                                      bool followFocus = true);
-    Q_INVOKABLE NiriPendingReply *setWindowWidth(quint64 windowId, const QVariant &change);
-    Q_INVOKABLE NiriPendingReply *setWindowHeight(quint64 windowId, const QVariant &change);
-    Q_INVOKABLE NiriPendingReply *moveColumnToIndex(int index);
-    Q_INVOKABLE NiriPendingReply *toggleWindowFloating(quint64 windowId);
+    // Native compatibility adapters. QML uses the checked generated signatures.
+    using NiriIpcActions::moveWindowToWorkspace;
+    using NiriIpcActions::setWindowHeight;
+    using NiriIpcActions::setWindowWidth;
+    NiriPendingReply *moveWindowToWorkspace(quint64 windowId, const QVariant &reference,
+                                            bool focus);
+    NiriPendingReply *setWindowWidth(quint64 windowId, const QVariant &change);
+    NiriPendingReply *setWindowHeight(quint64 windowId, const QVariant &change);
 
 private:
     explicit NiriActions(QObject *parent = nullptr);
+    NiriPendingReply *sendVariantAction(const QVariant &action);
+    NiriHandledReply *submitAction(const NiriWire::WireValue &action,
+                                   const QString &validationError) override;
 };

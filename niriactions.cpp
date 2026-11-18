@@ -1,15 +1,13 @@
 #include "niriactions.h"
 
 #include <QJSEngine>
-#include <QJsonArray>
 #include <QJsonObject>
-#include <QJsonValue>
 #include <QCoreApplication>
-#include <QPointer>
 #include "nirisession.h"
 
 #include "nirierror.h"
 #include "nirirequests.h"
+#include "generated/niriipccodec_generated.h"
 
 NiriActions *NiriActions::create(QQmlEngine *engine, QJSEngine *jsEngine)
 {
@@ -39,114 +37,93 @@ NiriActions *NiriActions::instance()
     return self;
 }
 
-NiriActions::NiriActions(QObject *parent) : QObject(parent) { }
+NiriActions::NiriActions(QObject *parent) : NiriIpcActions(parent) { }
 
 NiriPendingReply *NiriActions::sendAction(const QJsonObject &action)
 {
+    return sendVariantAction(action.toVariantMap());
+}
+
+NiriPendingReply *NiriActions::sendVariantAction(const QVariant &action)
+{
     if (!NiriSession::checkThread(this))
         return nullptr;
-    auto *reply = new NiriPendingReply(this);
-    QJsonObject request;
-    request["Action"] = action;
-
-    NiriRequests::instance()->send(
-            request,
-            [reply = QPointer<NiriPendingReply>(reply)](bool ok, const QJsonObject &result) {
-                if (!reply)
-                    return;
-                if (ok) {
-                    reply->setFinished(QVariant::fromValue(result.toVariantMap()));
-                } else {
-                    NiriError err;
-                    err.code = -1;
-                    err.message = result.value("error").toString();
-                    reply->setError(err);
-                }
-            });
-    return reply;
+    auto *requests = NiriRequests::instance();
+    NiriRequestOperation::Options options;
+    options.timeoutMs = requests->requestTimeoutMs();
+    options.maxFrameBytes = requests->maxFrameBytes();
+    // Use the same checked conversion boundary as raw requests and sequences.
+    // Native QVariant integers keep IDs exact; rejected input never reaches I/O.
+    QString error;
+    const auto request = NiriRequests::wireValue(QVariantMap{{"Action", action}}, error);
+    return NiriRequests::dispatch(request.value_or(NiriWire::WireValue()), this, options, nullptr,
+                                  {}, error);
 }
 
-// Convert QVariant reference (string or int) to niri WorkspaceReferenceArg JSON.
-// - String → {"Name":"<name>"}
-// - Int    → {"Index":<n>}
-static QJsonObject workspaceReferenceJson(const QVariant &reference)
+NiriHandledReply *NiriActions::submitAction(const NiriWire::WireValue &action,
+                                            const QString &validationError)
 {
-    if (reference.typeId() == QMetaType::QString) {
-        return QJsonObject{{"Name", reference.toString()}};
-    }
-    return QJsonObject{{"Index", reference.toInt()}};
+    if (!NiriSession::checkThread(this))
+        return nullptr;
+    const auto *requests = NiriRequests::instance();
+    NiriRequestOperation::Options options;
+    options.timeoutMs = requests->requestTimeoutMs();
+    options.maxFrameBytes = requests->maxFrameBytes();
+    const auto request = *NiriWire::WireValue::object({{QStringLiteral("Action"), action}});
+    return static_cast<NiriHandledReply *>(NiriRequests::dispatchTyped(
+            request, this, options, QStringLiteral("Handled"), validationError));
 }
 
-// Convert QVariant size to niri SizeChange JSON.
-// Convention: int → SetFixed, double → SetProportion.
-// Advanced: pass a QVariantMap with "SetFixed"/"SetProportion"/"AdjustFixed"/"AdjustProportion" key.
-static QJsonObject sizeChangeJson(const QVariant &change)
+namespace {
+template <typename T>
+bool legacyArgument(const QVariant &input, T &value, QString &error)
 {
-    if (change.typeId() == QMetaType::QVariantMap) {
-        return QJsonObject::fromVariantMap(change.toMap());
-    }
-    if (change.typeId() == QMetaType::Double) {
-        return QJsonObject{{"SetProportion", change.toDouble()}};
-    }
-    return QJsonObject{{"SetFixed", change.toInt()}};
+    const auto wire = NiriRequests::wireValue(input, error);
+    if (!wire)
+        return false;
+    NiriIpc::DecodeError detail;
+    if (NiriIpc::decode(*wire, value, &detail, QStringLiteral("$"), NiriIpc::DecodeMode::Outbound))
+        return true;
+    error = detail.path + QStringLiteral(": ") + detail.message;
+    return false;
 }
-
-NiriPendingReply *NiriActions::spawn(const QStringList &command)
+QVariant legacySize(const QVariant &change)
 {
-    QJsonArray cmd;
-    for (const QString &s : command)
-        cmd.append(s);
-    return sendAction(QJsonObject{{"Spawn", QJsonObject{{"command", cmd}}}});
+    if (change.typeId() == QMetaType::Double)
+        return QVariantMap{{"SetProportion", change}};
+    if (change.typeId() == QMetaType::Int)
+        return QVariantMap{{"SetFixed", change}};
+    return change;
 }
-
-NiriPendingReply *NiriActions::focusWindow(quint64 windowId)
-{
-    return sendAction(QJsonObject{{"FocusWindow", QJsonObject{{"id", qint64(windowId)}}}});
-}
-
-NiriPendingReply *NiriActions::closeWindow(quint64 windowId)
-{
-    return sendAction(QJsonObject{{"CloseWindow", QJsonObject{{"id", qint64(windowId)}}}});
-}
+} // namespace
 
 NiriPendingReply *NiriActions::moveWindowToWorkspace(quint64 windowId, const QVariant &reference,
-                                                     bool followFocus)
+                                                     bool focus)
 {
-    return sendAction(QJsonObject{{"MoveWindowToWorkspace",
-                                   QJsonObject{{"window_id", qint64(windowId)},
-                                               {"reference", workspaceReferenceJson(reference)},
-                                               {"focus", followFocus}}}});
+    QVariant input = reference;
+    if (reference.typeId() == QMetaType::QString)
+        input = QVariantMap{{"Name", reference}};
+    else if (reference.typeId() == QMetaType::Int)
+        input = QVariantMap{{"Index", reference}};
+    NiriWorkspaceReferenceArg typed;
+    QString error;
+    if (!legacyArgument(input, typed, error))
+        return submitAction({}, error);
+    return NiriIpcActions::moveWindowToWorkspace(std::optional<quint64>(windowId), typed, focus);
 }
-
-NiriPendingReply *NiriActions::moveWindowToMonitor(quint64 windowId, const QString &output,
-                                                   bool followFocus)
-{
-    return sendAction(QJsonObject{{"MoveWindowToMonitor",
-                                   QJsonObject{{"window_id", qint64(windowId)},
-                                               {"output", output},
-                                               {"focus", followFocus}}}});
-}
-
 NiriPendingReply *NiriActions::setWindowWidth(quint64 windowId, const QVariant &change)
 {
-    return sendAction(QJsonObject{
-            {"SetWindowWidth",
-             QJsonObject{{"window_id", qint64(windowId)}, {"change", sizeChangeJson(change)}}}});
+    NiriSizeChange typed;
+    QString error;
+    if (!legacyArgument(legacySize(change), typed, error))
+        return submitAction({}, error);
+    return NiriIpcActions::setWindowWidth(std::optional<quint64>(windowId), typed);
 }
-
 NiriPendingReply *NiriActions::setWindowHeight(quint64 windowId, const QVariant &change)
 {
-    return sendAction(QJsonObject{
-            {"SetWindowHeight",
-             QJsonObject{{"window_id", qint64(windowId)}, {"change", sizeChangeJson(change)}}}});
-}
-
-NiriPendingReply *NiriActions::moveColumnToIndex(int index)
-{
-    return sendAction(QJsonObject{{"MoveColumnToIndex", QJsonObject{{"index", index}}}});
-}
-
-NiriPendingReply *NiriActions::toggleWindowFloating(quint64 windowId)
-{
-    return sendAction(QJsonObject{{"ToggleWindowFloating", QJsonObject{{"id", qint64(windowId)}}}});
+    NiriSizeChange typed;
+    QString error;
+    if (!legacyArgument(legacySize(change), typed, error))
+        return submitAction({}, error);
+    return NiriIpcActions::setWindowHeight(std::optional<quint64>(windowId), typed);
 }

@@ -4,6 +4,7 @@
 #include "nirirequests.h"
 #include "niristate.h"
 #include "niriworkspacereactive.h"
+#include "streamfixture.h"
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QQmlEngine>
@@ -66,14 +67,19 @@ private slots:
         auto engine = std::make_unique<QQmlEngine>();
         auto *actions = NiriActions::create(engine.get(), engine.get());
         QPointer<NiriPendingReply> reply = actions->spawn({"true"});
+        std::unique_ptr<NiriPendingReply> retained(reply);
         QTRY_VERIFY(server.hasPendingConnections());
         auto *peer = server.nextPendingConnection();
         QTRY_VERIFY(peer->canReadLine());
         engine.reset();
-        QVERIFY(reply.isNull());
-        if (replyArrives)
+        // E5 replies are unparented and retainable. Engine teardown cancels
+        // their operation instead of deleting a caller-held reply.
+        QVERIFY(reply);
+        if (replyArrives && peer->state() == QLocalSocket::ConnectedState)
             peer->write("{\"Ok\":\"Handled\"}\n");
         QTest::qWait(150);
+        QVERIFY(reply->completed());
+        QCOMPARE(reply->error().category, QString("Cancelled"));
         QTRY_COMPARE(peer->state(), QLocalSocket::UnconnectedState);
         requests->setRequestTimeoutMs(5000);
     }
@@ -104,12 +110,12 @@ private slots:
                 });
         auto *events = NiriEvents::instance();
         QSignalSpy raw(events, &NiriEvents::rawEvent);
-        QSignalSpy typed(events, &NiriEvents::windowClosed);
+        QSignalSpy typed(events, &NiriEvents::configLoaded);
         connection->connectToSocket(server.fullServerName());
         QTRY_VERIFY(server.hasPendingConnections());
         auto *peer = server.nextPendingConnection();
         QTRY_VERIFY(peer->canReadLine());
-        peer->write("{\"Ok\":\"Handled\"}\n{\"WindowClosed\":{\"id\":7}}\n");
+        peer->write("{\"Ok\":\"Handled\"}\n{\"ConfigLoaded\":{\"failed\":true}}\n");
         QTRY_VERIFY(!connection->isConnected());
         QTest::qWait(20);
         QCOMPARE(typed.count(), 0);
@@ -118,23 +124,28 @@ private slots:
 
     void lateWorkspaceState()
     {
-        auto *events = NiriEvents::instance();
-        events->dispatchEvent("WorkspacesChanged",
-                              {{"workspaces",
-                                QVariantList{QVariantMap{{"id", 1},
-                                                         {"output", "DP-1"},
-                                                         {"is_active", true},
-                                                         {"is_focused", true}},
-                                             QVariantMap{{"id", 2},
-                                                         {"output", "DP-1"},
-                                                         {"is_active", false},
-                                                         {"is_focused", false}}}}});
+        StateStreamFixture stream;
+        QVERIFY(stream.start());
+        feed(stream, "WorkspacesChanged",
+             {{"workspaces",
+               QVariantList{QVariantMap{{"id", 1},
+                                        {"idx", 1},
+                                        {"is_urgent", false},
+                                        {"output", "DP-1"},
+                                        {"is_active", true},
+                                        {"is_focused", true}},
+                            QVariantMap{{"id", 2},
+                                        {"idx", 2},
+                                        {"is_urgent", false},
+                                        {"output", "DP-1"},
+                                        {"is_active", false},
+                                        {"is_focused", false}}}}});
         QQmlEngine firstEngine;
         auto *first = NiriState::create(&firstEngine, &firstEngine);
         QCOMPARE(first->focusedWorkspaceId(), quint64(1));
-        events->dispatchEvent("WorkspaceActivated", {{"id", 2}, {"focused", true}});
-        events->dispatchEvent("WorkspaceActiveWindowChanged",
-                              {{"workspace_id", 2}, {"active_window_id", 9}});
+        feed(stream, "WorkspaceActivated", {{"id", 2}, {"focused", true}});
+        feed(stream, "WorkspaceActiveWindowChanged",
+             {{"workspace_id", 2}, {"active_window_id", 9}});
         QCOMPARE(first->focusedWorkspaceId(), quint64(2));
         QQmlEngine secondEngine;
         auto *second = NiriState::create(&secondEngine, &secondEngine);
@@ -149,10 +160,16 @@ private slots:
 
     void urgentThreadGuard()
     {
+        StateStreamFixture stream;
+        QVERIFY(stream.start());
         NiriWorkspaceReactive workspace;
-        NiriEvents::instance()->dispatchEvent(
-                "WorkspacesChanged",
-                {{"workspaces", QVariantList{QVariantMap{{"id", 1}, {"is_urgent", true}}}}});
+        feed(stream, "WorkspacesChanged",
+             {{"workspaces",
+               QVariantList{QVariantMap{{"id", 1},
+                                        {"idx", 1},
+                                        {"is_urgent", true},
+                                        {"is_active", false},
+                                        {"is_focused", false}}}}});
         workspace.setWorkspaceId(1);
         QVERIFY(workspace.isUrgent());
         bool urgent = true;
@@ -162,6 +179,16 @@ private slots:
         worker->start();
         QVERIFY(worker->wait(1000));
         QVERIFY(!urgent);
+    }
+
+private:
+    void feed(StateStreamFixture &stream, const QString &name, const QVariantMap &payload)
+    {
+        const auto wire = NiriWire::fromQVariantLossy(payload);
+        QVERIFY(wire);
+        QSignalSpy raw(NiriEvents::instance(), &NiriEvents::rawEvent);
+        stream.send(*NiriWire::encode(*NiriWire::WireValue::object({{name, *wire}})));
+        QTRY_COMPARE(raw.size(), 1);
     }
 };
 

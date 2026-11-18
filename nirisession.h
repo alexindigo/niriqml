@@ -3,6 +3,7 @@
 #include "nirilinebuffer.h"
 #include "niritypes.h"
 #include "niriwire.h"
+#include "nirieventstreamstate.h"
 
 #include <QObject>
 #include <QTimer>
@@ -35,10 +36,18 @@ public:
     Status status() const;
     bool isConnected() const;
     bool subscribed() const;
+    std::optional<NiriWire::Document> subscriptionReply() const;
     bool autoReconnect() const;
     QVariantMap error() const;
     QString errorString() const;
     PeerInfo peerInfo() const;
+    const NiriEventStreamState &state() const
+    {
+        if (checkThread(this))
+            return m_state;
+        static const NiriEventStreamState empty;
+        return empty;
+    }
 
     void ensureStarted();
     void connectToSocket(const QString &path = {});
@@ -65,19 +74,29 @@ signals:
     void errorChanged();
     void peerInfoChanged();
     void reconnectScheduled(int delayMs, int attempt);
+    void initialStateReceivedChanged();
+    void stateProject(const NiriEventStreamState::Changes &changes);
+    void stateUpdated(const NiriEventStreamState::Changes &changes);
+    void decodedEventPublication(const NiriWire::Document &document, const NiriEvent &event,
+                                 const QString &errorPath, const QString &errorMessage,
+                                 quint64 epoch);
     // E7 integration points: reset/apply canonical state here, before public
     // event publication. Each carries the epoch; consumers must reject stale work.
     void streamReset(quint64 epoch, const QString &reason);
     void subscriptionAccepted(quint64 epoch);
     void eventFrame(const NiriWire::Document &document, quint64 epoch);
+    void eventPublication(const NiriWire::Document &document, quint64 epoch);
     void eventReceived(const QString &name, const QVariantMap &payload, quint64 producingEpoch);
 
 private:
     explicit NiriSession(QObject *parent);
     struct Attempt;
+    struct StateDelivery;
     struct Snapshot;
     Snapshot snapshot() const;
     bool publish(quint64 token);
+    void resetState(quint64 token, const QString &reason);
+    void publishState(const NiriEventStreamState::Changes &changes);
     bool current(const std::shared_ptr<Attempt> &attempt) const;
     void select(const QString &path, EndpointSource source);
     void queueAttempt();
@@ -106,6 +125,10 @@ private:
     std::shared_ptr<Attempt> m_attempt;
     std::unique_ptr<Snapshot> m_announced;
     bool m_publishing = false;
+    bool m_deliveringState = false;
+    bool m_projectingState = false;
+    std::optional<QPair<quint64, QString>> m_pendingStateReset;
+    NiriEventStreamState m_state;
     QTimer *m_retry;
     int m_reconnectAttempt = 0;
     quint64 m_retrySerial = 0;
