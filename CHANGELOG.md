@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [0.3.0] - 2026-11-18
 
 ### Breaking changes and migration
 
@@ -38,7 +38,7 @@ dashboard workspace clicks select a local detail view, not compositor focus.
 Generated API/schema/mapping docs have a deterministic staleness check. See
 [API.md](API.md), [DESIGN.md](DESIGN.md) and [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 Historical entries below describe their original implementation, not the current
-ID/null/lifetime or completeness contract. No release version is assigned here.
+ID/null/lifetime or completeness contract.
 
 ## 2026-08-07
 
