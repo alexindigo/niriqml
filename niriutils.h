@@ -7,6 +7,8 @@
 #include <QVariant>
 #include <QString>
 
+#include "generated/niriipccodec_generated.h"
+
 QByteArray toSnakeCase(QByteArrayView camel);
 
 QVariant jsonToGadget(const QJsonObject &json, QMetaType targetType);
@@ -14,7 +16,11 @@ QVariant jsonToGadget(const QJsonObject &json, QMetaType targetType);
 template <typename T>
 T fromNiriJson(const QJsonObject &json)
 {
-    return jsonToGadget(json, QMetaType::fromType<T>()).template value<T>();
+    T value{};
+    const auto wire = NiriWire::fromQJsonValueLossy(json);
+    if (wire)
+        NiriIpc::decode(*wire, value);
+    return value;
 }
 
 QVariantList jsonArrayToGadgets(const QJsonArray &arr, QMetaType elementType);

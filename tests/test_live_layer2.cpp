@@ -86,7 +86,9 @@ void TestLiveLayer2::niriStateWorkspaceCount()
 
 void TestLiveLayer2::niriStateActiveOutput()
 {
-    QVERIFY(!NiriState::instance()->activeOutput().isEmpty());
+    const auto output = NiriState::instance()->activeOutput();
+    QVERIFY(output.has_value());
+    QVERIFY(!output->isEmpty());
 }
 
 void TestLiveLayer2::niriWindowReactiveTracksId()
@@ -108,8 +110,8 @@ void TestLiveLayer2::niriWorkspaceReactiveTracksName()
     quint64 targetId = 0;
     for (const QVariant &v : wss) {
         NiriWorkspace ws = v.value<NiriWorkspace>();
-        if (!ws.name.isEmpty() && targetName.isEmpty())
-            targetName = ws.name;
+        if (ws.name && !ws.name->isEmpty() && targetName.isEmpty())
+            targetName = *ws.name;
         if (targetId == 0)
             targetId = ws.id;
     }

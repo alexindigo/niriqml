@@ -4,6 +4,9 @@ version = "0.0.0"
 edition = "2021"
 publish = false
 
+[features]
+newer = []
+
 [dependencies]
 niri-ipc = { git = "https://github.com/niri-wm/niri", rev = "8ed0da44d974c32c6877d2f4630c314da0717ecb", default-features = false, features = ["json-schema"] }
 schemars = "=1.2.1"

@@ -1,0 +1,5085 @@
+{
+  "$defs": {
+    "Action": {
+      "description": "Actions that niri can perform.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Exit niri.",
+          "properties": {
+            "Quit": {
+              "properties": {
+                "skip_confirmation": {
+                  "default": false,
+                  "description": "Skip the \"Press Enter to confirm\" prompt.",
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "Quit"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Change the virtual terminal.",
+          "properties": {
+            "ChangeVt": {
+              "properties": {
+                "vt": {
+                  "description": "Virtual terminal to change to.",
+                  "format": "uint8",
+                  "maximum": 255,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "vt"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "ChangeVt"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Power off all monitors via DPMS.",
+          "properties": {
+            "PowerOffMonitors": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "PowerOffMonitors"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Power on all monitors via DPMS.",
+          "properties": {
+            "PowerOnMonitors": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "PowerOnMonitors"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Spawn a command.",
+          "properties": {
+            "Spawn": {
+              "properties": {
+                "command": {
+                  "description": "Command to spawn.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "command"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Spawn"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Spawn a command through the shell.",
+          "properties": {
+            "SpawnSh": {
+              "properties": {
+                "command": {
+                  "description": "Command to run.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "command"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "SpawnSh"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Do a screen transition.",
+          "properties": {
+            "DoScreenTransition": {
+              "properties": {
+                "delay_ms": {
+                  "description": "Delay in milliseconds for the screen to freeze before starting the transition.",
+                  "format": "uint16",
+                  "maximum": 65535,
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "DoScreenTransition"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Open the screenshot UI.",
+          "properties": {
+            "Screenshot": {
+              "properties": {
+                "path": {
+                  "description": "Path to save the screenshot to.\n\nThe path must be absolute, otherwise an error is returned.\n\nIf `None`, the screenshot is saved according to the `screenshot-path` config setting.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "show_pointer": {
+                  "default": true,
+                  "description": "Whether to show the mouse pointer by default in the screenshot UI.",
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "Screenshot"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Screenshot the focused screen.",
+          "properties": {
+            "ScreenshotScreen": {
+              "properties": {
+                "path": {
+                  "description": "Path to save the screenshot to.\n\nThe path must be absolute, otherwise an error is returned.\n\nIf `None`, the screenshot is saved according to the `screenshot-path` config setting.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "show_pointer": {
+                  "default": true,
+                  "description": "Whether to include the mouse pointer in the screenshot.",
+                  "type": "boolean"
+                },
+                "write_to_disk": {
+                  "default": true,
+                  "description": "Write the screenshot to disk in addition to putting it in your clipboard.\n\nThe screenshot is saved according to the `screenshot-path` config setting.",
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "ScreenshotScreen"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Screenshot a window.",
+          "properties": {
+            "ScreenshotWindow": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window to screenshot.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "path": {
+                  "description": "Path to save the screenshot to.\n\nThe path must be absolute, otherwise an error is returned.\n\nIf `None`, the screenshot is saved according to the `screenshot-path` config setting.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "show_pointer": {
+                  "default": false,
+                  "description": "Whether to include the mouse pointer in the screenshot.\n\nThe pointer will be included only if the window is currently receiving pointer input\n(usually this means the pointer is on top of the window).",
+                  "type": "boolean"
+                },
+                "write_to_disk": {
+                  "default": true,
+                  "description": "Write the screenshot to disk in addition to putting it in your clipboard.\n\nThe screenshot is saved according to the `screenshot-path` config setting.",
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "ScreenshotWindow"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Enable or disable the keyboard shortcuts inhibitor (if any) for the focused surface.",
+          "properties": {
+            "ToggleKeyboardShortcutsInhibit": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "ToggleKeyboardShortcutsInhibit"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Close a window.",
+          "properties": {
+            "CloseWindow": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window to close.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "CloseWindow"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Toggle fullscreen on a window.",
+          "properties": {
+            "FullscreenWindow": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window to toggle fullscreen of.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "FullscreenWindow"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Toggle windowed (fake) fullscreen on a window.",
+          "properties": {
+            "ToggleWindowedFullscreen": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window to toggle windowed fullscreen of.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "ToggleWindowedFullscreen"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Make a window fullscreen.",
+          "properties": {
+            "SetWindowFullscreen": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window to make fullscreen.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "SetWindowFullscreen"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Take a window out of fullscreen.",
+          "properties": {
+            "UnsetWindowFullscreen": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window to take out of fullscreen.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "UnsetWindowFullscreen"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Maximize a window to the screen edges.",
+          "properties": {
+            "SetWindowMaximizedToEdges": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window to maximize to edges.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "SetWindowMaximizedToEdges"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Unmaximize a window from the screen edges.",
+          "properties": {
+            "UnsetWindowMaximizedToEdges": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window to unmaximize from edges.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "UnsetWindowMaximizedToEdges"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Enable windowed (fake) fullscreen on a window.",
+          "properties": {
+            "SetWindowedFullscreen": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window to enable windowed fullscreen on.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "SetWindowedFullscreen"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Disable windowed (fake) fullscreen on a window.",
+          "properties": {
+            "UnsetWindowedFullscreen": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window to disable windowed fullscreen on.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "UnsetWindowedFullscreen"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus a window by id.",
+          "properties": {
+            "FocusWindow": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window to focus.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusWindow"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus a window in the focused column by index.",
+          "properties": {
+            "FocusWindowInColumn": {
+              "properties": {
+                "index": {
+                  "description": "Index of the window in the column.\n\nThe index starts from 1 for the topmost window.",
+                  "format": "uint8",
+                  "maximum": 255,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "index"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusWindowInColumn"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the previously focused window.",
+          "properties": {
+            "FocusWindowPrevious": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusWindowPrevious"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the column to the left.",
+          "properties": {
+            "FocusColumnLeft": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusColumnLeft"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the column to the right.",
+          "properties": {
+            "FocusColumnRight": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusColumnRight"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the first column.",
+          "properties": {
+            "FocusColumnFirst": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusColumnFirst"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the last column.",
+          "properties": {
+            "FocusColumnLast": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusColumnLast"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the next column to the right, looping if at end.",
+          "properties": {
+            "FocusColumnRightOrFirst": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusColumnRightOrFirst"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the next column to the left, looping if at start.",
+          "properties": {
+            "FocusColumnLeftOrLast": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusColumnLeftOrLast"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus a column by index.",
+          "properties": {
+            "FocusColumn": {
+              "properties": {
+                "index": {
+                  "description": "Index of the column to focus.\n\nThe index starts from 1 for the first column.",
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "index"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusColumn"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the window or the monitor above.",
+          "properties": {
+            "FocusWindowOrMonitorUp": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusWindowOrMonitorUp"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the window or the monitor below.",
+          "properties": {
+            "FocusWindowOrMonitorDown": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusWindowOrMonitorDown"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the column or the monitor to the left.",
+          "properties": {
+            "FocusColumnOrMonitorLeft": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusColumnOrMonitorLeft"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the column or the monitor to the right.",
+          "properties": {
+            "FocusColumnOrMonitorRight": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusColumnOrMonitorRight"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the window below.",
+          "properties": {
+            "FocusWindowDown": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusWindowDown"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the window above.",
+          "properties": {
+            "FocusWindowUp": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusWindowUp"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the window below or the column to the left.",
+          "properties": {
+            "FocusWindowDownOrColumnLeft": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusWindowDownOrColumnLeft"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the window below or the column to the right.",
+          "properties": {
+            "FocusWindowDownOrColumnRight": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusWindowDownOrColumnRight"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the window above or the column to the left.",
+          "properties": {
+            "FocusWindowUpOrColumnLeft": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusWindowUpOrColumnLeft"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the window above or the column to the right.",
+          "properties": {
+            "FocusWindowUpOrColumnRight": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusWindowUpOrColumnRight"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the window or the workspace below.",
+          "properties": {
+            "FocusWindowOrWorkspaceDown": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusWindowOrWorkspaceDown"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the window or the workspace above.",
+          "properties": {
+            "FocusWindowOrWorkspaceUp": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusWindowOrWorkspaceUp"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the topmost window.",
+          "properties": {
+            "FocusWindowTop": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusWindowTop"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the bottommost window.",
+          "properties": {
+            "FocusWindowBottom": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusWindowBottom"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the window below or the topmost window.",
+          "properties": {
+            "FocusWindowDownOrTop": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusWindowDownOrTop"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the window above or the bottommost window.",
+          "properties": {
+            "FocusWindowUpOrBottom": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusWindowUpOrBottom"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused column to the left.",
+          "properties": {
+            "MoveColumnLeft": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveColumnLeft"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused column to the right.",
+          "properties": {
+            "MoveColumnRight": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveColumnRight"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused column to the start of the workspace.",
+          "properties": {
+            "MoveColumnToFirst": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveColumnToFirst"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused column to the end of the workspace.",
+          "properties": {
+            "MoveColumnToLast": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveColumnToLast"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused column to the left or to the monitor to the left.",
+          "properties": {
+            "MoveColumnLeftOrToMonitorLeft": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveColumnLeftOrToMonitorLeft"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused column to the right or to the monitor to the right.",
+          "properties": {
+            "MoveColumnRightOrToMonitorRight": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveColumnRightOrToMonitorRight"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused column to a specific index on its workspace.",
+          "properties": {
+            "MoveColumnToIndex": {
+              "properties": {
+                "index": {
+                  "description": "New index for the column.\n\nThe index starts from 1 for the first column.",
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "index"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveColumnToIndex"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused window down in a column.",
+          "properties": {
+            "MoveWindowDown": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWindowDown"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused window up in a column.",
+          "properties": {
+            "MoveWindowUp": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWindowUp"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused window down in a column or to the workspace below.",
+          "properties": {
+            "MoveWindowDownOrToWorkspaceDown": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWindowDownOrToWorkspaceDown"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused window up in a column or to the workspace above.",
+          "properties": {
+            "MoveWindowUpOrToWorkspaceUp": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWindowUpOrToWorkspaceUp"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Consume or expel a window left.",
+          "properties": {
+            "ConsumeOrExpelWindowLeft": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window to consume or expel.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "ConsumeOrExpelWindowLeft"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Consume or expel a window right.",
+          "properties": {
+            "ConsumeOrExpelWindowRight": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window to consume or expel.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "ConsumeOrExpelWindowRight"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Consume the window to the right into the focused column.",
+          "properties": {
+            "ConsumeWindowIntoColumn": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "ConsumeWindowIntoColumn"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Expel the bottom window from the focused column.",
+          "properties": {
+            "ExpelWindowFromColumn": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "ExpelWindowFromColumn"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Swap focused window with one to the right.",
+          "properties": {
+            "SwapWindowRight": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "SwapWindowRight"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Swap focused window with one to the left.",
+          "properties": {
+            "SwapWindowLeft": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "SwapWindowLeft"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Toggle the focused column between normal and tabbed display.",
+          "properties": {
+            "ToggleColumnTabbedDisplay": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "ToggleColumnTabbedDisplay"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Set the display mode of the focused column.",
+          "properties": {
+            "SetColumnDisplay": {
+              "properties": {
+                "display": {
+                  "$ref": "#/$defs/ColumnDisplay",
+                  "description": "Display mode to set."
+                }
+              },
+              "required": [
+                "display"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "SetColumnDisplay"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Center the focused column on the screen.",
+          "properties": {
+            "CenterColumn": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "CenterColumn"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Center a window on the screen.",
+          "properties": {
+            "CenterWindow": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window to center.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "CenterWindow"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Center all fully visible columns on the screen.",
+          "properties": {
+            "CenterVisibleColumns": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "CenterVisibleColumns"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the workspace below.",
+          "properties": {
+            "FocusWorkspaceDown": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusWorkspaceDown"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the workspace above.",
+          "properties": {
+            "FocusWorkspaceUp": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusWorkspaceUp"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus a workspace by reference (index or name).",
+          "properties": {
+            "FocusWorkspace": {
+              "properties": {
+                "reference": {
+                  "$ref": "#/$defs/WorkspaceReferenceArg",
+                  "description": "Reference (index or name) of the workspace to focus."
+                }
+              },
+              "required": [
+                "reference"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusWorkspace"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the previous workspace.",
+          "properties": {
+            "FocusWorkspacePrevious": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusWorkspacePrevious"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused window to the workspace below.",
+          "properties": {
+            "MoveWindowToWorkspaceDown": {
+              "properties": {
+                "focus": {
+                  "default": true,
+                  "description": "Whether the focus should follow the target workspace.\n\nIf `true` (the default), the focus will follow the window to the new workspace. If\n`false`, the focus will remain on the original workspace.",
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWindowToWorkspaceDown"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused window to the workspace above.",
+          "properties": {
+            "MoveWindowToWorkspaceUp": {
+              "properties": {
+                "focus": {
+                  "default": true,
+                  "description": "Whether the focus should follow the target workspace.\n\nIf `true` (the default), the focus will follow the window to the new workspace. If\n`false`, the focus will remain on the original workspace.",
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWindowToWorkspaceUp"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move a window to a workspace.",
+          "properties": {
+            "MoveWindowToWorkspace": {
+              "properties": {
+                "focus": {
+                  "default": true,
+                  "description": "Whether the focus should follow the moved window.\n\nIf `true` (the default) and the window to move is focused, the focus will follow the\nwindow to the new workspace. If `false`, the focus will remain on the original\nworkspace.",
+                  "type": "boolean"
+                },
+                "reference": {
+                  "$ref": "#/$defs/WorkspaceReferenceArg",
+                  "description": "Reference (index or name) of the workspace to move the window to."
+                },
+                "window_id": {
+                  "description": "Id of the window to move.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "reference"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWindowToWorkspace"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused column to the workspace below.",
+          "properties": {
+            "MoveColumnToWorkspaceDown": {
+              "properties": {
+                "focus": {
+                  "default": true,
+                  "description": "Whether the focus should follow the target workspace.\n\nIf `true` (the default), the focus will follow the column to the new workspace. If\n`false`, the focus will remain on the original workspace.",
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveColumnToWorkspaceDown"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused column to the workspace above.",
+          "properties": {
+            "MoveColumnToWorkspaceUp": {
+              "properties": {
+                "focus": {
+                  "default": true,
+                  "description": "Whether the focus should follow the target workspace.\n\nIf `true` (the default), the focus will follow the column to the new workspace. If\n`false`, the focus will remain on the original workspace.",
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveColumnToWorkspaceUp"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused column to a workspace by reference (index or name).",
+          "properties": {
+            "MoveColumnToWorkspace": {
+              "properties": {
+                "focus": {
+                  "default": true,
+                  "description": "Whether the focus should follow the target workspace.\n\nIf `true` (the default), the focus will follow the column to the new workspace. If\n`false`, the focus will remain on the original workspace.",
+                  "type": "boolean"
+                },
+                "reference": {
+                  "$ref": "#/$defs/WorkspaceReferenceArg",
+                  "description": "Reference (index or name) of the workspace to move the column to."
+                }
+              },
+              "required": [
+                "reference"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveColumnToWorkspace"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused workspace down.",
+          "properties": {
+            "MoveWorkspaceDown": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWorkspaceDown"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused workspace up.",
+          "properties": {
+            "MoveWorkspaceUp": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWorkspaceUp"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move a workspace to a specific index on its monitor.",
+          "properties": {
+            "MoveWorkspaceToIndex": {
+              "properties": {
+                "index": {
+                  "description": "New index for the workspace.",
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "reference": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/WorkspaceReferenceArg"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Reference (index or name) of the workspace to move.\n\nIf `None`, uses the focused workspace."
+                }
+              },
+              "required": [
+                "index"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWorkspaceToIndex"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Set the name of a workspace.",
+          "properties": {
+            "SetWorkspaceName": {
+              "properties": {
+                "name": {
+                  "description": "New name for the workspace.",
+                  "type": "string"
+                },
+                "workspace": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/WorkspaceReferenceArg"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Reference (index or name) of the workspace to name.\n\nIf `None`, uses the focused workspace."
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "SetWorkspaceName"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Unset the name of a workspace.",
+          "properties": {
+            "UnsetWorkspaceName": {
+              "properties": {
+                "reference": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/WorkspaceReferenceArg"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Reference (index or name) of the workspace to unname.\n\nIf `None`, uses the focused workspace."
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "UnsetWorkspaceName"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the monitor to the left.",
+          "properties": {
+            "FocusMonitorLeft": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusMonitorLeft"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the monitor to the right.",
+          "properties": {
+            "FocusMonitorRight": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusMonitorRight"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the monitor below.",
+          "properties": {
+            "FocusMonitorDown": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusMonitorDown"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the monitor above.",
+          "properties": {
+            "FocusMonitorUp": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusMonitorUp"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the previous monitor.",
+          "properties": {
+            "FocusMonitorPrevious": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusMonitorPrevious"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the next monitor.",
+          "properties": {
+            "FocusMonitorNext": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusMonitorNext"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus a monitor by name.",
+          "properties": {
+            "FocusMonitor": {
+              "properties": {
+                "output": {
+                  "description": "Name of the output to focus.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "output"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusMonitor"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused window to the monitor to the left.",
+          "properties": {
+            "MoveWindowToMonitorLeft": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWindowToMonitorLeft"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused window to the monitor to the right.",
+          "properties": {
+            "MoveWindowToMonitorRight": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWindowToMonitorRight"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused window to the monitor below.",
+          "properties": {
+            "MoveWindowToMonitorDown": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWindowToMonitorDown"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused window to the monitor above.",
+          "properties": {
+            "MoveWindowToMonitorUp": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWindowToMonitorUp"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused window to the previous monitor.",
+          "properties": {
+            "MoveWindowToMonitorPrevious": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWindowToMonitorPrevious"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused window to the next monitor.",
+          "properties": {
+            "MoveWindowToMonitorNext": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWindowToMonitorNext"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move a window to a specific monitor.",
+          "properties": {
+            "MoveWindowToMonitor": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window to move.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "output": {
+                  "description": "The target output name.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "output"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWindowToMonitor"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused column to the monitor to the left.",
+          "properties": {
+            "MoveColumnToMonitorLeft": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveColumnToMonitorLeft"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused column to the monitor to the right.",
+          "properties": {
+            "MoveColumnToMonitorRight": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveColumnToMonitorRight"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused column to the monitor below.",
+          "properties": {
+            "MoveColumnToMonitorDown": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveColumnToMonitorDown"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused column to the monitor above.",
+          "properties": {
+            "MoveColumnToMonitorUp": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveColumnToMonitorUp"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused column to the previous monitor.",
+          "properties": {
+            "MoveColumnToMonitorPrevious": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveColumnToMonitorPrevious"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused column to the next monitor.",
+          "properties": {
+            "MoveColumnToMonitorNext": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveColumnToMonitorNext"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused column to a specific monitor.",
+          "properties": {
+            "MoveColumnToMonitor": {
+              "properties": {
+                "output": {
+                  "description": "The target output name.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "output"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveColumnToMonitor"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Change the width of a window.",
+          "properties": {
+            "SetWindowWidth": {
+              "properties": {
+                "change": {
+                  "$ref": "#/$defs/SizeChange",
+                  "description": "How to change the width."
+                },
+                "id": {
+                  "description": "Id of the window whose width to set.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "change"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "SetWindowWidth"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Change the height of a window.",
+          "properties": {
+            "SetWindowHeight": {
+              "properties": {
+                "change": {
+                  "$ref": "#/$defs/SizeChange",
+                  "description": "How to change the height."
+                },
+                "id": {
+                  "description": "Id of the window whose height to set.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "change"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "SetWindowHeight"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Reset the height of a window back to automatic.",
+          "properties": {
+            "ResetWindowHeight": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window whose height to reset.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "ResetWindowHeight"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Switch between preset column widths.",
+          "properties": {
+            "SwitchPresetColumnWidth": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "SwitchPresetColumnWidth"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Switch between preset column widths backwards.",
+          "properties": {
+            "SwitchPresetColumnWidthBack": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "SwitchPresetColumnWidthBack"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Switch between preset window widths.",
+          "properties": {
+            "SwitchPresetWindowWidth": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window whose width to switch.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "SwitchPresetWindowWidth"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Switch between preset window widths backwards.",
+          "properties": {
+            "SwitchPresetWindowWidthBack": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window whose width to switch.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "SwitchPresetWindowWidthBack"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Switch between preset window heights.",
+          "properties": {
+            "SwitchPresetWindowHeight": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window whose height to switch.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "SwitchPresetWindowHeight"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Switch between preset window heights backwards.",
+          "properties": {
+            "SwitchPresetWindowHeightBack": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window whose height to switch.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "SwitchPresetWindowHeightBack"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Toggle the maximized state of the focused column.",
+          "properties": {
+            "MaximizeColumn": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MaximizeColumn"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Toggle the maximized-to-edges state of the focused window.",
+          "properties": {
+            "MaximizeWindowToEdges": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window to maximize.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "MaximizeWindowToEdges"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Change the width of the focused column.",
+          "properties": {
+            "SetColumnWidth": {
+              "properties": {
+                "change": {
+                  "$ref": "#/$defs/SizeChange",
+                  "description": "How to change the width."
+                }
+              },
+              "required": [
+                "change"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "SetColumnWidth"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Expand the focused column to space not taken up by other fully visible columns.",
+          "properties": {
+            "ExpandColumnToAvailableWidth": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "ExpandColumnToAvailableWidth"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Switch between keyboard layouts.",
+          "properties": {
+            "SwitchLayout": {
+              "properties": {
+                "layout": {
+                  "$ref": "#/$defs/LayoutSwitchTarget",
+                  "description": "Layout to switch to."
+                }
+              },
+              "required": [
+                "layout"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "SwitchLayout"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Show the hotkey overlay.",
+          "properties": {
+            "ShowHotkeyOverlay": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "ShowHotkeyOverlay"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused workspace to the monitor to the left.",
+          "properties": {
+            "MoveWorkspaceToMonitorLeft": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWorkspaceToMonitorLeft"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused workspace to the monitor to the right.",
+          "properties": {
+            "MoveWorkspaceToMonitorRight": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWorkspaceToMonitorRight"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused workspace to the monitor below.",
+          "properties": {
+            "MoveWorkspaceToMonitorDown": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWorkspaceToMonitorDown"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused workspace to the monitor above.",
+          "properties": {
+            "MoveWorkspaceToMonitorUp": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWorkspaceToMonitorUp"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused workspace to the previous monitor.",
+          "properties": {
+            "MoveWorkspaceToMonitorPrevious": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWorkspaceToMonitorPrevious"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused workspace to the next monitor.",
+          "properties": {
+            "MoveWorkspaceToMonitorNext": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWorkspaceToMonitorNext"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move a workspace to a specific monitor.",
+          "properties": {
+            "MoveWorkspaceToMonitor": {
+              "properties": {
+                "output": {
+                  "description": "The target output name.",
+                  "type": "string"
+                },
+                "reference": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/WorkspaceReferenceArg"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "If `None`, uses the focused workspace."
+                }
+              },
+              "required": [
+                "output"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWorkspaceToMonitor"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Toggle a debug tint on windows.",
+          "properties": {
+            "ToggleDebugTint": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "ToggleDebugTint"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Toggle visualization of render element opaque regions.",
+          "properties": {
+            "DebugToggleOpaqueRegions": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "DebugToggleOpaqueRegions"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Toggle visualization of output damage.",
+          "properties": {
+            "DebugToggleDamage": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "DebugToggleDamage"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Toggle the touchpad on/off at runtime.",
+          "properties": {
+            "ToggleTouchpad": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "ToggleTouchpad"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused window between the floating and the tiling layout.",
+          "properties": {
+            "ToggleWindowFloating": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window to move.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "ToggleWindowFloating"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused window to the floating layout.",
+          "properties": {
+            "MoveWindowToFloating": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window to move.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWindowToFloating"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move the focused window to the tiling layout.",
+          "properties": {
+            "MoveWindowToTiling": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window to move.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveWindowToTiling"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Switches focus to the floating layout.",
+          "properties": {
+            "FocusFloating": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusFloating"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Switches focus to the tiling layout.",
+          "properties": {
+            "FocusTiling": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "FocusTiling"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Toggles the focus between the floating and the tiling layout.",
+          "properties": {
+            "SwitchFocusBetweenFloatingAndTiling": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "SwitchFocusBetweenFloatingAndTiling"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Move a floating window on screen.",
+          "properties": {
+            "MoveFloatingWindow": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window to move.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "x": {
+                  "$ref": "#/$defs/PositionChange",
+                  "default": {
+                    "AdjustFixed": 0.0
+                  },
+                  "description": "How to change the X position."
+                },
+                "y": {
+                  "$ref": "#/$defs/PositionChange",
+                  "default": {
+                    "AdjustFixed": 0.0
+                  },
+                  "description": "How to change the Y position."
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "MoveFloatingWindow"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Toggle the opacity of a window.",
+          "properties": {
+            "ToggleWindowRuleOpacity": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "ToggleWindowRuleOpacity"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Set the dynamic cast target to a window.",
+          "properties": {
+            "SetDynamicCastWindow": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window to target.\n\nIf `None`, uses the focused window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "SetDynamicCastWindow"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Set the dynamic cast target to a monitor.",
+          "properties": {
+            "SetDynamicCastMonitor": {
+              "properties": {
+                "output": {
+                  "description": "Name of the output to target.\n\nIf `None`, uses the focused output.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "SetDynamicCastMonitor"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Clear the dynamic cast target, making it show nothing.",
+          "properties": {
+            "ClearDynamicCastTarget": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "ClearDynamicCastTarget"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Stop a PipeWire screencast.\n\nwlr-screencopy screencasts cannot currently be stopped via IPC.",
+          "properties": {
+            "StopCast": {
+              "properties": {
+                "session_id": {
+                  "description": "Session ID of the screencast to stop.\n\nIf the session has multiple screencast streams, this will stop all of them.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "session_id"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "StopCast"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Toggle (open/close) the Overview.",
+          "properties": {
+            "ToggleOverview": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "ToggleOverview"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Open the Overview.",
+          "properties": {
+            "OpenOverview": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "OpenOverview"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Close the Overview.",
+          "properties": {
+            "CloseOverview": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "CloseOverview"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Toggle urgent status of a window.",
+          "properties": {
+            "ToggleWindowUrgent": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window to toggle urgent.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "ToggleWindowUrgent"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Set urgent status of a window.",
+          "properties": {
+            "SetWindowUrgent": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window to set urgent.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "SetWindowUrgent"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Unset urgent status of a window.",
+          "properties": {
+            "UnsetWindowUrgent": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window to unset urgent.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "UnsetWindowUrgent"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Reload the config file.\n\nCan be useful for scripts changing the config file, to avoid waiting the small duration for\nniri's config file watcher to notice the changes.",
+          "properties": {
+            "LoadConfigFile": {
+              "properties": {
+                "path": {
+                  "description": "Path of a new config file to load.\n\nIf unset, reloads the current config file.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "LoadConfigFile"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Cast": {
+      "description": "A screencast.",
+      "properties": {
+        "is_active": {
+          "description": "Whether the cast is currently streaming frames.\n\nThis can be `false` for example when switching away to a different scene in OBS, which\npauses the stream.",
+          "type": "boolean"
+        },
+        "is_dynamic_target": {
+          "description": "Whether this is a Dynamic Cast Target screencast.\n\nMeaning that actions like `SetDynamicCastWindow` will act on this screencast.\n\nKeep in mind that the target can change even if this is `false`.",
+          "type": "boolean"
+        },
+        "kind": {
+          "$ref": "#/$defs/CastKind",
+          "description": "Kind of this screencast."
+        },
+        "pid": {
+          "description": "Process ID of the screencast consumer, if known.\n\nCurrently, only wlr-screencopy screencasts can have a pid.",
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "pw_node_id": {
+          "description": "PipeWire node ID of the screencast stream.\n\nThis is `None` for wlr-screencopy casts, and also for PipeWire casts before the node is\ncreated (when the cast is just starting up).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "session_id": {
+          "description": "Session ID of the screencast.\n\nA session can have multiple screencast streams. Then multiple `Cast`s will have the same\n`session_id`. Though, usually there's only one stream per session.\n\nDo not confuse `session_id` with [`stream_id`](Self::stream_id).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "stream_id": {
+          "description": "Stream ID of the screencast that uniquely identifies it.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "target": {
+          "$ref": "#/$defs/CastTarget",
+          "description": "Target being captured."
+        }
+      },
+      "required": [
+        "stream_id",
+        "session_id",
+        "kind",
+        "target",
+        "is_dynamic_target",
+        "is_active"
+      ],
+      "type": "object"
+    },
+    "CastKind": {
+      "description": "Kind of screencast.",
+      "oneOf": [
+        {
+          "const": "PipeWire",
+          "description": "PipeWire screencast, typically via xdg-desktop-portal-gnome.",
+          "type": "string"
+        },
+        {
+          "const": "WlrScreencopy",
+          "description": "wlr-screencopy protocol screencast.\n\nTools like wf-recorder, and the xdg-desktop-portal-wlr portal.\n\nOnly wlr-screencopy with damage tracking is reported here. Screencopy without damage is\ntreated as a regular screenshot and not reported as a screencast.",
+          "type": "string"
+        },
+        {
+          "const": "ExtImageCopyCapture",
+          "description": "ext-image-copy-capture protocol screencast.\n\nTools like wayvnc, wl-mirror, and the xdg-desktop-portal-wlr portal.\n\nA client capturing both an output and the cursor creates two sessions, which are reported\nas two `Cast`s sharing one [`session_id`](Cast::session_id).\n\nA session is reported once it requests its second frame. Sessions requesting only one\nframe are treated as regular screenshots (e.g. grim) and not reported as screencasts.",
+          "type": "string"
+        },
+        {
+          "const": "ExtImageCopyCaptureCursor",
+          "description": "ext-image-copy-capture protocol cursor screencast.\n\n`Cast`s of this kind show the image of the cursor and cursor position. Their\n[`target`](Cast::target) indicates the output or window that the cursor is captured over.\n\nLike [`ExtImageCopyCapture`](CastKind::ExtImageCopyCapture), reported once the session\nrequests its second frame.",
+          "type": "string"
+        }
+      ]
+    },
+    "CastTarget": {
+      "description": "Target of a screencast.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "The target is not yet set, or was cleared.",
+          "properties": {
+            "Nothing": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "Nothing"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Casting an output.",
+          "properties": {
+            "Output": {
+              "properties": {
+                "name": {
+                  "description": "Name of the screencasted output.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Output"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Casting a window.",
+          "properties": {
+            "Window": {
+              "properties": {
+                "id": {
+                  "description": "ID of the screencasted window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Window"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ColumnDisplay": {
+      "description": "How windows display in a column.",
+      "oneOf": [
+        {
+          "const": "Normal",
+          "description": "Windows are tiled vertically across the working area height.",
+          "type": "string"
+        },
+        {
+          "const": "Tabbed",
+          "description": "Windows are in tabs.",
+          "type": "string"
+        }
+      ]
+    },
+    "ConfiguredMode": {
+      "description": "Output mode as set in the config file.",
+      "properties": {
+        "height": {
+          "description": "Height in physical pixels.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "refresh": {
+          "description": "Refresh rate.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "width": {
+          "description": "Width in physical pixels.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ],
+      "type": "object"
+    },
+    "ConfiguredPosition": {
+      "description": "Output position as set in the config file.",
+      "properties": {
+        "x": {
+          "description": "Logical X position.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "y": {
+          "description": "Logical Y position.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "type": "object"
+    },
+    "Event": {
+      "description": "A compositor event.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "The workspace configuration has changed.",
+          "properties": {
+            "WorkspacesChanged": {
+              "properties": {
+                "workspaces": {
+                  "description": "The new workspace configuration.\n\nThis configuration completely replaces the previous configuration. I.e. if any\nworkspaces are missing from here, then they were deleted.",
+                  "items": {
+                    "$ref": "#/$defs/Workspace"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "workspaces"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "WorkspacesChanged"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The workspace urgency changed.",
+          "properties": {
+            "WorkspaceUrgencyChanged": {
+              "properties": {
+                "id": {
+                  "description": "Id of the workspace.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "urgent": {
+                  "description": "Whether this workspace has an urgent window.",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "urgent"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "WorkspaceUrgencyChanged"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A workspace was activated on an output.\n\nThis doesn't always mean the workspace became focused, just that it's now the active\nworkspace on its output. All other workspaces on the same output become inactive.",
+          "properties": {
+            "WorkspaceActivated": {
+              "properties": {
+                "focused": {
+                  "description": "Whether this workspace also became focused.\n\nIf `true`, this is now the single focused workspace. All other workspaces are no longer\nfocused, but they may remain active on their respective outputs.",
+                  "type": "boolean"
+                },
+                "id": {
+                  "description": "Id of the newly active workspace.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "focused"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "WorkspaceActivated"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "An active window changed on a workspace.",
+          "properties": {
+            "WorkspaceActiveWindowChanged": {
+              "properties": {
+                "active_window_id": {
+                  "description": "Id of the new active window, if any.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "workspace_id": {
+                  "description": "Id of the workspace on which the active window changed.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "workspace_id"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "WorkspaceActiveWindowChanged"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The window configuration has changed.",
+          "properties": {
+            "WindowsChanged": {
+              "properties": {
+                "windows": {
+                  "description": "The new window configuration.\n\nThis configuration completely replaces the previous configuration. I.e. if any windows\nare missing from here, then they were closed.",
+                  "items": {
+                    "$ref": "#/$defs/Window"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "windows"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "WindowsChanged"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A new toplevel window was opened, or an existing toplevel window changed.",
+          "properties": {
+            "WindowOpenedOrChanged": {
+              "properties": {
+                "window": {
+                  "$ref": "#/$defs/Window",
+                  "description": "The new or updated window.\n\nIf the window is focused, all other windows are no longer focused."
+                }
+              },
+              "required": [
+                "window"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "WindowOpenedOrChanged"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A toplevel window was closed.",
+          "properties": {
+            "WindowClosed": {
+              "properties": {
+                "id": {
+                  "description": "Id of the removed window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "WindowClosed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Window focus changed.\n\nAll other windows are no longer focused.",
+          "properties": {
+            "WindowFocusChanged": {
+              "properties": {
+                "id": {
+                  "description": "Id of the newly focused window, or `None` if no window is now focused.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "WindowFocusChanged"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Window focus timestamp changed.\n\nThis event is separate from [`Event::WindowFocusChanged`] because the focus timestamp only\nupdates after some debounce time so that quick window switching doesn't mark intermediate\nwindows as recently focused.",
+          "properties": {
+            "WindowFocusTimestampChanged": {
+              "properties": {
+                "focus_timestamp": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/Timestamp"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The new focus timestamp."
+                },
+                "id": {
+                  "description": "Id of the window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "WindowFocusTimestampChanged"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Window urgency changed.",
+          "properties": {
+            "WindowUrgencyChanged": {
+              "properties": {
+                "id": {
+                  "description": "Id of the window.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "urgent": {
+                  "description": "The new urgency state of the window.",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "urgent"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "WindowUrgencyChanged"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The layout of one or more windows has changed.",
+          "properties": {
+            "WindowLayoutsChanged": {
+              "properties": {
+                "changes": {
+                  "description": "Pairs consisting of a window id and new layout information for the window.",
+                  "items": {
+                    "maxItems": 2,
+                    "minItems": 2,
+                    "prefixItems": [
+                      {
+                        "format": "uint64",
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      {
+                        "$ref": "#/$defs/WindowLayout"
+                      }
+                    ],
+                    "type": "array"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "changes"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "WindowLayoutsChanged"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The configured keyboard layouts have changed.",
+          "properties": {
+            "KeyboardLayoutsChanged": {
+              "properties": {
+                "keyboard_layouts": {
+                  "$ref": "#/$defs/KeyboardLayouts",
+                  "description": "The new keyboard layout configuration."
+                }
+              },
+              "required": [
+                "keyboard_layouts"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "KeyboardLayoutsChanged"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The keyboard layout switched.",
+          "properties": {
+            "KeyboardLayoutSwitched": {
+              "properties": {
+                "idx": {
+                  "description": "Index of the newly active layout.",
+                  "format": "uint8",
+                  "maximum": 255,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "idx"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "KeyboardLayoutSwitched"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The overview was opened or closed.",
+          "properties": {
+            "OverviewOpenedOrClosed": {
+              "properties": {
+                "is_open": {
+                  "description": "The new state of the overview.",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "is_open"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "OverviewOpenedOrClosed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The configuration was reloaded.\n\nYou will always receive this event when connecting to the event stream, indicating the last\nconfig load attempt.",
+          "properties": {
+            "ConfigLoaded": {
+              "properties": {
+                "failed": {
+                  "description": "Whether the loading failed.\n\nFor example, the config file couldn't be parsed.",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "failed"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "ConfigLoaded"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A screenshot was captured.",
+          "properties": {
+            "ScreenshotCaptured": {
+              "properties": {
+                "path": {
+                  "description": "The file path where the screenshot was saved, if it was written to disk.\n\nIf `None`, the screenshot was either only copied to the clipboard, or the path couldn't\nbe converted to a `String` (e.g. contained invalid UTF-8 bytes).",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "ScreenshotCaptured"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The screencasts have changed.",
+          "properties": {
+            "CastsChanged": {
+              "properties": {
+                "casts": {
+                  "description": "The new screencast information.\n\nThis configuration completely replaces the previous configuration. I.e. if any casts\nare missing from here, then they were stopped.",
+                  "items": {
+                    "$ref": "#/$defs/Cast"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "casts"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "CastsChanged"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A screencast started, or an existing cast changed.",
+          "properties": {
+            "CastStartedOrChanged": {
+              "properties": {
+                "cast": {
+                  "$ref": "#/$defs/Cast",
+                  "description": "The cast that started or changed."
+                }
+              },
+              "required": [
+                "cast"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "CastStartedOrChanged"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A screencast stopped.",
+          "properties": {
+            "CastStopped": {
+              "properties": {
+                "stream_id": {
+                  "description": "Stream ID of the stopped screencast.",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "stream_id"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "CastStopped"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Touchpad toggled on/off via [`Action::ToggleTouchpad`].",
+          "properties": {
+            "TouchpadToggled": {
+              "properties": {
+                "on": {
+                  "description": "Whether the touchpad is now enabled.\n\nNote that this only indicates the [`Action::ToggleTouchpad`] state. The touchpad can be\ndisabled in hardware, or via `input { touchpad { off; } }`—this is not reflected here.",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "on"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "TouchpadToggled"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "HSyncPolarity": {
+      "description": "Modeline horizontal syncing polarity.",
+      "oneOf": [
+        {
+          "const": "PHSync",
+          "description": "Positive polarity.",
+          "type": "string"
+        },
+        {
+          "const": "NHSync",
+          "description": "Negative polarity.",
+          "type": "string"
+        }
+      ]
+    },
+    "KeyboardLayouts": {
+      "description": "Configured keyboard layouts.",
+      "properties": {
+        "current_idx": {
+          "description": "Index of the currently active layout in `names`.",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "names": {
+          "description": "XKB names of the configured layouts.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "names",
+        "current_idx"
+      ],
+      "type": "object"
+    },
+    "Layer": {
+      "description": "A layer-shell layer.",
+      "oneOf": [
+        {
+          "const": "Background",
+          "description": "The background layer.",
+          "type": "string"
+        },
+        {
+          "const": "Bottom",
+          "description": "The bottom layer.",
+          "type": "string"
+        },
+        {
+          "const": "Top",
+          "description": "The top layer.",
+          "type": "string"
+        },
+        {
+          "const": "Overlay",
+          "description": "The overlay layer.",
+          "type": "string"
+        }
+      ]
+    },
+    "LayerSurface": {
+      "description": "A layer-shell surface.",
+      "properties": {
+        "keyboard_interactivity": {
+          "$ref": "#/$defs/LayerSurfaceKeyboardInteractivity",
+          "description": "The surface's keyboard interactivity mode."
+        },
+        "layer": {
+          "$ref": "#/$defs/Layer",
+          "description": "Layer that the surface is on."
+        },
+        "namespace": {
+          "description": "Namespace provided by the layer-shell client.",
+          "type": "string"
+        },
+        "output": {
+          "description": "Name of the output the surface is on.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "namespace",
+        "output",
+        "layer",
+        "keyboard_interactivity"
+      ],
+      "type": "object"
+    },
+    "LayerSurfaceKeyboardInteractivity": {
+      "description": "Keyboard interactivity modes for a layer-shell surface.",
+      "oneOf": [
+        {
+          "const": "None",
+          "description": "Surface cannot receive keyboard focus.",
+          "type": "string"
+        },
+        {
+          "const": "Exclusive",
+          "description": "Surface receives keyboard focus whenever possible.",
+          "type": "string"
+        },
+        {
+          "const": "OnDemand",
+          "description": "Surface receives keyboard focus on demand, e.g. when clicked.",
+          "type": "string"
+        }
+      ]
+    },
+    "LayoutSwitchTarget": {
+      "description": "Layout to switch to.",
+      "oneOf": [
+        {
+          "const": "Next",
+          "description": "The next configured layout.",
+          "type": "string"
+        },
+        {
+          "const": "Prev",
+          "description": "The previous configured layout.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The specific layout by index.",
+          "properties": {
+            "Index": {
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "Index"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "LogicalOutput": {
+      "description": "Logical output in the compositor's coordinate space.",
+      "properties": {
+        "height": {
+          "description": "Height in logical pixels.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "scale": {
+          "description": "Scale factor.",
+          "format": "double",
+          "type": "number"
+        },
+        "transform": {
+          "$ref": "#/$defs/Transform",
+          "description": "Transform."
+        },
+        "width": {
+          "description": "Width in logical pixels.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "x": {
+          "description": "Logical X position.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "y": {
+          "description": "Logical Y position.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height",
+        "scale",
+        "transform"
+      ],
+      "type": "object"
+    },
+    "MaxBpc": {
+      "description": "Output maximum bits per channel.",
+      "oneOf": [
+        {
+          "const": "6",
+          "description": "6-bit.",
+          "type": "string"
+        },
+        {
+          "const": "8",
+          "description": "8-bit.",
+          "type": "string"
+        },
+        {
+          "const": "10",
+          "description": "10-bit.",
+          "type": "string"
+        },
+        {
+          "const": "12",
+          "description": "12-bit.",
+          "type": "string"
+        },
+        {
+          "const": "14",
+          "description": "14-bit.",
+          "type": "string"
+        },
+        {
+          "const": "16",
+          "description": "16-bit.",
+          "type": "string"
+        }
+      ]
+    },
+    "Mode": {
+      "description": "Output mode.",
+      "properties": {
+        "height": {
+          "description": "Height in physical pixels.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "is_preferred": {
+          "description": "Whether this mode is preferred by the monitor.",
+          "type": "boolean"
+        },
+        "refresh_rate": {
+          "description": "Refresh rate in millihertz.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "width": {
+          "description": "Width in physical pixels.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "width",
+        "height",
+        "refresh_rate",
+        "is_preferred"
+      ],
+      "type": "object"
+    },
+    "ModeToSet": {
+      "description": "Output mode to set.",
+      "oneOf": [
+        {
+          "const": "Automatic",
+          "description": "Niri will pick the mode automatically.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Specific mode.",
+          "properties": {
+            "Specific": {
+              "$ref": "#/$defs/ConfiguredMode"
+            }
+          },
+          "required": [
+            "Specific"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Output": {
+      "description": "Connected output.",
+      "properties": {
+        "current_mode": {
+          "description": "Index of the current mode in [`Self::modes`].\n\n`None` if the output is disabled.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "is_custom_mode": {
+          "description": "Whether the current_mode is a custom mode.",
+          "type": "boolean"
+        },
+        "logical": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LogicalOutput"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Logical output information.\n\n`None` if the output is not mapped to any logical output (for example, if it is disabled)."
+        },
+        "make": {
+          "description": "Textual description of the manufacturer.",
+          "type": "string"
+        },
+        "max_bpc": {
+          "description": "Maximum bits per channel (bit depth), if known.",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "model": {
+          "description": "Textual description of the model.",
+          "type": "string"
+        },
+        "modes": {
+          "description": "Available modes for the output.",
+          "items": {
+            "$ref": "#/$defs/Mode"
+          },
+          "type": "array"
+        },
+        "name": {
+          "description": "Name of the output.",
+          "type": "string"
+        },
+        "physical_size": {
+          "description": "Physical width and height of the output in millimeters, if known.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          ],
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "serial": {
+          "description": "Serial of the output, if known.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "vrr_enabled": {
+          "description": "Whether variable refresh rate is enabled on the output.",
+          "type": "boolean"
+        },
+        "vrr_supported": {
+          "description": "Whether the output supports variable refresh rate.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "make",
+        "model",
+        "modes",
+        "is_custom_mode",
+        "vrr_supported",
+        "vrr_enabled"
+      ],
+      "type": "object"
+    },
+    "OutputAction": {
+      "description": "Output actions that niri can perform.",
+      "oneOf": [
+        {
+          "const": "Off",
+          "description": "Turn off the output.",
+          "type": "string"
+        },
+        {
+          "const": "On",
+          "description": "Turn on the output.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Set the output mode.",
+          "properties": {
+            "Mode": {
+              "properties": {
+                "mode": {
+                  "$ref": "#/$defs/ModeToSet",
+                  "description": "Mode to set, or \"auto\" for automatic selection.\n\nRun `niri msg outputs` to see the available modes."
+                }
+              },
+              "required": [
+                "mode"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Mode"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Set a custom output mode.",
+          "properties": {
+            "CustomMode": {
+              "properties": {
+                "mode": {
+                  "$ref": "#/$defs/ConfiguredMode",
+                  "description": "Custom mode to set."
+                }
+              },
+              "required": [
+                "mode"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "CustomMode"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Set a custom VESA CVT modeline.",
+          "properties": {
+            "Modeline": {
+              "properties": {
+                "clock": {
+                  "description": "The rate at which pixels are drawn in MHz.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "hdisplay": {
+                  "description": "Horizontal active pixels.",
+                  "format": "uint16",
+                  "maximum": 65535,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "hsync_end": {
+                  "description": "Horizontal sync pulse end position in pixels.",
+                  "format": "uint16",
+                  "maximum": 65535,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "hsync_polarity": {
+                  "$ref": "#/$defs/HSyncPolarity",
+                  "description": "Horizontal sync polarity: \"+hsync\" or \"-hsync\"."
+                },
+                "hsync_start": {
+                  "description": "Horizontal sync pulse start position in pixels.",
+                  "format": "uint16",
+                  "maximum": 65535,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "htotal": {
+                  "description": "Total horizontal number of pixels before resetting the horizontal drawing position to\nzero.",
+                  "format": "uint16",
+                  "maximum": 65535,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "vdisplay": {
+                  "description": "Vertical active pixels.",
+                  "format": "uint16",
+                  "maximum": 65535,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "vsync_end": {
+                  "description": "Vertical sync pulse end position in pixels.",
+                  "format": "uint16",
+                  "maximum": 65535,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "vsync_polarity": {
+                  "$ref": "#/$defs/VSyncPolarity",
+                  "description": "Vertical sync polarity: \"+vsync\" or \"-vsync\"."
+                },
+                "vsync_start": {
+                  "description": "Vertical sync pulse start position in pixels.",
+                  "format": "uint16",
+                  "maximum": 65535,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "vtotal": {
+                  "description": "Total vertical number of pixels before resetting the vertical drawing position to zero.",
+                  "format": "uint16",
+                  "maximum": 65535,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "clock",
+                "hdisplay",
+                "hsync_start",
+                "hsync_end",
+                "htotal",
+                "vdisplay",
+                "vsync_start",
+                "vsync_end",
+                "vtotal",
+                "hsync_polarity",
+                "vsync_polarity"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Modeline"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Set the output scale.",
+          "properties": {
+            "Scale": {
+              "properties": {
+                "scale": {
+                  "$ref": "#/$defs/ScaleToSet",
+                  "description": "Scale factor to set, or \"auto\" for automatic selection."
+                }
+              },
+              "required": [
+                "scale"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Scale"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Set the output transform.",
+          "properties": {
+            "Transform": {
+              "properties": {
+                "transform": {
+                  "$ref": "#/$defs/Transform",
+                  "description": "Transform to set, counter-clockwise."
+                }
+              },
+              "required": [
+                "transform"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Transform"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Set the output position.",
+          "properties": {
+            "Position": {
+              "properties": {
+                "position": {
+                  "$ref": "#/$defs/PositionToSet",
+                  "description": "Position to set, or \"auto\" for automatic selection."
+                }
+              },
+              "required": [
+                "position"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Position"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Set the variable refresh rate mode.",
+          "properties": {
+            "Vrr": {
+              "properties": {
+                "vrr": {
+                  "$ref": "#/$defs/VrrToSet",
+                  "description": "Variable refresh rate mode to set."
+                }
+              },
+              "required": [
+                "vrr"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Vrr"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Set the maximum bits per channel (bit depth).",
+          "properties": {
+            "MaxBpc": {
+              "properties": {
+                "max_bpc": {
+                  "$ref": "#/$defs/MaxBpc",
+                  "description": "Maximum bits per channel to set."
+                }
+              },
+              "required": [
+                "max_bpc"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "MaxBpc"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "OutputConfigChanged": {
+      "description": "Output configuration change result.",
+      "oneOf": [
+        {
+          "const": "Applied",
+          "description": "The target output was connected and the change was applied.",
+          "type": "string"
+        },
+        {
+          "const": "OutputWasMissing",
+          "description": "The target output was not found, the change will be applied when it is connected.",
+          "type": "string"
+        }
+      ]
+    },
+    "Overview": {
+      "description": "Overview information.",
+      "properties": {
+        "is_open": {
+          "description": "Whether the overview is currently open.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "is_open"
+      ],
+      "type": "object"
+    },
+    "PickedColor": {
+      "description": "Color picked from the screen.",
+      "properties": {
+        "rgb": {
+          "description": "Color values as red, green, blue, each ranging from 0.0 to 1.0.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        }
+      },
+      "required": [
+        "rgb"
+      ],
+      "type": "object"
+    },
+    "PositionChange": {
+      "description": "Change in floating window position.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Set the position in logical pixels.",
+          "properties": {
+            "SetFixed": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "SetFixed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Set the position as a proportion of the working area.",
+          "properties": {
+            "SetProportion": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "SetProportion"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Add or subtract to the current position in logical pixels.",
+          "properties": {
+            "AdjustFixed": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "AdjustFixed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Add or subtract to the current position as a proportion of the working area.",
+          "properties": {
+            "AdjustProportion": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "AdjustProportion"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PositionToSet": {
+      "description": "Output position to set.",
+      "oneOf": [
+        {
+          "const": "Automatic",
+          "description": "Position the output automatically.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Set a specific position.",
+          "properties": {
+            "Specific": {
+              "$ref": "#/$defs/ConfiguredPosition"
+            }
+          },
+          "required": [
+            "Specific"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Request": {
+      "description": "Request from client to niri.",
+      "oneOf": [
+        {
+          "const": "Version",
+          "description": "Request the version string for the running niri instance.",
+          "type": "string"
+        },
+        {
+          "const": "Outputs",
+          "description": "Request information about connected outputs.",
+          "type": "string"
+        },
+        {
+          "const": "Workspaces",
+          "description": "Request information about workspaces.",
+          "type": "string"
+        },
+        {
+          "const": "Windows",
+          "description": "Request information about open windows.",
+          "type": "string"
+        },
+        {
+          "const": "Layers",
+          "description": "Request information about layer-shell surfaces.",
+          "type": "string"
+        },
+        {
+          "const": "KeyboardLayouts",
+          "description": "Request information about the configured keyboard layouts.",
+          "type": "string"
+        },
+        {
+          "const": "FocusedOutput",
+          "description": "Request information about the focused output.",
+          "type": "string"
+        },
+        {
+          "const": "FocusedWindow",
+          "description": "Request information about the focused window.",
+          "type": "string"
+        },
+        {
+          "const": "PickWindow",
+          "description": "Request picking a window and get its information.",
+          "type": "string"
+        },
+        {
+          "const": "PickColor",
+          "description": "Request picking a color from the screen.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Perform an action.",
+          "properties": {
+            "Action": {
+              "$ref": "#/$defs/Action"
+            }
+          },
+          "required": [
+            "Action"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Change output configuration temporarily.\n\nThe configuration is changed temporarily and not saved into the config file. If the output\nconfiguration subsequently changes in the config file, these temporary changes will be\nforgotten.",
+          "properties": {
+            "Output": {
+              "properties": {
+                "action": {
+                  "$ref": "#/$defs/OutputAction",
+                  "description": "Configuration to apply."
+                },
+                "output": {
+                  "description": "Output name.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "output",
+                "action"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Output"
+          ],
+          "type": "object"
+        },
+        {
+          "const": "EventStream",
+          "description": "Start continuously receiving events from the compositor.\n\nThe compositor should reply with `Reply::Ok(Response::Handled)`, then continuously send\n[`Event`]s, one per line.\n\nThe event stream will always give you the full current state up-front. For example, the\nfirst workspace-related event you will receive will be [`Event::WorkspacesChanged`]\ncontaining the full current workspaces state. You *do not* need to separately send\n[`Request::Workspaces`] when using the event stream.\n\nWhere reasonable, event stream state updates are atomic, though this is not always the\ncase. For example, a window may end up with a workspace id for a workspace that had already\nbeen removed. This can happen if the corresponding [`Event::WorkspacesChanged`] arrives\nbefore the corresponding [`Event::WindowOpenedOrChanged`].",
+          "type": "string"
+        },
+        {
+          "const": "ReturnError",
+          "description": "Respond with an error (for testing error handling).",
+          "type": "string"
+        },
+        {
+          "const": "OverviewState",
+          "description": "Request information about the overview.",
+          "type": "string"
+        },
+        {
+          "const": "Casts",
+          "description": "Request information about screencasts.",
+          "type": "string"
+        }
+      ]
+    },
+    "Response": {
+      "description": "Successful response from niri to client.",
+      "oneOf": [
+        {
+          "const": "Handled",
+          "description": "A request that does not need a response was handled successfully.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The version string for the running niri instance.",
+          "properties": {
+            "Version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "Version"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Information about connected outputs.\n\nMap from output name to output info.",
+          "properties": {
+            "Outputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/Output"
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "Outputs"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Information about workspaces.",
+          "properties": {
+            "Workspaces": {
+              "items": {
+                "$ref": "#/$defs/Workspace"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "Workspaces"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Information about open windows.",
+          "properties": {
+            "Windows": {
+              "items": {
+                "$ref": "#/$defs/Window"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "Windows"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Information about layer-shell surfaces.",
+          "properties": {
+            "Layers": {
+              "items": {
+                "$ref": "#/$defs/LayerSurface"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "Layers"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Information about the keyboard layout.",
+          "properties": {
+            "KeyboardLayouts": {
+              "$ref": "#/$defs/KeyboardLayouts"
+            }
+          },
+          "required": [
+            "KeyboardLayouts"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Information about the focused output.",
+          "properties": {
+            "FocusedOutput": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Output"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "FocusedOutput"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Information about the focused window.",
+          "properties": {
+            "FocusedWindow": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Window"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "FocusedWindow"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Information about the picked window.",
+          "properties": {
+            "PickedWindow": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Window"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "PickedWindow"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Information about the picked color.",
+          "properties": {
+            "PickedColor": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PickedColor"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "PickedColor"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Output configuration change result.",
+          "properties": {
+            "OutputConfigChanged": {
+              "$ref": "#/$defs/OutputConfigChanged"
+            }
+          },
+          "required": [
+            "OutputConfigChanged"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Information about the overview.",
+          "properties": {
+            "OverviewState": {
+              "$ref": "#/$defs/Overview"
+            }
+          },
+          "required": [
+            "OverviewState"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Information about screencasts.",
+          "properties": {
+            "Casts": {
+              "items": {
+                "$ref": "#/$defs/Cast"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "Casts"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Result_of_Response_or_string": {
+      "oneOf": [
+        {
+          "properties": {
+            "Ok": {
+              "$ref": "#/$defs/Response"
+            }
+          },
+          "required": [
+            "Ok"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "Err": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "Err"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ScaleToSet": {
+      "description": "Output scale to set.",
+      "oneOf": [
+        {
+          "const": "Automatic",
+          "description": "Niri will pick the scale automatically.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Specific scale.",
+          "properties": {
+            "Specific": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "Specific"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "SizeChange": {
+      "description": "Change in window or column size.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Set the size in logical pixels.",
+          "properties": {
+            "SetFixed": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "SetFixed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Set the size as a proportion of the working area.",
+          "properties": {
+            "SetProportion": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "SetProportion"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Add or subtract to the current size in logical pixels.",
+          "properties": {
+            "AdjustFixed": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "AdjustFixed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Add or subtract to the current size as a proportion of the working area.",
+          "properties": {
+            "AdjustProportion": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "AdjustProportion"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Timestamp": {
+      "description": "A moment in time.",
+      "properties": {
+        "nanos": {
+          "description": "Fractional part of the timestamp in nanoseconds (10<sup>-9</sup> seconds).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "secs": {
+          "description": "Number of whole seconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "secs",
+        "nanos"
+      ],
+      "type": "object"
+    },
+    "Transform": {
+      "description": "Output transform, which goes counter-clockwise.",
+      "oneOf": [
+        {
+          "const": "Normal",
+          "description": "Untransformed.",
+          "type": "string"
+        },
+        {
+          "const": "90",
+          "description": "Rotated by 90°.",
+          "type": "string"
+        },
+        {
+          "const": "180",
+          "description": "Rotated by 180°.",
+          "type": "string"
+        },
+        {
+          "const": "270",
+          "description": "Rotated by 270°.",
+          "type": "string"
+        },
+        {
+          "const": "Flipped",
+          "description": "Flipped horizontally.",
+          "type": "string"
+        },
+        {
+          "const": "Flipped90",
+          "description": "Rotated by 90° and flipped horizontally.",
+          "type": "string"
+        },
+        {
+          "const": "Flipped180",
+          "description": "Flipped vertically.",
+          "type": "string"
+        },
+        {
+          "const": "Flipped270",
+          "description": "Rotated by 270° and flipped horizontally.",
+          "type": "string"
+        }
+      ]
+    },
+    "VSyncPolarity": {
+      "description": "Modeline vertical syncing polarity.",
+      "oneOf": [
+        {
+          "const": "PVSync",
+          "description": "Positive polarity.",
+          "type": "string"
+        },
+        {
+          "const": "NVSync",
+          "description": "Negative polarity.",
+          "type": "string"
+        }
+      ]
+    },
+    "VrrToSet": {
+      "description": "Output VRR to set.",
+      "properties": {
+        "on_demand": {
+          "default": false,
+          "description": "Only enable when the output shows a window matching the variable-refresh-rate window rule.",
+          "type": "boolean"
+        },
+        "vrr": {
+          "description": "Whether to enable variable refresh rate.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "vrr"
+      ],
+      "type": "object"
+    },
+    "Window": {
+      "description": "Toplevel window.",
+      "properties": {
+        "app_id": {
+          "description": "Application ID, if set.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "focus_timestamp": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Timestamp when the window was most recently focused.\n\nThis timestamp is intended for most-recently-used window switchers, i.e. Alt-Tab. It only\nupdates after some debounce time so that quick window switching doesn't mark intermediate\nwindows as recently focused.\n\nThe timestamp comes from the monotonic clock."
+        },
+        "id": {
+          "description": "Unique id of this window.\n\nThis id remains constant while this window is open.\n\nDo not assume that window ids will always increase without wrapping, or start at 1. That is\nan implementation detail subject to change. For example, ids may change to be randomly\ngenerated for each new window.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "is_floating": {
+          "description": "Whether this window is currently floating.\n\nIf the window isn't floating then it is in the tiling layout.",
+          "type": "boolean"
+        },
+        "is_focused": {
+          "description": "Whether this window is currently focused.\n\nThere can be either one focused window or zero (e.g. when a layer-shell surface has focus).",
+          "type": "boolean"
+        },
+        "is_urgent": {
+          "description": "Whether this window requests your attention.",
+          "type": "boolean"
+        },
+        "layout": {
+          "$ref": "#/$defs/WindowLayout",
+          "description": "Position- and size-related properties of the window."
+        },
+        "pid": {
+          "description": "Process ID that created the Wayland connection for this window, if known.\n\nCurrently, windows created by xdg-desktop-portal-gnome will have a `None` PID, but this may\nchange in the future.",
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "title": {
+          "description": "Title, if set.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "workspace_id": {
+          "description": "Id of the workspace this window is on, if any.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "is_focused",
+        "is_floating",
+        "is_urgent",
+        "layout"
+      ],
+      "type": "object"
+    },
+    "WindowLayout": {
+      "description": "Position- and size-related properties of a [`Window`].\n\nOptional properties will be unset for some windows, do not rely on them being present. Whether\nsome optional properties are present or absent for certain window types may change across niri\nreleases.\n\nAll sizes and positions are in *logical pixels* unless stated otherwise. Logical sizes may be\nfractional. For example, at 1.25 monitor scale, a 2-physical-pixel-wide window border is 1.6\nlogical pixels wide.\n\nThis struct contains positions and sizes both for full tiles ([`Self::tile_size`],\n[`Self::tile_pos_in_workspace_view`]) and the window geometry ([`Self::window_size`],\n[`Self::window_offset_in_tile`]). For visual displays, use the tile properties, as they\ncorrespond to what the user visually considers \"window\". The window properties on the other\nhand are mainly useful when you need to know the underlying Wayland window sizes, e.g. for\napplication debugging.",
+      "properties": {
+        "pos_in_scrolling_layout": {
+          "description": "Location of a tiled window within a workspace: (column index, tile index in column).\n\nThe indices are 1-based, i.e. the leftmost column is at index 1 and the topmost tile in a\ncolumn is at index 1. This is consistent with [`Action::FocusColumn`] and\n[`Action::FocusWindowInColumn`].",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          ],
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "tile_pos_in_workspace_view": {
+          "description": "Tile position within the current view of the workspace.\n\nThis is the same \"workspace view\" as in gradients' `relative-to` in the niri config.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "double",
+              "type": "number"
+            },
+            {
+              "format": "double",
+              "type": "number"
+            }
+          ],
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "tile_size": {
+          "description": "Size of the tile this window is in, including decorations like borders.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "double",
+              "type": "number"
+            },
+            {
+              "format": "double",
+              "type": "number"
+            }
+          ],
+          "type": "array"
+        },
+        "window_offset_in_tile": {
+          "description": "Location of the window's visual geometry within its tile.\n\nThis includes things like border sizes. For fullscreened fixed-size windows this includes\nthe distance from the corner of the black backdrop to the corner of the (centered) window\ncontents.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "double",
+              "type": "number"
+            },
+            {
+              "format": "double",
+              "type": "number"
+            }
+          ],
+          "type": "array"
+        },
+        "window_size": {
+          "description": "Size of the window's visual geometry itself.\n\nDoes not include niri decorations like borders.\n\nCurrently, Wayland toplevel windows can only be integer-sized in logical pixels, even\nthough it doesn't necessarily align to physical pixels.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "int32",
+              "type": "integer"
+            },
+            {
+              "format": "int32",
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        }
+      },
+      "required": [
+        "tile_size",
+        "window_size",
+        "window_offset_in_tile"
+      ],
+      "type": "object"
+    },
+    "Workspace": {
+      "description": "A workspace.",
+      "properties": {
+        "active_window_id": {
+          "description": "Id of the active window on this workspace, if any.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "id": {
+          "description": "Unique id of this workspace.\n\nThis id remains constant regardless of the workspace moving around and across monitors.\n\nDo not assume that workspace ids will always increase without wrapping, or start at 1. That\nis an implementation detail subject to change. For example, ids may change to be randomly\ngenerated for each new workspace.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "idx": {
+          "description": "Index of the workspace on its monitor.\n\nThis is the same index you can use for requests like `niri msg action focus-workspace`.\n\nThis index *will change* as you move and re-order workspace. It is merely the workspace's\ncurrent position on its monitor. Workspaces on different monitors can have the same index.\n\nIf you need a unique workspace id that doesn't change, see [`Self::id`].",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "is_active": {
+          "description": "Whether the workspace is currently active on its output.\n\nEvery output has one active workspace, the one that is currently visible on that output.",
+          "type": "boolean"
+        },
+        "is_focused": {
+          "description": "Whether the workspace is currently focused.\n\nThere's only one focused workspace across all outputs.",
+          "type": "boolean"
+        },
+        "is_urgent": {
+          "description": "Whether the workspace currently has an urgent window in its output.",
+          "type": "boolean"
+        },
+        "name": {
+          "description": "Optional name of the workspace.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "output": {
+          "description": "Name of the output that the workspace is on.\n\nCan be `None` if no outputs are currently connected.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "idx",
+        "is_urgent",
+        "is_active",
+        "is_focused"
+      ],
+      "type": "object"
+    },
+    "WorkspaceReferenceArg": {
+      "description": "Workspace reference (id, index or name) to operate on.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Id of the workspace.",
+          "properties": {
+            "Id": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "Id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Index of the workspace.",
+          "properties": {
+            "Index": {
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "Index"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Name of the workspace.",
+          "properties": {
+            "Name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "Name"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "action": {
+      "$ref": "#/$defs/Action"
+    },
+    "event": {
+      "$ref": "#/$defs/Event"
+    },
+    "output_action": {
+      "$ref": "#/$defs/OutputAction"
+    },
+    "reply": {
+      "$ref": "#/$defs/Result_of_Response_or_string"
+    },
+    "request": {
+      "$ref": "#/$defs/Request"
+    },
+    "response": {
+      "$ref": "#/$defs/Response"
+    }
+  },
+  "required": [
+    "request",
+    "reply",
+    "response",
+    "event",
+    "action",
+    "output_action"
+  ],
+  "title": "IpcRoots",
+  "type": "object",
+  "x-niri-source": {
+    "commit": "689c1e914a5af782a476e433b79c15554bf5a312",
+    "contract": "deserialize",
+    "extraction_format_version": 1,
+    "release": "main-689c1e9",
+    "schemars_version": "1.2.2"
+  }
+}

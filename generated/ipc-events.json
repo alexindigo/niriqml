@@ -1,0 +1,368 @@
+[
+  {
+    "arguments": [
+      {
+        "name": "cast",
+        "type": {
+          "kind": "ref",
+          "name": "Cast"
+        },
+        "wire": "cast"
+      }
+    ],
+    "signal": "castStartedOrChanged",
+    "variant": "CastStartedOrChanged"
+  },
+  {
+    "arguments": [
+      {
+        "name": "streamId",
+        "type": {
+          "format": "uint64",
+          "kind": "integer",
+          "minimum": 0
+        },
+        "wire": "stream_id"
+      }
+    ],
+    "signal": "castStopped",
+    "variant": "CastStopped"
+  },
+  {
+    "arguments": [
+      {
+        "name": "casts",
+        "type": {
+          "item": {
+            "kind": "ref",
+            "name": "Cast"
+          },
+          "kind": "array",
+          "max": null,
+          "min": 0
+        },
+        "wire": "casts"
+      }
+    ],
+    "signal": "castsChanged",
+    "variant": "CastsChanged"
+  },
+  {
+    "arguments": [
+      {
+        "name": "failed",
+        "type": {
+          "kind": "boolean"
+        },
+        "wire": "failed"
+      }
+    ],
+    "signal": "configLoaded",
+    "variant": "ConfigLoaded"
+  },
+  {
+    "arguments": [
+      {
+        "name": "idx",
+        "type": {
+          "format": "uint8",
+          "kind": "integer",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "wire": "idx"
+      }
+    ],
+    "signal": "keyboardLayoutSwitched",
+    "variant": "KeyboardLayoutSwitched"
+  },
+  {
+    "arguments": [
+      {
+        "name": "layouts",
+        "type": {
+          "kind": "ref",
+          "name": "KeyboardLayouts"
+        },
+        "wire": "keyboard_layouts"
+      }
+    ],
+    "signal": "keyboardLayoutsChanged",
+    "variant": "KeyboardLayoutsChanged"
+  },
+  {
+    "arguments": [
+      {
+        "name": "isOpen",
+        "type": {
+          "kind": "boolean"
+        },
+        "wire": "is_open"
+      }
+    ],
+    "signal": "overviewOpenedOrClosed",
+    "variant": "OverviewOpenedOrClosed"
+  },
+  {
+    "arguments": [
+      {
+        "name": "path",
+        "type": {
+          "item": {
+            "kind": "string"
+          },
+          "kind": "optional"
+        },
+        "wire": "path"
+      }
+    ],
+    "signal": "screenshotCaptured",
+    "variant": "ScreenshotCaptured"
+  },
+  {
+    "arguments": [
+      {
+        "name": "on",
+        "type": {
+          "kind": "boolean"
+        },
+        "wire": "on"
+      }
+    ],
+    "signal": "touchpadToggled",
+    "variant": "TouchpadToggled"
+  },
+  {
+    "arguments": [
+      {
+        "name": "windowId",
+        "type": {
+          "format": "uint64",
+          "kind": "integer",
+          "minimum": 0
+        },
+        "wire": "id"
+      }
+    ],
+    "signal": "windowClosed",
+    "variant": "WindowClosed"
+  },
+  {
+    "arguments": [
+      {
+        "name": "windowId",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      }
+    ],
+    "signal": "windowFocusChanged",
+    "variant": "WindowFocusChanged"
+  },
+  {
+    "arguments": [
+      {
+        "name": "windowId",
+        "type": {
+          "format": "uint64",
+          "kind": "integer",
+          "minimum": 0
+        },
+        "wire": "id"
+      },
+      {
+        "name": "focusTimestamp",
+        "type": {
+          "item": {
+            "kind": "ref",
+            "name": "Timestamp"
+          },
+          "kind": "optional"
+        },
+        "wire": "focus_timestamp"
+      }
+    ],
+    "signal": "windowFocusTimestampChanged",
+    "variant": "WindowFocusTimestampChanged"
+  },
+  {
+    "arguments": [
+      {
+        "name": "changes",
+        "type": {
+          "item": {
+            "items": [
+              {
+                "format": "uint64",
+                "kind": "integer",
+                "minimum": 0
+              },
+              {
+                "kind": "ref",
+                "name": "WindowLayout"
+              }
+            ],
+            "kind": "tuple"
+          },
+          "kind": "array",
+          "max": null,
+          "min": 0
+        },
+        "wire": "changes"
+      }
+    ],
+    "signal": "windowLayoutsChanged",
+    "variant": "WindowLayoutsChanged"
+  },
+  {
+    "arguments": [
+      {
+        "name": "window",
+        "type": {
+          "kind": "ref",
+          "name": "Window"
+        },
+        "wire": "window"
+      }
+    ],
+    "signal": "windowOpenedOrChanged",
+    "variant": "WindowOpenedOrChanged"
+  },
+  {
+    "arguments": [
+      {
+        "name": "windowId",
+        "type": {
+          "format": "uint64",
+          "kind": "integer",
+          "minimum": 0
+        },
+        "wire": "id"
+      },
+      {
+        "name": "urgent",
+        "type": {
+          "kind": "boolean"
+        },
+        "wire": "urgent"
+      }
+    ],
+    "signal": "windowUrgencyChanged",
+    "variant": "WindowUrgencyChanged"
+  },
+  {
+    "arguments": [
+      {
+        "name": "windows",
+        "type": {
+          "item": {
+            "kind": "ref",
+            "name": "Window"
+          },
+          "kind": "array",
+          "max": null,
+          "min": 0
+        },
+        "wire": "windows"
+      }
+    ],
+    "signal": "windowsChanged",
+    "variant": "WindowsChanged"
+  },
+  {
+    "arguments": [
+      {
+        "name": "workspaceId",
+        "type": {
+          "format": "uint64",
+          "kind": "integer",
+          "minimum": 0
+        },
+        "wire": "id"
+      },
+      {
+        "name": "focused",
+        "type": {
+          "kind": "boolean"
+        },
+        "wire": "focused"
+      }
+    ],
+    "signal": "workspaceActivated",
+    "variant": "WorkspaceActivated"
+  },
+  {
+    "arguments": [
+      {
+        "name": "workspaceId",
+        "type": {
+          "format": "uint64",
+          "kind": "integer",
+          "minimum": 0
+        },
+        "wire": "workspace_id"
+      },
+      {
+        "name": "windowId",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "active_window_id"
+      }
+    ],
+    "signal": "workspaceActiveWindowChanged",
+    "variant": "WorkspaceActiveWindowChanged"
+  },
+  {
+    "arguments": [
+      {
+        "name": "workspaceId",
+        "type": {
+          "format": "uint64",
+          "kind": "integer",
+          "minimum": 0
+        },
+        "wire": "id"
+      },
+      {
+        "name": "urgent",
+        "type": {
+          "kind": "boolean"
+        },
+        "wire": "urgent"
+      }
+    ],
+    "signal": "workspaceUrgencyChanged",
+    "variant": "WorkspaceUrgencyChanged"
+  },
+  {
+    "arguments": [
+      {
+        "name": "workspaces",
+        "type": {
+          "item": {
+            "kind": "ref",
+            "name": "Workspace"
+          },
+          "kind": "array",
+          "max": null,
+          "min": 0
+        },
+        "wire": "workspaces"
+      }
+    ],
+    "signal": "workspacesChanged",
+    "variant": "WorkspacesChanged"
+  }
+]

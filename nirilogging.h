@@ -1,0 +1,9 @@
+#pragma once
+
+#include <QLoggingCategory>
+
+Q_DECLARE_LOGGING_CATEGORY(niriTransport)
+Q_DECLARE_LOGGING_CATEGORY(niriProtocol)
+Q_DECLARE_LOGGING_CATEGORY(niriEventsLog)
+Q_DECLARE_LOGGING_CATEGORY(niriRequestsLog)
+Q_DECLARE_LOGGING_CATEGORY(niriWireLog)

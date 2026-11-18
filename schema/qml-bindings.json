@@ -1,0 +1,76 @@
+{
+  "formatVersion": 1,
+  "events": {
+    "WorkspacesChanged": {},
+    "WorkspaceUrgencyChanged": {"aliases": {"id": "workspaceId"}},
+    "WorkspaceActivated": {"arguments": ["id", "focused"], "aliases": {"id": "workspaceId"}},
+    "WorkspaceActiveWindowChanged": {"arguments": ["workspace_id", "active_window_id"], "aliases": {"active_window_id": "windowId"}},
+    "WindowsChanged": {},
+    "WindowOpenedOrChanged": {},
+    "WindowClosed": {"aliases": {"id": "windowId"}},
+    "WindowFocusChanged": {"aliases": {"id": "windowId"}},
+    "WindowFocusTimestampChanged": {"arguments": ["id", "focus_timestamp"], "aliases": {"id": "windowId"}},
+    "WindowUrgencyChanged": {"aliases": {"id": "windowId"}},
+    "WindowLayoutsChanged": {},
+    "KeyboardLayoutsChanged": {"aliases": {"keyboard_layouts": "layouts"}},
+    "KeyboardLayoutSwitched": {},
+    "OverviewOpenedOrClosed": {},
+    "ConfigLoaded": {},
+    "ScreenshotCaptured": {},
+    "CastsChanged": {},
+    "CastStartedOrChanged": {},
+    "CastStopped": {},
+    "TouchpadToggled": {}
+  },
+  "requests": {
+    "Version": {"response": "Version", "source": "v26.04:src/ipc/server.rs:274"},
+    "Outputs": {"response": "Outputs", "source": "v26.04:src/ipc/server.rs:275-279"},
+    "Workspaces": {"response": "Workspaces", "source": "v26.04:src/ipc/server.rs:280-284"},
+    "Windows": {"response": "Windows", "source": "v26.04:src/ipc/server.rs:285-289"},
+    "Layers": {"response": "Layers", "source": "v26.04:src/ipc/server.rs:290-329"},
+    "KeyboardLayouts": {"response": "KeyboardLayouts", "source": "v26.04:src/ipc/server.rs:331-335"},
+    "FocusedOutput": {"response": "FocusedOutput", "source": "v26.04:src/ipc/server.rs:421-445"},
+    "FocusedWindow": {"response": "FocusedWindow", "source": "v26.04:src/ipc/server.rs:337-341"},
+    "PickWindow": {"response": "PickedWindow", "source": "v26.04:src/ipc/server.rs:343-370"},
+    "PickColor": {"response": "PickedColor", "source": "v26.04:src/ipc/server.rs:372-379"},
+    "Action": {"response": "Handled", "argument": "action", "source": "v26.04:src/ipc/server.rs:381-399"},
+    "Output": {"response": "OutputConfigChanged", "arguments": ["output", "action"], "source": "v26.04:src/ipc/server.rs:401-419"},
+    "EventStream": {"response": "Handled", "source": "v26.04:src/ipc/server.rs:227-266,447"},
+    "ReturnError": {"response": "Err", "source": "v26.04:src/ipc/server.rs:273"},
+    "OverviewState": {"response": "OverviewState", "source": "v26.04:src/ipc/server.rs:448-452"},
+    "Casts": {"response": "Casts", "source": "v26.04:src/ipc/server.rs:453-456"}
+  },
+  "actions": {
+    "FocusWindow": {"aliases": {"id": "windowId"}},
+    "CloseWindow": {"aliases": {"id": "windowId"}},
+    "ToggleWindowFloating": {"aliases": {"id": "windowId"}},
+    "MoveWindowToWorkspace": {"arguments": ["window_id", "reference", "focus"]},
+    "MoveWindowToMonitor": {"arguments": ["id", "output"], "aliases": {"id": "windowId"}},
+    "SetWindowWidth": {"arguments": ["id", "change"], "aliases": {"id": "windowId"}},
+    "SetWindowHeight": {"arguments": ["id", "change"], "aliases": {"id": "windowId"}}
+  },
+  "tuples": {
+    "Event/WindowLayoutsChanged/changes/items": {
+      "cppName": "NiriWindowLayoutChange",
+      "qmlName": "niriWindowLayoutChange",
+      "members": ["id", "layout"]
+    }
+  },
+  "types": {
+    "MaxBpc": {
+      "variants": {"6": "Bits6", "8": "Bits8", "10": "Bits10", "12": "Bits12", "14": "Bits14", "16": "Bits16"}
+    },
+    "LayerSurface": {
+      "fields": {
+        "namespace": "namespaceName"
+      }
+    },
+    "Transform": {
+      "variants": {
+        "90": "Rotate90",
+        "180": "Rotate180",
+        "270": "Rotate270"
+      }
+    }
+  }
+}

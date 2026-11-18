@@ -1,0 +1,125 @@
+[
+  {
+    "arguments": [
+      {
+        "name": "action",
+        "type": {
+          "kind": "ref",
+          "name": "Action"
+        },
+        "wire": null
+      }
+    ],
+    "method": "action",
+    "response": "Handled",
+    "variant": "Action"
+  },
+  {
+    "arguments": [],
+    "method": "casts",
+    "response": "Casts",
+    "variant": "Casts"
+  },
+  {
+    "arguments": [],
+    "method": "eventStream",
+    "response": "Handled",
+    "variant": "EventStream"
+  },
+  {
+    "arguments": [],
+    "method": "focusedOutput",
+    "response": "FocusedOutput",
+    "variant": "FocusedOutput"
+  },
+  {
+    "arguments": [],
+    "method": "focusedWindow",
+    "response": "FocusedWindow",
+    "variant": "FocusedWindow"
+  },
+  {
+    "arguments": [],
+    "method": "keyboardLayouts",
+    "response": "KeyboardLayouts",
+    "variant": "KeyboardLayouts"
+  },
+  {
+    "arguments": [],
+    "method": "layers",
+    "response": "Layers",
+    "variant": "Layers"
+  },
+  {
+    "arguments": [
+      {
+        "name": "output",
+        "required": true,
+        "type": {
+          "kind": "string"
+        },
+        "wire": "output"
+      },
+      {
+        "name": "action",
+        "required": true,
+        "type": {
+          "kind": "ref",
+          "name": "OutputAction"
+        },
+        "wire": "action"
+      }
+    ],
+    "method": "output",
+    "response": "OutputConfigChanged",
+    "variant": "Output"
+  },
+  {
+    "arguments": [],
+    "method": "outputs",
+    "response": "Outputs",
+    "variant": "Outputs"
+  },
+  {
+    "arguments": [],
+    "method": "overviewState",
+    "response": "OverviewState",
+    "variant": "OverviewState"
+  },
+  {
+    "arguments": [],
+    "method": "pickColor",
+    "response": "PickedColor",
+    "variant": "PickColor"
+  },
+  {
+    "arguments": [],
+    "method": "pickWindow",
+    "response": "PickedWindow",
+    "variant": "PickWindow"
+  },
+  {
+    "arguments": [],
+    "method": "returnError",
+    "response": "Err",
+    "variant": "ReturnError"
+  },
+  {
+    "arguments": [],
+    "method": "version",
+    "response": "Version",
+    "variant": "Version"
+  },
+  {
+    "arguments": [],
+    "method": "windows",
+    "response": "Windows",
+    "variant": "Windows"
+  },
+  {
+    "arguments": [],
+    "method": "workspaces",
+    "response": "Workspaces",
+    "variant": "Workspaces"
+  }
+]

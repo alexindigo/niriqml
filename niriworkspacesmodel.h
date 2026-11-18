@@ -5,9 +5,9 @@
 #include <QList>
 #include <QtQml/qqmlregistration.h>
 
-#include "niritypes.h"
+#include "niristateprojection.h"
 
-class NiriWorkspacesModel : public QAbstractListModel
+class NiriWorkspacesModel : public NiriRecordModel<NiriWorkspace>
 {
     Q_OBJECT
     QML_NAMED_ELEMENT(NiriWorkspaces)
@@ -32,15 +32,4 @@ public:
 
 protected:
     QHash<int, QByteArray> roleNames() const override;
-
-private slots:
-    void onWorkspacesChanged(const QVariantList &workspaces);
-    void onWorkspaceActivated(quint64 workspaceId, bool focused);
-    void onWorkspaceActiveWindowChanged(quint64 workspaceId, quint64 windowId);
-
-private:
-    QList<NiriWorkspace> m_workspaces;
-    QHash<quint64, int> m_idToRow;
-
-    void rebuildIndex();
 };

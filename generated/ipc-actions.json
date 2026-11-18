@@ -1,0 +1,1573 @@
+[
+  {
+    "arguments": [],
+    "method": "centerColumn",
+    "variant": "CenterColumn"
+  },
+  {
+    "arguments": [],
+    "method": "centerVisibleColumns",
+    "variant": "CenterVisibleColumns"
+  },
+  {
+    "arguments": [
+      {
+        "name": "id",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "centerWindow",
+    "variant": "CenterWindow"
+  },
+  {
+    "arguments": [
+      {
+        "name": "vt",
+        "type": {
+          "format": "uint8",
+          "kind": "integer",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "wire": "vt"
+      }
+    ],
+    "method": "changeVt",
+    "variant": "ChangeVt"
+  },
+  {
+    "arguments": [],
+    "method": "clearDynamicCastTarget",
+    "variant": "ClearDynamicCastTarget"
+  },
+  {
+    "arguments": [],
+    "method": "closeOverview",
+    "variant": "CloseOverview"
+  },
+  {
+    "arguments": [
+      {
+        "name": "windowId",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "closeWindow",
+    "variant": "CloseWindow"
+  },
+  {
+    "arguments": [
+      {
+        "name": "id",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "consumeOrExpelWindowLeft",
+    "variant": "ConsumeOrExpelWindowLeft"
+  },
+  {
+    "arguments": [
+      {
+        "name": "id",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "consumeOrExpelWindowRight",
+    "variant": "ConsumeOrExpelWindowRight"
+  },
+  {
+    "arguments": [],
+    "method": "consumeWindowIntoColumn",
+    "variant": "ConsumeWindowIntoColumn"
+  },
+  {
+    "arguments": [],
+    "method": "debugToggleDamage",
+    "variant": "DebugToggleDamage"
+  },
+  {
+    "arguments": [],
+    "method": "debugToggleOpaqueRegions",
+    "variant": "DebugToggleOpaqueRegions"
+  },
+  {
+    "arguments": [
+      {
+        "name": "delayMs",
+        "type": {
+          "item": {
+            "format": "uint16",
+            "kind": "integer",
+            "maximum": 65535,
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "delay_ms"
+      }
+    ],
+    "method": "doScreenTransition",
+    "variant": "DoScreenTransition"
+  },
+  {
+    "arguments": [],
+    "method": "expandColumnToAvailableWidth",
+    "variant": "ExpandColumnToAvailableWidth"
+  },
+  {
+    "arguments": [],
+    "method": "expelWindowFromColumn",
+    "variant": "ExpelWindowFromColumn"
+  },
+  {
+    "arguments": [
+      {
+        "name": "index",
+        "type": {
+          "format": "uint",
+          "kind": "integer",
+          "minimum": 0
+        },
+        "wire": "index"
+      }
+    ],
+    "method": "focusColumn",
+    "variant": "FocusColumn"
+  },
+  {
+    "arguments": [],
+    "method": "focusColumnFirst",
+    "variant": "FocusColumnFirst"
+  },
+  {
+    "arguments": [],
+    "method": "focusColumnLast",
+    "variant": "FocusColumnLast"
+  },
+  {
+    "arguments": [],
+    "method": "focusColumnLeft",
+    "variant": "FocusColumnLeft"
+  },
+  {
+    "arguments": [],
+    "method": "focusColumnLeftOrLast",
+    "variant": "FocusColumnLeftOrLast"
+  },
+  {
+    "arguments": [],
+    "method": "focusColumnOrMonitorLeft",
+    "variant": "FocusColumnOrMonitorLeft"
+  },
+  {
+    "arguments": [],
+    "method": "focusColumnOrMonitorRight",
+    "variant": "FocusColumnOrMonitorRight"
+  },
+  {
+    "arguments": [],
+    "method": "focusColumnRight",
+    "variant": "FocusColumnRight"
+  },
+  {
+    "arguments": [],
+    "method": "focusColumnRightOrFirst",
+    "variant": "FocusColumnRightOrFirst"
+  },
+  {
+    "arguments": [],
+    "method": "focusFloating",
+    "variant": "FocusFloating"
+  },
+  {
+    "arguments": [
+      {
+        "name": "output",
+        "type": {
+          "kind": "string"
+        },
+        "wire": "output"
+      }
+    ],
+    "method": "focusMonitor",
+    "variant": "FocusMonitor"
+  },
+  {
+    "arguments": [],
+    "method": "focusMonitorDown",
+    "variant": "FocusMonitorDown"
+  },
+  {
+    "arguments": [],
+    "method": "focusMonitorLeft",
+    "variant": "FocusMonitorLeft"
+  },
+  {
+    "arguments": [],
+    "method": "focusMonitorNext",
+    "variant": "FocusMonitorNext"
+  },
+  {
+    "arguments": [],
+    "method": "focusMonitorPrevious",
+    "variant": "FocusMonitorPrevious"
+  },
+  {
+    "arguments": [],
+    "method": "focusMonitorRight",
+    "variant": "FocusMonitorRight"
+  },
+  {
+    "arguments": [],
+    "method": "focusMonitorUp",
+    "variant": "FocusMonitorUp"
+  },
+  {
+    "arguments": [],
+    "method": "focusTiling",
+    "variant": "FocusTiling"
+  },
+  {
+    "arguments": [
+      {
+        "name": "windowId",
+        "type": {
+          "format": "uint64",
+          "kind": "integer",
+          "minimum": 0
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "focusWindow",
+    "variant": "FocusWindow"
+  },
+  {
+    "arguments": [],
+    "method": "focusWindowBottom",
+    "variant": "FocusWindowBottom"
+  },
+  {
+    "arguments": [],
+    "method": "focusWindowDown",
+    "variant": "FocusWindowDown"
+  },
+  {
+    "arguments": [],
+    "method": "focusWindowDownOrColumnLeft",
+    "variant": "FocusWindowDownOrColumnLeft"
+  },
+  {
+    "arguments": [],
+    "method": "focusWindowDownOrColumnRight",
+    "variant": "FocusWindowDownOrColumnRight"
+  },
+  {
+    "arguments": [],
+    "method": "focusWindowDownOrTop",
+    "variant": "FocusWindowDownOrTop"
+  },
+  {
+    "arguments": [
+      {
+        "name": "index",
+        "type": {
+          "format": "uint8",
+          "kind": "integer",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "wire": "index"
+      }
+    ],
+    "method": "focusWindowInColumn",
+    "variant": "FocusWindowInColumn"
+  },
+  {
+    "arguments": [],
+    "method": "focusWindowOrMonitorDown",
+    "variant": "FocusWindowOrMonitorDown"
+  },
+  {
+    "arguments": [],
+    "method": "focusWindowOrMonitorUp",
+    "variant": "FocusWindowOrMonitorUp"
+  },
+  {
+    "arguments": [],
+    "method": "focusWindowOrWorkspaceDown",
+    "variant": "FocusWindowOrWorkspaceDown"
+  },
+  {
+    "arguments": [],
+    "method": "focusWindowOrWorkspaceUp",
+    "variant": "FocusWindowOrWorkspaceUp"
+  },
+  {
+    "arguments": [],
+    "method": "focusWindowPrevious",
+    "variant": "FocusWindowPrevious"
+  },
+  {
+    "arguments": [],
+    "method": "focusWindowTop",
+    "variant": "FocusWindowTop"
+  },
+  {
+    "arguments": [],
+    "method": "focusWindowUp",
+    "variant": "FocusWindowUp"
+  },
+  {
+    "arguments": [],
+    "method": "focusWindowUpOrBottom",
+    "variant": "FocusWindowUpOrBottom"
+  },
+  {
+    "arguments": [],
+    "method": "focusWindowUpOrColumnLeft",
+    "variant": "FocusWindowUpOrColumnLeft"
+  },
+  {
+    "arguments": [],
+    "method": "focusWindowUpOrColumnRight",
+    "variant": "FocusWindowUpOrColumnRight"
+  },
+  {
+    "arguments": [
+      {
+        "name": "reference",
+        "type": {
+          "kind": "ref",
+          "name": "WorkspaceReferenceArg"
+        },
+        "wire": "reference"
+      }
+    ],
+    "method": "focusWorkspace",
+    "variant": "FocusWorkspace"
+  },
+  {
+    "arguments": [],
+    "method": "focusWorkspaceDown",
+    "variant": "FocusWorkspaceDown"
+  },
+  {
+    "arguments": [],
+    "method": "focusWorkspacePrevious",
+    "variant": "FocusWorkspacePrevious"
+  },
+  {
+    "arguments": [],
+    "method": "focusWorkspaceUp",
+    "variant": "FocusWorkspaceUp"
+  },
+  {
+    "arguments": [
+      {
+        "name": "id",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "fullscreenWindow",
+    "variant": "FullscreenWindow"
+  },
+  {
+    "arguments": [
+      {
+        "name": "path",
+        "type": {
+          "item": {
+            "kind": "string"
+          },
+          "kind": "optional"
+        },
+        "wire": "path"
+      }
+    ],
+    "method": "loadConfigFile",
+    "variant": "LoadConfigFile"
+  },
+  {
+    "arguments": [],
+    "method": "maximizeColumn",
+    "variant": "MaximizeColumn"
+  },
+  {
+    "arguments": [
+      {
+        "name": "id",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "maximizeWindowToEdges",
+    "variant": "MaximizeWindowToEdges"
+  },
+  {
+    "arguments": [],
+    "method": "moveColumnLeft",
+    "variant": "MoveColumnLeft"
+  },
+  {
+    "arguments": [],
+    "method": "moveColumnLeftOrToMonitorLeft",
+    "variant": "MoveColumnLeftOrToMonitorLeft"
+  },
+  {
+    "arguments": [],
+    "method": "moveColumnRight",
+    "variant": "MoveColumnRight"
+  },
+  {
+    "arguments": [],
+    "method": "moveColumnRightOrToMonitorRight",
+    "variant": "MoveColumnRightOrToMonitorRight"
+  },
+  {
+    "arguments": [],
+    "method": "moveColumnToFirst",
+    "variant": "MoveColumnToFirst"
+  },
+  {
+    "arguments": [
+      {
+        "name": "index",
+        "type": {
+          "format": "uint",
+          "kind": "integer",
+          "minimum": 0
+        },
+        "wire": "index"
+      }
+    ],
+    "method": "moveColumnToIndex",
+    "variant": "MoveColumnToIndex"
+  },
+  {
+    "arguments": [],
+    "method": "moveColumnToLast",
+    "variant": "MoveColumnToLast"
+  },
+  {
+    "arguments": [
+      {
+        "name": "output",
+        "type": {
+          "kind": "string"
+        },
+        "wire": "output"
+      }
+    ],
+    "method": "moveColumnToMonitor",
+    "variant": "MoveColumnToMonitor"
+  },
+  {
+    "arguments": [],
+    "method": "moveColumnToMonitorDown",
+    "variant": "MoveColumnToMonitorDown"
+  },
+  {
+    "arguments": [],
+    "method": "moveColumnToMonitorLeft",
+    "variant": "MoveColumnToMonitorLeft"
+  },
+  {
+    "arguments": [],
+    "method": "moveColumnToMonitorNext",
+    "variant": "MoveColumnToMonitorNext"
+  },
+  {
+    "arguments": [],
+    "method": "moveColumnToMonitorPrevious",
+    "variant": "MoveColumnToMonitorPrevious"
+  },
+  {
+    "arguments": [],
+    "method": "moveColumnToMonitorRight",
+    "variant": "MoveColumnToMonitorRight"
+  },
+  {
+    "arguments": [],
+    "method": "moveColumnToMonitorUp",
+    "variant": "MoveColumnToMonitorUp"
+  },
+  {
+    "arguments": [
+      {
+        "name": "focus",
+        "type": {
+          "kind": "boolean"
+        },
+        "wire": "focus"
+      },
+      {
+        "name": "reference",
+        "type": {
+          "kind": "ref",
+          "name": "WorkspaceReferenceArg"
+        },
+        "wire": "reference"
+      }
+    ],
+    "method": "moveColumnToWorkspace",
+    "variant": "MoveColumnToWorkspace"
+  },
+  {
+    "arguments": [
+      {
+        "name": "focus",
+        "type": {
+          "kind": "boolean"
+        },
+        "wire": "focus"
+      }
+    ],
+    "method": "moveColumnToWorkspaceDown",
+    "variant": "MoveColumnToWorkspaceDown"
+  },
+  {
+    "arguments": [
+      {
+        "name": "focus",
+        "type": {
+          "kind": "boolean"
+        },
+        "wire": "focus"
+      }
+    ],
+    "method": "moveColumnToWorkspaceUp",
+    "variant": "MoveColumnToWorkspaceUp"
+  },
+  {
+    "arguments": [
+      {
+        "name": "x",
+        "type": {
+          "kind": "ref",
+          "name": "PositionChange"
+        },
+        "wire": "x"
+      },
+      {
+        "name": "y",
+        "type": {
+          "kind": "ref",
+          "name": "PositionChange"
+        },
+        "wire": "y"
+      },
+      {
+        "name": "id",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "moveFloatingWindow",
+    "variant": "MoveFloatingWindow"
+  },
+  {
+    "arguments": [],
+    "method": "moveWindowDown",
+    "variant": "MoveWindowDown"
+  },
+  {
+    "arguments": [],
+    "method": "moveWindowDownOrToWorkspaceDown",
+    "variant": "MoveWindowDownOrToWorkspaceDown"
+  },
+  {
+    "arguments": [
+      {
+        "name": "id",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "moveWindowToFloating",
+    "variant": "MoveWindowToFloating"
+  },
+  {
+    "arguments": [
+      {
+        "name": "windowId",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      },
+      {
+        "name": "output",
+        "type": {
+          "kind": "string"
+        },
+        "wire": "output"
+      }
+    ],
+    "method": "moveWindowToMonitor",
+    "variant": "MoveWindowToMonitor"
+  },
+  {
+    "arguments": [],
+    "method": "moveWindowToMonitorDown",
+    "variant": "MoveWindowToMonitorDown"
+  },
+  {
+    "arguments": [],
+    "method": "moveWindowToMonitorLeft",
+    "variant": "MoveWindowToMonitorLeft"
+  },
+  {
+    "arguments": [],
+    "method": "moveWindowToMonitorNext",
+    "variant": "MoveWindowToMonitorNext"
+  },
+  {
+    "arguments": [],
+    "method": "moveWindowToMonitorPrevious",
+    "variant": "MoveWindowToMonitorPrevious"
+  },
+  {
+    "arguments": [],
+    "method": "moveWindowToMonitorRight",
+    "variant": "MoveWindowToMonitorRight"
+  },
+  {
+    "arguments": [],
+    "method": "moveWindowToMonitorUp",
+    "variant": "MoveWindowToMonitorUp"
+  },
+  {
+    "arguments": [
+      {
+        "name": "id",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "moveWindowToTiling",
+    "variant": "MoveWindowToTiling"
+  },
+  {
+    "arguments": [
+      {
+        "name": "windowId",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "window_id"
+      },
+      {
+        "name": "reference",
+        "type": {
+          "kind": "ref",
+          "name": "WorkspaceReferenceArg"
+        },
+        "wire": "reference"
+      },
+      {
+        "name": "focus",
+        "type": {
+          "kind": "boolean"
+        },
+        "wire": "focus"
+      }
+    ],
+    "method": "moveWindowToWorkspace",
+    "variant": "MoveWindowToWorkspace"
+  },
+  {
+    "arguments": [
+      {
+        "name": "focus",
+        "type": {
+          "kind": "boolean"
+        },
+        "wire": "focus"
+      }
+    ],
+    "method": "moveWindowToWorkspaceDown",
+    "variant": "MoveWindowToWorkspaceDown"
+  },
+  {
+    "arguments": [
+      {
+        "name": "focus",
+        "type": {
+          "kind": "boolean"
+        },
+        "wire": "focus"
+      }
+    ],
+    "method": "moveWindowToWorkspaceUp",
+    "variant": "MoveWindowToWorkspaceUp"
+  },
+  {
+    "arguments": [],
+    "method": "moveWindowUp",
+    "variant": "MoveWindowUp"
+  },
+  {
+    "arguments": [],
+    "method": "moveWindowUpOrToWorkspaceUp",
+    "variant": "MoveWindowUpOrToWorkspaceUp"
+  },
+  {
+    "arguments": [],
+    "method": "moveWorkspaceDown",
+    "variant": "MoveWorkspaceDown"
+  },
+  {
+    "arguments": [
+      {
+        "name": "index",
+        "type": {
+          "format": "uint",
+          "kind": "integer",
+          "minimum": 0
+        },
+        "wire": "index"
+      },
+      {
+        "name": "reference",
+        "type": {
+          "item": {
+            "kind": "ref",
+            "name": "WorkspaceReferenceArg"
+          },
+          "kind": "optional"
+        },
+        "wire": "reference"
+      }
+    ],
+    "method": "moveWorkspaceToIndex",
+    "variant": "MoveWorkspaceToIndex"
+  },
+  {
+    "arguments": [
+      {
+        "name": "output",
+        "type": {
+          "kind": "string"
+        },
+        "wire": "output"
+      },
+      {
+        "name": "reference",
+        "type": {
+          "item": {
+            "kind": "ref",
+            "name": "WorkspaceReferenceArg"
+          },
+          "kind": "optional"
+        },
+        "wire": "reference"
+      }
+    ],
+    "method": "moveWorkspaceToMonitor",
+    "variant": "MoveWorkspaceToMonitor"
+  },
+  {
+    "arguments": [],
+    "method": "moveWorkspaceToMonitorDown",
+    "variant": "MoveWorkspaceToMonitorDown"
+  },
+  {
+    "arguments": [],
+    "method": "moveWorkspaceToMonitorLeft",
+    "variant": "MoveWorkspaceToMonitorLeft"
+  },
+  {
+    "arguments": [],
+    "method": "moveWorkspaceToMonitorNext",
+    "variant": "MoveWorkspaceToMonitorNext"
+  },
+  {
+    "arguments": [],
+    "method": "moveWorkspaceToMonitorPrevious",
+    "variant": "MoveWorkspaceToMonitorPrevious"
+  },
+  {
+    "arguments": [],
+    "method": "moveWorkspaceToMonitorRight",
+    "variant": "MoveWorkspaceToMonitorRight"
+  },
+  {
+    "arguments": [],
+    "method": "moveWorkspaceToMonitorUp",
+    "variant": "MoveWorkspaceToMonitorUp"
+  },
+  {
+    "arguments": [],
+    "method": "moveWorkspaceUp",
+    "variant": "MoveWorkspaceUp"
+  },
+  {
+    "arguments": [],
+    "method": "openOverview",
+    "variant": "OpenOverview"
+  },
+  {
+    "arguments": [],
+    "method": "powerOffMonitors",
+    "variant": "PowerOffMonitors"
+  },
+  {
+    "arguments": [],
+    "method": "powerOnMonitors",
+    "variant": "PowerOnMonitors"
+  },
+  {
+    "arguments": [
+      {
+        "name": "skipConfirmation",
+        "type": {
+          "kind": "boolean"
+        },
+        "wire": "skip_confirmation"
+      }
+    ],
+    "method": "quit",
+    "variant": "Quit"
+  },
+  {
+    "arguments": [
+      {
+        "name": "id",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "resetWindowHeight",
+    "variant": "ResetWindowHeight"
+  },
+  {
+    "arguments": [
+      {
+        "name": "showPointer",
+        "type": {
+          "kind": "boolean"
+        },
+        "wire": "show_pointer"
+      },
+      {
+        "name": "path",
+        "type": {
+          "item": {
+            "kind": "string"
+          },
+          "kind": "optional"
+        },
+        "wire": "path"
+      }
+    ],
+    "method": "screenshot",
+    "variant": "Screenshot"
+  },
+  {
+    "arguments": [
+      {
+        "name": "showPointer",
+        "type": {
+          "kind": "boolean"
+        },
+        "wire": "show_pointer"
+      },
+      {
+        "name": "writeToDisk",
+        "type": {
+          "kind": "boolean"
+        },
+        "wire": "write_to_disk"
+      },
+      {
+        "name": "path",
+        "type": {
+          "item": {
+            "kind": "string"
+          },
+          "kind": "optional"
+        },
+        "wire": "path"
+      }
+    ],
+    "method": "screenshotScreen",
+    "variant": "ScreenshotScreen"
+  },
+  {
+    "arguments": [
+      {
+        "name": "showPointer",
+        "type": {
+          "kind": "boolean"
+        },
+        "wire": "show_pointer"
+      },
+      {
+        "name": "writeToDisk",
+        "type": {
+          "kind": "boolean"
+        },
+        "wire": "write_to_disk"
+      },
+      {
+        "name": "id",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      },
+      {
+        "name": "path",
+        "type": {
+          "item": {
+            "kind": "string"
+          },
+          "kind": "optional"
+        },
+        "wire": "path"
+      }
+    ],
+    "method": "screenshotWindow",
+    "variant": "ScreenshotWindow"
+  },
+  {
+    "arguments": [
+      {
+        "name": "display",
+        "type": {
+          "kind": "ref",
+          "name": "ColumnDisplay"
+        },
+        "wire": "display"
+      }
+    ],
+    "method": "setColumnDisplay",
+    "variant": "SetColumnDisplay"
+  },
+  {
+    "arguments": [
+      {
+        "name": "change",
+        "type": {
+          "kind": "ref",
+          "name": "SizeChange"
+        },
+        "wire": "change"
+      }
+    ],
+    "method": "setColumnWidth",
+    "variant": "SetColumnWidth"
+  },
+  {
+    "arguments": [
+      {
+        "name": "output",
+        "type": {
+          "item": {
+            "kind": "string"
+          },
+          "kind": "optional"
+        },
+        "wire": "output"
+      }
+    ],
+    "method": "setDynamicCastMonitor",
+    "variant": "SetDynamicCastMonitor"
+  },
+  {
+    "arguments": [
+      {
+        "name": "id",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "setDynamicCastWindow",
+    "variant": "SetDynamicCastWindow"
+  },
+  {
+    "arguments": [
+      {
+        "name": "id",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "setWindowFullscreen",
+    "variant": "SetWindowFullscreen"
+  },
+  {
+    "arguments": [
+      {
+        "name": "windowId",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      },
+      {
+        "name": "change",
+        "type": {
+          "kind": "ref",
+          "name": "SizeChange"
+        },
+        "wire": "change"
+      }
+    ],
+    "method": "setWindowHeight",
+    "variant": "SetWindowHeight"
+  },
+  {
+    "arguments": [
+      {
+        "name": "id",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "setWindowMaximizedToEdges",
+    "variant": "SetWindowMaximizedToEdges"
+  },
+  {
+    "arguments": [
+      {
+        "name": "id",
+        "type": {
+          "format": "uint64",
+          "kind": "integer",
+          "minimum": 0
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "setWindowUrgent",
+    "variant": "SetWindowUrgent"
+  },
+  {
+    "arguments": [
+      {
+        "name": "windowId",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      },
+      {
+        "name": "change",
+        "type": {
+          "kind": "ref",
+          "name": "SizeChange"
+        },
+        "wire": "change"
+      }
+    ],
+    "method": "setWindowWidth",
+    "variant": "SetWindowWidth"
+  },
+  {
+    "arguments": [
+      {
+        "name": "id",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "setWindowedFullscreen",
+    "variant": "SetWindowedFullscreen"
+  },
+  {
+    "arguments": [
+      {
+        "name": "name",
+        "type": {
+          "kind": "string"
+        },
+        "wire": "name"
+      },
+      {
+        "name": "workspace",
+        "type": {
+          "item": {
+            "kind": "ref",
+            "name": "WorkspaceReferenceArg"
+          },
+          "kind": "optional"
+        },
+        "wire": "workspace"
+      }
+    ],
+    "method": "setWorkspaceName",
+    "variant": "SetWorkspaceName"
+  },
+  {
+    "arguments": [],
+    "method": "showHotkeyOverlay",
+    "variant": "ShowHotkeyOverlay"
+  },
+  {
+    "arguments": [
+      {
+        "name": "command",
+        "type": {
+          "item": {
+            "kind": "string"
+          },
+          "kind": "array",
+          "max": null,
+          "min": 0
+        },
+        "wire": "command"
+      }
+    ],
+    "method": "spawn",
+    "variant": "Spawn"
+  },
+  {
+    "arguments": [
+      {
+        "name": "command",
+        "type": {
+          "kind": "string"
+        },
+        "wire": "command"
+      }
+    ],
+    "method": "spawnSh",
+    "variant": "SpawnSh"
+  },
+  {
+    "arguments": [
+      {
+        "name": "sessionId",
+        "type": {
+          "format": "uint64",
+          "kind": "integer",
+          "minimum": 0
+        },
+        "wire": "session_id"
+      }
+    ],
+    "method": "stopCast",
+    "variant": "StopCast"
+  },
+  {
+    "arguments": [],
+    "method": "swapWindowLeft",
+    "variant": "SwapWindowLeft"
+  },
+  {
+    "arguments": [],
+    "method": "swapWindowRight",
+    "variant": "SwapWindowRight"
+  },
+  {
+    "arguments": [],
+    "method": "switchFocusBetweenFloatingAndTiling",
+    "variant": "SwitchFocusBetweenFloatingAndTiling"
+  },
+  {
+    "arguments": [
+      {
+        "name": "layout",
+        "type": {
+          "kind": "ref",
+          "name": "LayoutSwitchTarget"
+        },
+        "wire": "layout"
+      }
+    ],
+    "method": "switchLayout",
+    "variant": "SwitchLayout"
+  },
+  {
+    "arguments": [],
+    "method": "switchPresetColumnWidth",
+    "variant": "SwitchPresetColumnWidth"
+  },
+  {
+    "arguments": [],
+    "method": "switchPresetColumnWidthBack",
+    "variant": "SwitchPresetColumnWidthBack"
+  },
+  {
+    "arguments": [
+      {
+        "name": "id",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "switchPresetWindowHeight",
+    "variant": "SwitchPresetWindowHeight"
+  },
+  {
+    "arguments": [
+      {
+        "name": "id",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "switchPresetWindowHeightBack",
+    "variant": "SwitchPresetWindowHeightBack"
+  },
+  {
+    "arguments": [
+      {
+        "name": "id",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "switchPresetWindowWidth",
+    "variant": "SwitchPresetWindowWidth"
+  },
+  {
+    "arguments": [
+      {
+        "name": "id",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "switchPresetWindowWidthBack",
+    "variant": "SwitchPresetWindowWidthBack"
+  },
+  {
+    "arguments": [],
+    "method": "toggleColumnTabbedDisplay",
+    "variant": "ToggleColumnTabbedDisplay"
+  },
+  {
+    "arguments": [],
+    "method": "toggleDebugTint",
+    "variant": "ToggleDebugTint"
+  },
+  {
+    "arguments": [],
+    "method": "toggleKeyboardShortcutsInhibit",
+    "variant": "ToggleKeyboardShortcutsInhibit"
+  },
+  {
+    "arguments": [],
+    "method": "toggleOverview",
+    "variant": "ToggleOverview"
+  },
+  {
+    "arguments": [],
+    "method": "toggleTouchpad",
+    "variant": "ToggleTouchpad"
+  },
+  {
+    "arguments": [
+      {
+        "name": "windowId",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "toggleWindowFloating",
+    "variant": "ToggleWindowFloating"
+  },
+  {
+    "arguments": [
+      {
+        "name": "id",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "toggleWindowRuleOpacity",
+    "variant": "ToggleWindowRuleOpacity"
+  },
+  {
+    "arguments": [
+      {
+        "name": "id",
+        "type": {
+          "format": "uint64",
+          "kind": "integer",
+          "minimum": 0
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "toggleWindowUrgent",
+    "variant": "ToggleWindowUrgent"
+  },
+  {
+    "arguments": [
+      {
+        "name": "id",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "toggleWindowedFullscreen",
+    "variant": "ToggleWindowedFullscreen"
+  },
+  {
+    "arguments": [
+      {
+        "name": "id",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "unsetWindowFullscreen",
+    "variant": "UnsetWindowFullscreen"
+  },
+  {
+    "arguments": [
+      {
+        "name": "id",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "unsetWindowMaximizedToEdges",
+    "variant": "UnsetWindowMaximizedToEdges"
+  },
+  {
+    "arguments": [
+      {
+        "name": "id",
+        "type": {
+          "format": "uint64",
+          "kind": "integer",
+          "minimum": 0
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "unsetWindowUrgent",
+    "variant": "UnsetWindowUrgent"
+  },
+  {
+    "arguments": [
+      {
+        "name": "id",
+        "type": {
+          "item": {
+            "format": "uint64",
+            "kind": "integer",
+            "minimum": 0
+          },
+          "kind": "optional"
+        },
+        "wire": "id"
+      }
+    ],
+    "method": "unsetWindowedFullscreen",
+    "variant": "UnsetWindowedFullscreen"
+  },
+  {
+    "arguments": [
+      {
+        "name": "reference",
+        "type": {
+          "item": {
+            "kind": "ref",
+            "name": "WorkspaceReferenceArg"
+          },
+          "kind": "optional"
+        },
+        "wire": "reference"
+      }
+    ],
+    "method": "unsetWorkspaceName",
+    "variant": "UnsetWorkspaceName"
+  }
+]
