@@ -1,0 +1,9 @@
+{
+  "description": "Hand-written future wire samples, separate from pinned serde vectors.",
+  "vectors": [
+    {"type": "Transform", "value": "FutureTransform"},
+    {"type": "SizeChange", "value": "FutureUnit"},
+    {"type": "SizeChange", "value": {"FutureData": {"id": 18446744073709551615}}},
+    {"type": "CastTarget", "value": {"FutureTarget": [9007199254740993, null]}}
+  ]
+}

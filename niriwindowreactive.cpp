@@ -1,144 +1,145 @@
 #include "niriwindowreactive.h"
-
-#include "nirievents.h"
+#include "niriselectors.h"
+#include "nirisession.h"
+#include "generated/niriipccodec_generated.h"
+#include <QQmlInfo>
 
 NiriWindowReactive::NiriWindowReactive(QObject *parent) : QObject(parent)
 {
-    NiriEvents *events = NiriEvents::instance();
-    connect(events, &NiriEvents::windowOpenedOrChanged, this,
-            &NiriWindowReactive::onWindowOpenedOrChanged);
-    connect(events, &NiriEvents::windowClosed, this, &NiriWindowReactive::onWindowClosed);
-    connect(events, &NiriEvents::windowsChanged, this, &NiriWindowReactive::onWindowsChanged);
-    connect(events, &NiriEvents::windowFocusChanged, this,
-            &NiriWindowReactive::onWindowFocusChanged);
+    auto *session = NiriSession::instance();
+    if (!session)
+        return;
+    m_revision = session->state().revision();
+    connect(session, &NiriSession::stateUpdated, this, [this](const auto &c) {
+        if (c.revision <= m_revision)
+            return;
+        m_revision = c.revision;
+        if (m_windowId && c.windows.contains(*m_windowId))
+            notify();
+    });
+    session->ensureStarted();
 }
 
-quint64 NiriWindowReactive::windowId() const
+NiriWindowReactive::Entry NiriWindowReactive::selected() const
 {
-    return m_windowId;
+    return NiriSession::checkThread(this)
+            ? NiriSelectors::window(NiriSession::instance()->state(), m_windowId)
+            : nullptr;
 }
 
-void NiriWindowReactive::setWindowId(quint64 id)
+std::optional<quint64> NiriWindowReactive::windowId() const
 {
-    if (m_windowId == id)
+    return NiriSession::checkThread(this) ? m_windowId : std::nullopt;
+}
+
+void NiriWindowReactive::setQmlWindowId(const QVariant &id)
+{
+    if (!NiriSession::checkThread(this))
+        return;
+    std::optional<quint64> value;
+    NiriIpc::DecodeError error;
+    if (NiriIpc::idInput(id, value, error))
+        setWindowId(value);
+    else
+        qmlWarning(this) << error.path << error.message;
+}
+
+void NiriWindowReactive::setWindowId(std::optional<quint64> id)
+{
+    if (!NiriSession::checkThread(this) || m_windowId == id)
         return;
     m_windowId = id;
-    emit windowIdChanged();
-    // Clear current data; consumers will get it via next event or windowsChanged snapshot
-    if (m_valid) {
-        clear();
-        emit windowChanged();
-    }
-    // Bootstrap from cached snapshot if available
-    QVariantList snapshot = NiriEvents::instance()->lastWindowsSnapshot();
-    for (const QVariant &v : snapshot) {
-        NiriWindow w = v.value<NiriWindow>();
-        if (w.id == id) {
-            updateFrom(w);
-            break;
-        }
-    }
+    notify();
+}
+
+NiriProjectionNotifications::Values NiriWindowReactive::values(const Selection &selection)
+{
+    const auto &entry = selection.record;
+    const auto w = entry ? *entry : NiriWindow{};
+    return {NiriIpc::qmlValue(selection.id),
+            bool(entry),
+            entry ? w.qmlId() : QVariant::fromValue(nullptr),
+            w.qmlTitle(),
+            w.qmlAppId(),
+            w.qmlPid(),
+            w.qmlWorkspaceId(),
+            w.isFocused,
+            w.isFloating,
+            w.isUrgent,
+            QVariant::fromValue(w.layout),
+            w.qmlFocusTimestamp(),
+            entry ? QVariant::fromValue(w) : QVariant::fromValue(nullptr)};
+}
+
+void NiriWindowReactive::notify()
+{
+    m_notifications.flush(
+            this, m_announced, [this] { return Selection{m_windowId, selected()}; }, values,
+            {[this] { emit windowIdChanged(); }, [this] { emit validChanged(); },
+             [this] { emit idChanged(); }, [this] { emit titleChanged(); },
+             [this] { emit appIdChanged(); }, [this] { emit pidChanged(); },
+             [this] { emit workspaceIdChanged(); }, [this] { emit isFocusedChanged(); },
+             [this] { emit isFloatingChanged(); }, [this] { emit isUrgentChanged(); },
+             [this] { emit layoutChanged(); }, [this] { emit focusTimestampChanged(); },
+             [this] { emit windowChanged(); }});
 }
 
 bool NiriWindowReactive::valid() const
 {
-    return m_valid;
+    return bool(selected());
 }
 quint64 NiriWindowReactive::id() const
 {
-    return m_data.id;
+    auto w = selected();
+    return w ? w->id : 0;
 }
-QString NiriWindowReactive::title() const
+std::optional<QString> NiriWindowReactive::title() const
 {
-    return m_data.title;
+    auto w = selected();
+    return w ? w->title : std::nullopt;
 }
-QString NiriWindowReactive::appId() const
+std::optional<QString> NiriWindowReactive::appId() const
 {
-    return m_data.appId;
+    auto w = selected();
+    return w ? w->appId : std::nullopt;
 }
-quint32 NiriWindowReactive::pid() const
+std::optional<qint32> NiriWindowReactive::pid() const
 {
-    return m_data.pid;
+    auto w = selected();
+    return w ? w->pid : std::nullopt;
 }
-quint64 NiriWindowReactive::workspaceId() const
+std::optional<quint64> NiriWindowReactive::workspaceId() const
 {
-    return m_data.workspaceId;
+    auto w = selected();
+    return w ? w->workspaceId : std::nullopt;
 }
 bool NiriWindowReactive::isFocused() const
 {
-    return m_data.isFocused;
+    auto w = selected();
+    return w && w->isFocused;
 }
 bool NiriWindowReactive::isFloating() const
 {
-    return m_data.isFloating;
+    auto w = selected();
+    return w && w->isFloating;
 }
 bool NiriWindowReactive::isUrgent() const
 {
-    return m_data.isUrgent;
+    auto w = selected();
+    return w && w->isUrgent;
 }
 NiriWindowLayout NiriWindowReactive::layout() const
 {
-    return m_data.layout;
+    auto w = selected();
+    return w ? w->layout : NiriWindowLayout{};
 }
-NiriTimestamp NiriWindowReactive::focusTimestamp() const
+std::optional<NiriTimestamp> NiriWindowReactive::focusTimestamp() const
 {
-    return m_data.focusTimestamp;
+    auto w = selected();
+    return w ? w->focusTimestamp : std::nullopt;
 }
-
-void NiriWindowReactive::updateFrom(const NiriWindow &w)
+std::optional<NiriWindow> NiriWindowReactive::window() const
 {
-    m_data = w;
-    m_valid = true;
-    emit windowChanged();
-}
-
-void NiriWindowReactive::clear()
-{
-    m_data = NiriWindow{};
-    m_valid = false;
-}
-
-void NiriWindowReactive::onWindowOpenedOrChanged(const NiriWindow &window)
-{
-    if (window.id != m_windowId)
-        return;
-    updateFrom(window);
-}
-
-void NiriWindowReactive::onWindowClosed(quint64 id)
-{
-    if (id != m_windowId)
-        return;
-    clear();
-    emit windowChanged();
-}
-
-void NiriWindowReactive::onWindowsChanged(const QVariantList &windows)
-{
-    if (m_windowId == 0)
-        return;
-    for (const QVariant &v : windows) {
-        NiriWindow w = v.value<NiriWindow>();
-        if (w.id == m_windowId) {
-            updateFrom(w);
-            return;
-        }
-    }
-    // Not found in snapshot
-    if (m_valid) {
-        clear();
-        emit windowChanged();
-    }
-}
-
-void NiriWindowReactive::onWindowFocusChanged(quint64 id)
-{
-    if (m_windowId == 0 || !m_valid)
-        return;
-    bool wasFocused = m_data.isFocused;
-    bool nowFocused = (id == m_windowId);
-    if (wasFocused != nowFocused) {
-        m_data.isFocused = nowFocused;
-        emit windowChanged();
-    }
+    auto w = selected();
+    return w ? std::optional<NiriWindow>(*w) : std::nullopt;
 }

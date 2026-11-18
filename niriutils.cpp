@@ -7,8 +7,6 @@
 
 #include "niritypes.h"
 
-static QHash<const QMetaObject *, QVector<QByteArray>> g_snakeCaseCache;
-
 QByteArray toSnakeCase(QByteArrayView camel)
 {
     QByteArray result;
@@ -116,6 +114,16 @@ static QVariant jsonValueToVariant(const QJsonValue &val, QMetaType targetType)
 
 QVariant jsonToGadget(const QJsonObject &json, QMetaType targetType)
 {
+    const QByteArray typeName(targetType.name());
+    if (typeName.startsWith("Niri")) {
+        const auto wire = NiriWire::fromQJsonValueLossy(json);
+        QVariant result;
+        NiriIpc::DecodeError error;
+        if (wire
+            && NiriIpc::decodeNamed(QString::fromLatin1(typeName.mid(4)), *wire, result, error))
+            return result;
+        return {};
+    }
     const QMetaObject *meta = targetType.metaObject();
     if (!meta) {
         qWarning() << "niriqml: jsonToGadget called on non-gadget type" << targetType.name();
@@ -126,13 +134,11 @@ QVariant jsonToGadget(const QJsonObject &json, QMetaType targetType)
     void *instance = result.data();
     QByteArray fullTypeName(targetType.name());
 
-    if (!g_snakeCaseCache.contains(meta)) {
-        QVector<QByteArray> keys(meta->propertyCount());
-        for (int i = 0; i < meta->propertyCount(); ++i)
-            keys[i] = toSnakeCase(meta->property(i).name());
-        g_snakeCaseCache.insert(meta, keys);
-    }
-    const QVector<QByteArray> &snakeKeys = g_snakeCaseCache[meta];
+    // Compatibility reflection is deliberately reentrant. Typed wire decoding
+    // uses generated codecs and never calls this lossy QJson adapter.
+    QVector<QByteArray> snakeKeys(meta->propertyCount());
+    for (int i = 0; i < meta->propertyCount(); ++i)
+        snakeKeys[i] = toSnakeCase(meta->property(i).name());
 
     for (int i = 0; i < meta->propertyCount(); ++i) {
         QMetaProperty prop = meta->property(i);
@@ -169,5 +175,5 @@ QVariantList jsonArrayToGadgets(const QJsonArray &arr, QMetaType elementType)
 
 int snakeCaseCacheSizeForTesting()
 {
-    return g_snakeCaseCache.size();
+    return 0;
 }

@@ -2,6 +2,8 @@
 
 #include <QAbstractListModel>
 #include <QList>
+#include <QQueue>
+#include <functional>
 #include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
 
@@ -26,7 +28,7 @@ public:
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
 
-    void appendEvent(const QString &name, const QVariantMap &payload);
+    void appendEvent(const QString &name, const QVariant &payload);
 
 signals:
     void capacityChanged();
@@ -39,7 +41,11 @@ private:
     struct Event
     {
         QString name;
-        QVariantMap payload;
+        QVariant payload;
     };
     QList<Event> m_events;
+    QQueue<std::function<void()>> m_pending;
+    bool m_mutating = false;
+    void enqueue(std::function<void()> operation);
+    void removeOldest(int count);
 };

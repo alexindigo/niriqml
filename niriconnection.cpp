@@ -1,239 +1,135 @@
 #include "niriconnection.h"
+#include <QCoreApplication>
 
-#include <QJsonDocument>
-#include <QJsonParseError>
-#include <QJSEngine>
-#include <QDebug>
-#include <QVector>
-
-#ifdef Q_OS_LINUX
-#  include <sys/socket.h>
-#  include <sys/types.h>
-#endif
-
-NiriConnection *NiriConnection::create(QQmlEngine *, QJSEngine *jsEngine)
+NiriConnection *NiriConnection::create(QQmlEngine *engine, QJSEngine *jsEngine)
 {
-    NiriConnection *self = instance();
-    if (jsEngine)
-        QJSEngine::setObjectOwnership(self, QJSEngine::CppOwnership);
-    if (!self->m_connected && self->m_socketPath.isEmpty())
-        self->connectToSocket();
+    if (!NiriSession::checkThread(engine ? engine : jsEngine))
+        return nullptr;
+    QObject *owner = engine ? static_cast<QObject *>(engine) : static_cast<QObject *>(jsEngine);
+    if (!owner)
+        return instance();
+    auto *self = new NiriConnection(owner);
+    QJSEngine::setObjectOwnership(self, QJSEngine::CppOwnership);
+    self->m_session->ensureStarted();
     return self;
 }
 
 NiriConnection *NiriConnection::instance()
 {
-    static NiriConnection s;
-    return &s;
-}
-
-NiriConnection::NiriConnection(QObject *parent) : QObject(parent)
-{
-    connect(&m_socket, &QLocalSocket::connected, this, &NiriConnection::onConnected);
-    connect(&m_socket, &QLocalSocket::disconnected, this, &NiriConnection::onDisconnected);
-    connect(&m_socket, &QLocalSocket::errorOccurred, this, &NiriConnection::onErrorOccurred);
-    connect(&m_socket, &QLocalSocket::readyRead, this, &NiriConnection::onReadyRead);
-
-    m_reconnectTimer.setSingleShot(true);
-    connect(&m_reconnectTimer, &QTimer::timeout, this, [this]() {
-        if (m_socketPath.isEmpty())
-            return;
-        qInfo() << "NiriConnection: reconnect attempt" << m_reconnectAttempt;
-        connectToSocket(m_socketPath);
-    });
-}
-
-NiriConnection::~NiriConnection()
-{
-    // Static singleton: destroyed during process teardown, when Qt's event
-    // dispatcher may already be gone. ~QLocalSocket would attempt a graceful
-    // disconnectFromHost(), which starts a QTimer and segfaults. Close the
-    // socket immediately (no timers) and stop the reconnect timer first.
-    m_intentionalDisconnect = true;
-    m_reconnectTimer.stop();
-    if (m_socket.state() != QLocalSocket::UnconnectedState)
-        m_socket.abort();
-}
-
-PeerInfo NiriConnection::peerInfo() const
-{
-    PeerInfo info;
-#ifdef Q_OS_LINUX
-    if (!m_connected)
-        return info;
-
-    struct ucred cred;
-    socklen_t len = sizeof(cred);
-    if (getsockopt(m_socket.socketDescriptor(), SOL_SOCKET, SO_PEERCRED, &cred, &len) == 0) {
-        info.pid = static_cast<qint64>(cred.pid);
-        info.uid = static_cast<quint32>(cred.uid);
-        info.gid = static_cast<quint32>(cred.gid);
+    if (!NiriSession::checkThread())
+        return nullptr;
+    auto *app = QCoreApplication::instance();
+    auto *self = app->findChild<NiriConnection *>(QStringLiteral("niriqml.connection"),
+                                                  Qt::FindDirectChildrenOnly);
+    if (!self) {
+        self = new NiriConnection(app);
+        self->setObjectName(QStringLiteral("niriqml.connection"));
     }
+    self->m_session->ensureStarted();
+    return self;
+}
 
-    // SO_PEERSEC requires two calls: first to get the buffer length,
-    // second to read the actual label. Using a dummy buffer for the
-    // first call avoids passing nullptr to getsockopt (undefined on
-    // some implementations).
-    char secBuf;
-    socklen_t secLen = sizeof(secBuf);
-    if (getsockopt(m_socket.socketDescriptor(), SOL_SOCKET, SO_PEERSEC, &secBuf, &secLen) == 0
-        && secLen > 0) {
-        // secLen is now the actual label length. SELinux labels are
-        // null-terminated, so the returned length includes the NUL
-        // byte — we skip it in fromUtf8.
-        QVector<char> buf(secLen);
-        if (getsockopt(m_socket.socketDescriptor(), SOL_SOCKET, SO_PEERSEC, buf.data(), &secLen)
-            == 0) {
-            info.peerSecurityContext = QString::fromUtf8(buf.data(), secLen - 1);
-        }
-    }
-#endif
-    return info;
+NiriConnection::NiriConnection(QObject *parent)
+    : QObject(parent), m_session(NiriSession::instance())
+{
+#define FORWARD(name) connect(m_session, &NiriSession::name, this, &NiriConnection::name)
+    FORWARD(connectedChanged);
+    FORWARD(socketPathChanged);
+    FORWARD(endpointSourceChanged);
+    FORWARD(statusChanged);
+    FORWARD(subscribedChanged);
+    FORWARD(autoReconnectChanged);
+    FORWARD(errorChanged);
+    FORWARD(peerInfoChanged);
+    FORWARD(reconnectScheduled);
+    // Public compatibility signal omits epoch, but the internal typed event
+    // receiver subscribes to the session's producing-epoch signal directly.
+    FORWARD(eventReceived);
+#undef FORWARD
 }
 
 bool NiriConnection::isConnected() const
 {
-    return m_connected;
+    return NiriSession::checkThread(this) && m_session->isConnected();
 }
 QString NiriConnection::socketPath() const
 {
-    return m_socketPath;
+    return NiriSession::checkThread(this) ? m_session->currentEndpoint().path : QString{};
 }
 QString NiriConnection::errorString() const
 {
-    return m_socket.errorString();
+    return NiriSession::checkThread(this) ? m_session->errorString() : QString{};
+}
+QVariantMap NiriConnection::error() const
+{
+    return NiriSession::checkThread(this) ? m_session->error() : QVariantMap{};
+}
+PeerInfo NiriConnection::peerInfo() const
+{
+    return NiriSession::checkThread(this) ? m_session->peerInfo() : PeerInfo{};
+}
+NiriConnection::Status NiriConnection::status() const
+{
+    return NiriSession::checkThread(this) ? static_cast<Status>(m_session->status()) : Failed;
+}
+NiriConnection::EndpointSource NiriConnection::endpointSource() const
+{
+    return NiriSession::checkThread(this)
+            ? static_cast<EndpointSource>(m_session->currentEndpoint().source)
+            : Environment;
+}
+bool NiriConnection::subscribed() const
+{
+    return NiriSession::checkThread(this) && m_session->subscribed();
+}
+bool NiriConnection::autoReconnect() const
+{
+    return NiriSession::checkThread(this) && m_session->autoReconnect();
 }
 
 void NiriConnection::connectToSocket(const QString &path)
 {
-    if (m_socket.state() != QLocalSocket::UnconnectedState) {
-        m_socket.abort();
-    }
-    m_reconnectTimer.stop();
-    m_intentionalDisconnect = false;
-    m_connected = false;
-    m_subscriptionConfirmed = false;
-    m_readBuffer.clear();
-
-    m_socketPath = path.isEmpty() ? QString::fromUtf8(qgetenv("NIRI_SOCKET")) : path;
-    // Don't attempt to connect with an empty path — QLocalSocket warns
-    // "Invalid name" and produces no useful behavior.
-    if (m_socketPath.isEmpty()) {
-        qDebug() << "NiriConnection: no socket path (NIRI_SOCKET unset or niri not running)";
+    if (!NiriSession::checkThread(this))
         return;
-    }
-    qInfo() << "NiriConnection: connecting to" << m_socketPath;
-    m_socket.connectToServer(m_socketPath);
+    m_session->connectToSocket(path);
 }
-
 void NiriConnection::disconnect()
 {
-    m_intentionalDisconnect = true;
-    m_reconnectTimer.stop();
-    m_reconnectAttempt = 0;
-    m_socket.abort();
-    m_connected = false;
-    m_subscriptionConfirmed = false;
-    m_readBuffer.clear();
+    stop();
 }
-
+void NiriConnection::start()
+{
+    if (NiriSession::checkThread(this))
+        m_session->start();
+}
+void NiriConnection::stop()
+{
+    if (NiriSession::checkThread(this))
+        m_session->stop();
+}
+void NiriConnection::selectEndpoint(const QString &path)
+{
+    if (NiriSession::checkThread(this))
+        m_session->selectEndpoint(path);
+}
+void NiriConnection::useEnvironmentEndpoint()
+{
+    if (NiriSession::checkThread(this))
+        m_session->useEnvironmentEndpoint();
+}
 void NiriConnection::setAutoReconnect(bool enabled)
 {
-    m_autoReconnect = enabled;
-    if (!enabled)
-        m_reconnectTimer.stop();
+    if (NiriSession::checkThread(this))
+        m_session->setAutoReconnect(enabled);
 }
 
-void NiriConnection::scheduleReconnect()
+void NiriConnection::setMaxFrameBytes(qsizetype bytes)
 {
-    if (!m_autoReconnect || m_intentionalDisconnect || m_socketPath.isEmpty())
-        return;
-    if (m_reconnectTimer.isActive())
-        return;
-    // Exponential backoff: 500ms, 1s, 2s, 4s, ... capped at 30s
-    int delayMs = qMin(30000, 500 << qMin(m_reconnectAttempt, 6));
-    m_reconnectAttempt++;
-    qInfo() << "NiriConnection: reconnect scheduled in" << delayMs << "ms (attempt"
-            << m_reconnectAttempt << ")";
-    emit reconnectScheduled(delayMs, m_reconnectAttempt);
-    m_reconnectTimer.start(delayMs);
+    if (NiriSession::checkThread(this))
+        m_session->setMaxFrameBytes(bytes);
 }
 
-void NiriConnection::onConnected()
+qsizetype NiriConnection::maxFrameBytes() const
 {
-    qInfo() << "NiriConnection: connected, sending subscription";
-    m_reconnectAttempt = 0;
-    m_connected = true;
-    emit connectedChanged();
-    sendEventStreamSubscription();
-}
-
-void NiriConnection::onDisconnected()
-{
-    bool wasConnected = m_connected;
-    m_connected = false;
-    m_subscriptionConfirmed = false;
-    m_readBuffer.clear();
-    emit connectedChanged();
-    if (wasConnected)
-        scheduleReconnect();
-}
-
-void NiriConnection::onErrorOccurred(QLocalSocket::LocalSocketError error)
-{
-    Q_UNUSED(error)
-    qWarning() << "NiriConnection: socket error:" << m_socket.errorString()
-               << "| path:" << m_socketPath;
-    m_connected = false;
-    m_subscriptionConfirmed = false;
-    m_readBuffer.clear();
-    emit connectedChanged();
-    scheduleReconnect();
-}
-
-void NiriConnection::onReadyRead()
-{
-    m_readBuffer.feed(m_socket.readAll());
-    for (const QByteArray &line : m_readBuffer.takeCompleteLines())
-        processLine(line);
-}
-
-void NiriConnection::processLine(const QByteArray &line)
-{
-    QJsonParseError err;
-    QJsonDocument doc = QJsonDocument::fromJson(line, &err);
-
-    if (err.error != QJsonParseError::NoError) {
-        qWarning() << "Niri: failed to parse JSON:" << err.errorString() << "| line:" << line;
-        return;
-    }
-
-    if (!doc.isObject()) {
-        qWarning() << "Niri: expected JSON object, got:" << line;
-        return;
-    }
-
-    QJsonObject obj = doc.object();
-
-    if (!m_subscriptionConfirmed) {
-        // First reply: {"Ok":"Handled"} or {"Err":"..."}
-        if (obj.contains("Ok")) {
-            qInfo() << "NiriConnection: subscription confirmed";
-        } else if (obj.contains("Err")) {
-            qWarning() << "Niri: subscription error:" << obj["Err"].toString();
-        }
-        m_subscriptionConfirmed = true;
-    } else {
-        // Subsequent: {"EventName":{"payload":...}}
-        // Object has exactly one key: the event name
-        for (auto it = obj.begin(); it != obj.end(); ++it)
-            emit eventReceived(it.key(), it.value().toObject().toVariantMap());
-    }
-}
-
-void NiriConnection::sendEventStreamSubscription()
-{
-    // Wire format: bare JSON string "EventStream"
-    m_socket.write("\"EventStream\"\n");
-    m_socket.flush();
+    return NiriSession::checkThread(this) ? m_session->maxFrameBytes() : 0;
 }

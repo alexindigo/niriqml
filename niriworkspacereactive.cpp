@@ -1,188 +1,144 @@
 #include "niriworkspacereactive.h"
-
-#include <optional>
-
-#include "nirievents.h"
+#include "niriselectors.h"
+#include "nirisession.h"
+#include "generated/niriipccodec_generated.h"
+#include <QQmlInfo>
 
 NiriWorkspaceReactive::NiriWorkspaceReactive(QObject *parent) : QObject(parent)
 {
-    NiriEvents *events = NiriEvents::instance();
-    connect(events, &NiriEvents::workspacesChanged, this,
-            &NiriWorkspaceReactive::onWorkspacesChanged);
-    connect(events, &NiriEvents::workspaceActivated, this,
-            &NiriWorkspaceReactive::onWorkspaceActivated);
-    connect(events, &NiriEvents::workspaceActiveWindowChanged, this,
-            &NiriWorkspaceReactive::onWorkspaceActiveWindowChanged);
+    auto *session = NiriSession::instance();
+    if (!session)
+        return;
+    m_revision = session->state().revision();
+    connect(session, &NiriSession::stateUpdated, this, [this](const auto &c) {
+        if (c.revision <= m_revision)
+            return;
+        m_revision = c.revision;
+        if ((!m_selectorName.isEmpty() && !c.workspaces.isEmpty())
+            || (m_selectorId && c.workspaces.contains(*m_selectorId)))
+            notify();
+    });
+    session->ensureStarted();
+}
+
+NiriWorkspaceReactive::Entry NiriWorkspaceReactive::selected() const
+{
+    return NiriSession::checkThread(this)
+            ? NiriSelectors::workspace(NiriSession::instance()->state(), m_selectorName,
+                                       m_selectorId)
+            : nullptr;
 }
 
 QString NiriWorkspaceReactive::workspaceName() const
 {
-    return m_selectorName;
+    return NiriSession::checkThread(this) ? m_selectorName : QString{};
+}
+std::optional<quint64> NiriWorkspaceReactive::workspaceId() const
+{
+    return NiriSession::checkThread(this) ? m_selectorId : std::nullopt;
 }
 void NiriWorkspaceReactive::setWorkspaceName(const QString &name)
 {
-    if (m_selectorName == name)
+    if (!NiriSession::checkThread(this) || name == m_selectorName)
         return;
     m_selectorName = name;
-    emit workspaceNameChanged();
-    if (m_valid) {
-        clear();
-        emit workspaceChanged();
-    }
-    // Bootstrap
-    QVariantList snapshot = NiriEvents::instance()->lastWorkspacesSnapshot();
-    for (const QVariant &v : snapshot) {
-        NiriWorkspace w = v.value<NiriWorkspace>();
-        if (w.name == name && !name.isEmpty()) {
-            updateFrom(w);
-            break;
-        }
-    }
+    notify();
 }
-
-quint64 NiriWorkspaceReactive::workspaceId() const
+void NiriWorkspaceReactive::setWorkspaceId(std::optional<quint64> id)
 {
-    return m_selectorId;
-}
-void NiriWorkspaceReactive::setWorkspaceId(quint64 id)
-{
-    if (m_selectorId == id)
+    if (!NiriSession::checkThread(this) || id == m_selectorId)
         return;
     m_selectorId = id;
-    emit workspaceIdChanged();
-    if (m_valid) {
-        clear();
-        emit workspaceChanged();
-    }
-    // Bootstrap
-    QVariantList snapshot = NiriEvents::instance()->lastWorkspacesSnapshot();
-    for (const QVariant &v : snapshot) {
-        NiriWorkspace w = v.value<NiriWorkspace>();
-        if (w.id == id && id != 0) {
-            updateFrom(w);
-            break;
-        }
-    }
+    notify();
+}
+void NiriWorkspaceReactive::setQmlWorkspaceId(const QVariant &id)
+{
+    if (!NiriSession::checkThread(this))
+        return;
+    std::optional<quint64> value;
+    NiriIpc::DecodeError error;
+    if (NiriIpc::idInput(id, value, error))
+        setWorkspaceId(value);
+    else
+        qmlWarning(this) << error.path << error.message;
+}
+
+NiriProjectionNotifications::Values NiriWorkspaceReactive::values(const Selection &selection)
+{
+    const auto &entry = selection.record;
+    const auto w = entry ? *entry : NiriWorkspace{};
+    return {selection.name,
+            NiriIpc::qmlValue(selection.id),
+            bool(entry),
+            entry ? w.qmlId() : QVariant::fromValue(nullptr),
+            w.idx,
+            w.qmlName(),
+            w.qmlOutput(),
+            w.isUrgent,
+            w.isActive,
+            w.isFocused,
+            w.qmlActiveWindowId(),
+            entry ? QVariant::fromValue(w) : QVariant::fromValue(nullptr)};
+}
+void NiriWorkspaceReactive::notify()
+{
+    m_notifications.flush(
+            this, m_announced,
+            [this] { return Selection{m_selectorName, m_selectorId, selected()}; }, values,
+            {[this] { emit workspaceNameChanged(); }, [this] { emit workspaceIdChanged(); },
+             [this] { emit validChanged(); }, [this] { emit idChanged(); },
+             [this] { emit idxChanged(); }, [this] { emit nameChanged(); },
+             [this] { emit outputChanged(); }, [this] { emit isUrgentChanged(); },
+             [this] { emit isActiveChanged(); }, [this] { emit isFocusedChanged(); },
+             [this] { emit activeWindowIdChanged(); }, [this] { emit workspaceChanged(); }});
 }
 
 bool NiriWorkspaceReactive::valid() const
 {
-    return m_valid;
+    return bool(selected());
 }
 quint64 NiriWorkspaceReactive::id() const
 {
-    return m_data.id;
+    auto w = selected();
+    return w ? w->id : 0;
 }
 int NiriWorkspaceReactive::idx() const
 {
-    return m_data.idx;
+    auto w = selected();
+    return w ? w->idx : 0;
 }
-QString NiriWorkspaceReactive::name() const
+std::optional<QString> NiriWorkspaceReactive::name() const
 {
-    return m_data.name;
+    auto w = selected();
+    return w ? w->name : std::nullopt;
 }
-QString NiriWorkspaceReactive::output() const
+std::optional<QString> NiriWorkspaceReactive::output() const
 {
-    return m_data.output;
+    auto w = selected();
+    return w ? w->output : std::nullopt;
 }
 bool NiriWorkspaceReactive::isUrgent() const
 {
-    return m_data.isUrgent;
+    auto w = selected();
+    return w && w->isUrgent;
 }
 bool NiriWorkspaceReactive::isActive() const
 {
-    return m_data.isActive;
+    auto w = selected();
+    return w && w->isActive;
 }
 bool NiriWorkspaceReactive::isFocused() const
 {
-    return m_data.isFocused;
+    auto w = selected();
+    return w && w->isFocused;
 }
-quint64 NiriWorkspaceReactive::activeWindowId() const
+std::optional<quint64> NiriWorkspaceReactive::activeWindowId() const
 {
-    return m_data.activeWindowId;
+    auto w = selected();
+    return w ? w->activeWindowId : std::nullopt;
 }
-
-bool NiriWorkspaceReactive::matches(const NiriWorkspace &w) const
+std::optional<NiriWorkspace> NiriWorkspaceReactive::workspace() const
 {
-    if (!m_selectorName.isEmpty())
-        return w.name == m_selectorName;
-    if (m_selectorId != 0)
-        return w.id == m_selectorId;
-    return false;
-}
-
-void NiriWorkspaceReactive::updateFrom(const NiriWorkspace &w)
-{
-    m_data = w;
-    m_valid = true;
-    emit workspaceChanged();
-}
-
-void NiriWorkspaceReactive::clear()
-{
-    m_data = NiriWorkspace{};
-    m_valid = false;
-}
-
-void NiriWorkspaceReactive::onWorkspacesChanged(const QVariantList &workspaces)
-{
-    for (const QVariant &v : workspaces) {
-        NiriWorkspace w = v.value<NiriWorkspace>();
-        if (matches(w)) {
-            updateFrom(w);
-            return;
-        }
-    }
-    if (m_valid) {
-        clear();
-        emit workspaceChanged();
-    }
-}
-
-void NiriWorkspaceReactive::onWorkspaceActivated(quint64 workspaceId, bool focused)
-{
-    if (!m_valid)
-        return;
-    // Look up the activated workspace to find its output. If it matches our
-    // workspace's output, our isActive flag needs updating.
-    std::optional<NiriWorkspace> target;
-    QVariantList snapshot = NiriEvents::instance()->lastWorkspacesSnapshot();
-    for (const QVariant &v : snapshot) {
-        NiriWorkspace w = v.value<NiriWorkspace>();
-        if (w.id == workspaceId) {
-            target = w;
-            break;
-        }
-    }
-    if (!target.has_value())
-        return;
-
-    if (m_data.output != target->output && m_data.id != workspaceId)
-        return;
-
-    bool changed = false;
-    bool nowActive = (m_data.id == workspaceId);
-    if (m_data.isActive != nowActive) {
-        m_data.isActive = nowActive;
-        changed = true;
-    }
-    if (focused) {
-        bool nowFocused = (m_data.id == workspaceId);
-        if (m_data.isFocused != nowFocused) {
-            m_data.isFocused = nowFocused;
-            changed = true;
-        }
-    }
-    if (changed)
-        emit workspaceChanged();
-}
-
-void NiriWorkspaceReactive::onWorkspaceActiveWindowChanged(quint64 workspaceId, quint64 windowId)
-{
-    if (!m_valid || m_data.id != workspaceId)
-        return;
-    if (m_data.activeWindowId == windowId)
-        return;
-    m_data.activeWindowId = windowId;
-    emit workspaceChanged();
+    auto w = selected();
+    return w ? std::optional<NiriWorkspace>(*w) : std::nullopt;
 }

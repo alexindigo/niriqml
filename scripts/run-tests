@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BUILD_DIR="${1:-build-debug}"
-COVERAGE_DIR="coverage"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+source "$(dirname -- "$0")/build-paths.sh"
+resolve_build_dir "${1:-${BUILD_DIR:-build-debug}}"
+if [[ $# -gt 0 ]]; then shift; fi
+require_build_dir
+COVERAGE_DIR="${PROJECT_DIR}/coverage"
+
+if ! grep -qx 'ENABLE_COVERAGE:BOOL=ON' "${BUILD_DIR}/CMakeCache.txt"; then
+    exec ctest --test-dir "$BUILD_DIR" --output-on-failure "$@"
+fi
 
 LCOV_OPTS="--ignore-errors inconsistent,empty"
 REMOVE_OPTS="--ignore-errors unused,inconsistent,empty"
@@ -15,7 +20,7 @@ OVERALL_EXIT=0
 run_pipeline() {
     local label=$1
     local prefix=$2
-    local test_command=$3
+    shift 2
     local exit_code=0
 
     echo ""
@@ -23,7 +28,7 @@ run_pipeline() {
 
     lcov --directory "${BUILD_DIR}" -z ${LCOV_OPTS} > /dev/null 2>&1
 
-    eval "${test_command}" || exit_code=$?
+    "$@" || exit_code=$?
 
     if lcov --capture --directory "${BUILD_DIR}" \
             -o "${COVERAGE_DIR}/${prefix}_raw.info" ${LCOV_OPTS} > /dev/null 2>&1 \
@@ -50,7 +55,7 @@ mkdir -p "${COVERAGE_DIR}"
 run_pipeline \
     "C++ unit tests" \
     "cpp" \
-    "(cd '${BUILD_DIR}' && ctest --output-on-failure)"
+    ctest --test-dir "$BUILD_DIR" --output-on-failure "$@"
 
 if [ -f "${COVERAGE_DIR}/cpp_clean.info" ]; then
     lcov --summary "${COVERAGE_DIR}/cpp_clean.info" 2>&1 | grep -E "lines|functions" || true

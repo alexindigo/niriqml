@@ -6,7 +6,10 @@
 
 #include "niriconnection.h"
 #include "nirirequests.h"
+#include "niriactions.h"
 #include "nirimock.h"
+#include "ipcfixtures.h"
+#include <memory>
 
 class TestConnection : public QObject
 {
@@ -21,6 +24,8 @@ private slots:
     void mockSendsStreamEvent();
     void actionRequestReturnsOk();
     void actionRequestReturnsError();
+    void bareQueryReturnsTypedResult();
+    void actionReturnsReleasedHandled();
     void disconnectDetected();
 
 private:
@@ -33,7 +38,7 @@ void TestConnection::initTestCase()
     QVERIFY(m_mock->start());
 
     QJsonArray windows;
-    QJsonObject w;
+    QJsonObject w = windowFixture();
     w["id"] = 1;
     w["title"] = "Test Window";
     w["app_id"] = "test";
@@ -44,7 +49,7 @@ void TestConnection::initTestCase()
     windows.append(w);
 
     QJsonArray workspaces;
-    QJsonObject ws;
+    QJsonObject ws = workspaceFixture();
     ws["id"] = 1;
     ws["idx"] = 0;
     ws["name"] = "main";
@@ -115,11 +120,11 @@ void TestConnection::mockSendsStreamEvent()
 
     // Mock sends a stream event
     QJsonObject payload;
-    payload["window"] = QJsonObject{
-            {"id", 2},
-            {"title", "New Window"},
-            {"app_id", "test2"},
-    };
+    auto window = windowFixture();
+    window["id"] = 2;
+    window["title"] = "New Window";
+    window["app_id"] = "test2";
+    payload["window"] = window;
     m_mock->sendEvent(QJsonObject{{"WindowOpenedOrChanged", payload}});
 
     QVERIFY(eventSpy.wait(1000));
@@ -176,6 +181,27 @@ void TestConnection::disconnectDetected()
 
     NiriConnection::instance()->disconnect();
     QVERIFY(!NiriConnection::instance()->isConnected());
+}
+
+void TestConnection::bareQueryReturnsTypedResult()
+{
+    NiriConnection::instance()->connectToSocket(m_mock->socketPath());
+    std::unique_ptr<NiriVersionReply> reply(NiriRequests::instance()->version());
+    QSignalSpy finished(reply.get(), &NiriPendingReply::finished);
+    QVERIFY(finished.wait(6000));
+    QVERIFY2(!reply->isError(), qPrintable(reply->error().message));
+    QVERIFY(reply->result().startsWith("26.04"));
+}
+
+void TestConnection::actionReturnsReleasedHandled()
+{
+    NiriConnection::instance()->connectToSocket(m_mock->socketPath());
+    std::unique_ptr<NiriHandledReply> reply(NiriActions::instance()->focusWindow(quint64(1)));
+    QSignalSpy finished(reply.get(), &NiriPendingReply::finished);
+    QVERIFY(finished.wait(2000));
+    QVERIFY2(!reply->isError(), qPrintable(reply->error().message));
+    QCOMPARE(reply->value().toString(), QString("Handled"));
+    QCOMPARE(reply->result().wireName(), QString("Handled"));
 }
 
 QTEST_MAIN(TestConnection)

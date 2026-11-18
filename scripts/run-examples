@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BUILD_DIR="${BUILD_DIR:-build-release}"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-BUILD_ABS="$(cd "${PROJECT_DIR}/${BUILD_DIR}" 2>/dev/null && pwd || echo "${BUILD_DIR}")"
+source "$(dirname -- "$0")/build-paths.sh"
+resolve_build_dir "${BUILD_DIR:-build-release}"
+require_build_dir
 
 run_one() {
     echo ""
     echo "--- $1 ---"
-    QML_IMPORT_PATH="${BUILD_ABS}" qml6 "$1"
+    QML_IMPORT_PATH="${BUILD_DIR}" qml6 "$1"
     echo ""
 }
 
