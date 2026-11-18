@@ -10,12 +10,12 @@ NiriWindowReactive::NiriWindowReactive(QObject *parent) : QObject(parent)
     if (!session)
         return;
     m_revision = session->state().revision();
-    connect(session, &NiriSession::stateUpdated, this, [this, session](const auto &c) {
+    connect(session, &NiriSession::stateUpdated, this, [this](const auto &c) {
         if (c.revision <= m_revision)
             return;
         m_revision = c.revision;
         if (m_windowId && c.windows.contains(*m_windowId))
-            notify(values(NiriSelectors::window(session->state(), m_windowId, &c)));
+            notify();
     });
     session->ensureStarted();
 }
@@ -48,15 +48,15 @@ void NiriWindowReactive::setWindowId(std::optional<quint64> id)
 {
     if (!NiriSession::checkThread(this) || m_windowId == id)
         return;
-    auto before = values(selected());
     m_windowId = id;
-    notify(std::move(before));
+    notify();
 }
 
-NiriProjectionNotifications::Values NiriWindowReactive::values(const Entry &entry) const
+NiriProjectionNotifications::Values NiriWindowReactive::values(const Selection &selection)
 {
+    const auto &entry = selection.record;
     const auto w = entry ? *entry : NiriWindow{};
-    return {qmlWindowId(),
+    return {NiriIpc::qmlValue(selection.id),
             bool(entry),
             entry ? w.qmlId() : QVariant::fromValue(nullptr),
             w.qmlTitle(),
@@ -71,10 +71,10 @@ NiriProjectionNotifications::Values NiriWindowReactive::values(const Entry &entr
             entry ? QVariant::fromValue(w) : QVariant::fromValue(nullptr)};
 }
 
-void NiriWindowReactive::notify(NiriProjectionNotifications::Values before)
+void NiriWindowReactive::notify()
 {
     m_notifications.flush(
-            this, std::move(before), [this] { return values(selected()); },
+            this, m_announced, [this] { return Selection{m_windowId, selected()}; }, values,
             {[this] { emit windowIdChanged(); }, [this] { emit validChanged(); },
              [this] { emit idChanged(); }, [this] { emit titleChanged(); },
              [this] { emit appIdChanged(); }, [this] { emit pidChanged(); },

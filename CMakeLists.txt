@@ -256,6 +256,21 @@ if(BUILD_TEST_MODE)
     set_tests_properties(test_api PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QML_IMPORT_PATH=${CMAKE_CURRENT_BINARY_DIR}"
     )
+    add_executable(test_examples tests/test_examples.cpp)
+    target_link_libraries(test_examples PRIVATE
+        Qt6::Core Qt6::Quick Qt6::QuickTest Qt6::Network niriqml nirimock)
+    target_compile_definitions(test_examples PRIVATE
+        NIRIQML_EXAMPLE_SOURCE="${CMAKE_CURRENT_SOURCE_DIR}")
+    add_test(NAME test_examples COMMAND test_examples
+        -input ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_examples.qml)
+    set_tests_properties(test_examples PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QML_IMPORT_PATH=${CMAKE_CURRENT_BINARY_DIR}"
+        TIMEOUT 120)
+    add_test(NAME test_examples_qmllint COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_qml_examples.py
+        --qmllint $<TARGET_FILE:Qt6::qmllint>
+        --imports ${CMAKE_CURRENT_BINARY_DIR}
+        --output ${CMAKE_CURRENT_BINARY_DIR}/documentation-snippets)
     if(ENABLE_COVERAGE)
         target_compile_options(test_api PRIVATE --coverage -fprofile-abs-path)
         target_link_options(test_api PRIVATE --coverage -fprofile-abs-path)
@@ -282,7 +297,7 @@ if(BUILD_TEST_MODE)
     foreach(_test IN LISTS _tests)
         if(_test MATCHES "^test_live_")
             set_tests_properties(${_test} PROPERTIES LABELS live RUN_SERIAL TRUE)
-        elseif(_test STREQUAL "test_api")
+        elseif(_test STREQUAL "test_api" OR _test MATCHES "^test_examples")
             set_tests_properties(${_test} PROPERTIES LABELS qml)
         else()
             set_tests_properties(${_test} PROPERTIES LABELS unit)

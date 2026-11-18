@@ -158,6 +158,8 @@ private slots:
     void initTestCase()
     {
         fixtures = loadFixture(QFINDTESTDATA("fixtures/serde-v26.04/vectors.json"));
+        fixtures = withNewerSurface(
+                fixtures, loadFixture(QFINDTESTDATA("fixtures/serde-main-689c1e9/vectors.json")));
         manifest = loadFixture(QFINDTESTDATA("../generated/ipc-requests.json"));
     }
     void init()
@@ -179,8 +181,8 @@ private slots:
         for (int i = meta.methodOffset(); i < meta.methodCount(); ++i)
             actual.insert(meta.method(i).name());
         QCOMPARE(actual, expected);
-        QCOMPARE(NiriOutputAction::staticMetaObject.enumerator(0).keyCount() - 2, 9);
-        QCOMPARE(NiriAction::staticMetaObject.enumerator(0).keyCount() - 2, 141);
+        QCOMPARE(NiriOutputAction::staticMetaObject.enumerator(0).keyCount() - 2, 10);
+        QCOMPARE(NiriAction::staticMetaObject.enumerator(0).keyCount() - 2, 149);
     }
     void everyRequest_data()
     {

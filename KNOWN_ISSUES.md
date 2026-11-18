@@ -1,106 +1,63 @@
-# Known Issues
+# Known issues and verification limits
 
 ## Historical QML teardown/coverage crash: cause unconfirmed
 
-On 2026-11-17, the E9 investigation ran `test_api`, `test_events` and
-`test_session_review` in fresh processes ten times each in three separate Debug
-builds: coverage OFF, GCC `--coverage` ON, and AddressSanitizer with
-`halt_on_error=1` and leak detection enabled. All 90 suite executions passed;
-no teardown crash or sanitizer diagnostic was observed. The tests cover real
+On 2026-11-17, E9 ran test_api, test_events and test_session_review in fresh
+processes ten times each in three Debug builds: coverage OFF, GCC --coverage ON,
+and AddressSanitizer with halt_on_error=1 and normal leak detection. All 90 suite
+executions passed without a crash or sanitizer diagnostic. They exercise real
 QML reply/state consumers, engine destruction and reconnect/exit paths.
 
-Environment: DigitalOcean guest `niriqml-full-ipc-api`, Arch container,
-Qt 6.12.0, GCC 16.2.1. The bounded investigation took less than 45 minutes.
-Raw evidence is in the external E9 execution record's `teardown-matrix.log`.
-This does not reproduce the older Qt/toolchain environment, establish a Qt bug,
-identify the historical cause, or guarantee absence of lifecycle defects.
-Earlier lifecycle corrections on this branch have independent regression
-evidence; this non-reproduction cannot attribute the old crash to any one fix.
-CI retains a distinct coverage-OFF QML lane without claiming an external cause.
+Environment: DigitalOcean guest niriqml-full-ipc-api, Arch container, Qt 6.12.0,
+GCC 16.2.1. The bounded investigation took less than 45 minutes. Evidence is in
+the external E9 execution record's teardown-matrix.log. It does not reproduce the
+older toolchain, establish a Qt bug, identify the historical cause, attribute it
+to a particular earlier correction, or guarantee absence of lifecycle defects.
+CI retains a separate coverage-OFF QML lane without claiming an external cause.
 
-## niri 26.04: "error writing reply" / Broken pipe WARN in niri log
+## Minimum Qt and newer compositor runtime
 
-**Status:** niri-side bug — fix submitted upstream (PR #4180 / mailing list patch)
-**Reported:** 2026-08-07 (Atmosphera VM testing)
-**Severity:** cosmetic — WARN-level log, no functional impact
+Qt >= 6.5 remains the declared build requirement. Runtime/build/import results
+reported for this branch use Qt 6.12; Qt 6.5 has not been exercised at runtime.
+Source inspection and layout fixtures are not a minimum-Qt runtime proof.
 
-### Symptom
+Selected post-v26.04 types/calls/events are verified with pinned independent
+Rust serde vectors and mocks, not a running main compositor. Live suites use
+niri 26.04. Optional touchpad state can arrive one event after released readiness;
+null is unknown, not false. Older niri may reject newer operations.
 
-niri 26.04 logs the following when an niriqml client disconnects:
+## Headless cage X11 socket path
 
-```
-WARN niri::ipc::server: error handling IPC client: error writing reply
-Caused by: Broken pipe (os error 32)
-```
+Installed cage 0.3.1 unconditionally creates its compiled-in Xwayland listener
+and can allocate `/tmp/.X11-unix` despite TMPDIR. WLR_XWAYLAND chooses an
+executable, not a disable flag. niri 26.04 has no built-in Xwayland server.
+Project checkouts, fixtures, logs and scratch stay in the disk-backed workspace;
+this caveat concerns cage itself. See [live harness notes](tests/live/README.md).
+No shared infrastructure or different compositor approach is substituted.
 
-This appears for every client disconnect. With niriqml's auto-reconnect
-enabled, short-lived clients (test binaries, quick-connect-and-disconnect
-shells) produce two broken pipe entries per run.
+## niri 26.04 Broken pipe warnings
 
-### Root cause
+When a client closes before a reply write, released niri's regular request
+handler can log `error writing reply` / `Broken pipe (os error 32)`. Its event
+stream handler treats BrokenPipe as normal disconnection; the regular write path
+propagates it. Earlier VM investigation reported this logging race and an
+upstream submission. This document does not assert the submission's current
+status or that every warning has the same cause.
 
-In niri's `src/ipc/server.rs`, client disconnect is handled inconsistently:
+A warning alone neither proves request failure nor proves successful delivery.
+Inspect the reply's certainty and actual consumer state. The current session
+uses guarded retirement/epochs; it no longer has the old facade-owned socket
+destructor described in historical notes. Do not infer that all lifecycle/data
+flow is correct or that no data loss is possible from a cosmetic-log observation.
 
-- `handle_event_stream_client()` — correctly handles `BrokenPipe` as normal
-  disconnection (returns `Ok`)
-- `handle_client()` — does NOT handle `BrokenPipe` on the reply write path.
-  When a client sends a query/action and disconnects before niri writes
-  the `{"Ok":"Handled"}` reply, `write_all()` returns `EPIPE`, which
-  propagates through `.context("error writing reply")` and is logged as a
-  WARN.
+## Tooling metadata and compositor limits
 
-The event stream path already has the pattern. The regular request/response
-path is missing it.
+qmllint can report an unresolved template-base import for
+NiriRecordModel<NiriWindow/Workspace>. Fresh QML consumers load/populate in the
+guest. No lint categories are suppressed; this metadata warning is not a Qt
+lifecycle attribution. Exact diagnostics are retained with verification logs.
 
-### Why this is NOT an niriqml bug
-
-niriqml's connection lifecycle is correct:
-
-1. `NiriConnection::disconnect()` uses `m_socket.abort()` — immediate
-   close, which prevents the QTimer-in-destructor SIGSEGV (fixed in
-   v0.1.2)
-2. The `NiriConnection` destructor also calls `abort()` as a safety net
-   for process teardown
-3. niri's IPC server has no way to know the client disconnected until
-   it tries to write — EPIPE is inherent to Unix socket teardown
-
-We investigated alternative approaches (graceful `disconnectFromServer()`
-+ `waitForDisconnected()`, `shutdown(SHUT_WR)` + `nanosleep()`) on the VM.
-None prevented the EPIPE on niri's side. The race is in niri's write path,
-not niriqml's close path.
-
-### Impact
-
-**None.** The WARN is cosmetic. niri continues operating. niriqml's
-auto-reconnect handles the event stream seamlessly. Events stream
-correctly. No data loss. No functional degradation.
-
-### Fix
-
-The fix is in niri's `handle_client()`. After the `write_all()` call:
-
-```rust
-match write.write_all(&buf).await {
-    Ok(()) => (),
-    Err(err) if err.kind() == io::ErrorKind::BrokenPipe => return Ok(()),
-    Err(err) => return Err(err).context("error writing reply"),
-}
-```
-
-This pattern already exists in `handle_event_stream_client()`. It brings
-the regular request/response path to parity.
-
-The fix has been submitted to niri upstream (PR #4180, mailing list patch
-to `~nikoyak/niri-dev@lists.sr.ht`).
-
-### Workaround
-
-None needed. The WARN is safe to ignore. No action required from niriqml
-consumers.
-
-### Verification
-
-Reproduced in a VM with cage headless + nested niri 26.04. The WARN fires
-2× per test run (test_live_wire, test_live_events, etc.). Confirmed events
-stream correctly (all 6 initial event types received). Confirmed no
-functional regression.
+niri provides no stable column IDs, atomic arbitrary-ID stack insertion, output
+hotplug event or animation-completion acknowledgement. Multi-action layout
+recipes are revalidated inferences, not transactions. See
+[API limits](API.md#compositor-limits-and-within-row-moves).
