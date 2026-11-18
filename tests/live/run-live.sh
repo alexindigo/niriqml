@@ -113,7 +113,7 @@ case ${1:-} in
         exit ;;
     --inside)
         shift
-        trap 'status=$?; stop_niri || status=1; exit "$status"' EXIT
+        trap 'status=$?; if ((started_niri)); then stop_niri || status=1; fi; exit "$status"' EXIT
         start_niri
         export NIRIQML_LIVE_FIXTURE=1
         "$@"

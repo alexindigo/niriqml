@@ -89,15 +89,25 @@ stop_case() {
     bash "$runner" --stop # Repeated cleanup is harmless.
 }
 refuse_start_case() {
+    local mode=${1:---start} state
+    local args=("$mode")
     prepare
     start_stub
-    if bash "$runner" --start > "$fixture/start.log" 2>&1; then
-        echo "start overwrote a live PID" >&2
+    if [[ $mode == --inside ]]; then
+        args+=(touch "$NIRIQML_LIVE_RUN/inside-ran")
+    fi
+    if bash "$runner" "${args[@]}" > "$fixture/start.log" 2>&1; then
+        echo "$mode accepted a live PID" >&2
         exit 1
     fi
     grep -q 'still running' "$fixture/start.log"
+    builtin kill -0 "$owned"
+    read -r state < "/proc/$owned/stat"
+    [[ ${state##*) } != Z\ * && ${state##*) } != X\ * ]]
     test "$(cat "$NIRIQML_LIVE_RUN/niri.pid")" == "$owned"
     test "$(wc -l < "$NIRIQML_LIVE_RUN/launches")" == 1
+    test ! -e "$NIRIQML_LIVE_RUN/term-seen"
+    test ! -e "$NIRIQML_LIVE_RUN/inside-ran"
 }
 unreclaimed_case() {
     prepare
@@ -130,10 +140,11 @@ timeout_case() {
 case ${2:-all} in
     stop) stop_case ;;
     refuse-start) refuse_start_case ;;
+    refuse-inside) refuse_start_case --inside ;;
     unreclaimed) unreclaimed_case ;;
     timeout) timeout_case ;;
     all)
-        for name in stop refuse-start unreclaimed timeout; do
+        for name in stop refuse-start refuse-inside unreclaimed timeout; do
             bash "$0" "$root" "$name"
         done ;;
     *) exit 2 ;;
