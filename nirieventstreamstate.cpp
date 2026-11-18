@@ -1,4 +1,5 @@
 #include "nirieventstreamstate.h"
+#include <algorithm>
 
 namespace {
 using State = NiriEventStreamState;
@@ -116,21 +117,12 @@ QList<T> ordered(const QMap<quint64, State::Entry<T>> &map)
         result.append(*entry);
     return result;
 }
-template <typename T>
-std::optional<quint64> focused(const QMap<quint64, State::Entry<T>> &map)
-{
-    for (auto it = map.cbegin(); it != map.cend(); ++it) {
-        if (it.value()->isFocused)
-            return it.key();
-    }
-    return std::nullopt;
-}
 } // namespace
 
 bool State::Changes::changed() const
 {
     return !windows.isEmpty() || !workspaces.isEmpty() || !casts.isEmpty() || keyboardLayouts
-            || overview || config || readiness;
+            || overview || config || readiness || touchpad;
 }
 
 State::ApplyResult State::apply(const NiriEvent &event, quint64 token)
@@ -143,6 +135,8 @@ State::ApplyResult State::apply(const NiriEvent &event, quint64 token)
         return result;
     }
     auto &c = result.changes;
+    c.focusedWindowBefore = focusedWindowId();
+    c.focusedWorkspaceBefore = focusedWorkspaceId();
     auto reject = [&](const QString &message) {
         result.status = ApplyResult::ProtocolError;
         result.error = message;
@@ -331,12 +325,19 @@ State::ApplyResult State::apply(const NiriEvent &event, quint64 token)
         put(m_casts, c.casts, p.streamId, Entry<NiriCast>{});
         break;
     }
+    case NiriEvent::TouchpadToggled: {
+        PAYLOAD(TouchpadToggled);
+        c.touchpad = m_touchpad != p.on;
+        m_touchpad = p.on;
+        break;
+    }
     case NiriEvent::ScreenshotCaptured:
     case NiriEvent::Unknown:
     case NiriEvent::Invalid:
         break;
     }
 #undef PAYLOAD
+    updateIndexes(c);
     c.revision = ++m_revision;
     return result;
 }
@@ -348,6 +349,8 @@ State::Changes State::reset(quint64 token, const QString &reason)
     c.revision = ++m_revision;
     c.reset = true;
     c.reason = reason;
+    c.focusedWindowBefore = focusedWindowId();
+    c.focusedWorkspaceBefore = focusedWorkspaceId();
     replace(m_windows, c.windows, {}, &NiriWindow::id);
     replace(m_workspaces, c.workspaces, {}, &NiriWorkspace::id);
     replace(m_casts, c.casts, {}, &NiriCast::streamId);
@@ -355,15 +358,20 @@ State::Changes State::reset(quint64 token, const QString &reason)
     c.overview = m_overview;
     c.config = m_config;
     c.readiness = m_ready;
+    c.touchpad = m_touchpad.has_value();
     m_layouts.reset();
+    m_touchpad.reset();
     m_overview = m_config = m_ready = false;
     m_epoch = token;
+    updateIndexes(c);
     return c;
 }
 
 QList<NiriEvent> State::replicate() const
 {
-    // state.rs:97-105,240-247: layouts optional, casts always last.
+    // v26.04 state.rs:97-105: casts ends the released six-part burst.
+    // Pinned main appends touchpad after casts (state.rs:120). Do not invent
+    // a touchpad value when this optional extension has not been received.
     QList<NiriEvent> result{NiriEvent::fromWorkspacesChanged({workspacesSnapshot(), {}}),
                             NiriEvent::fromWindowsChanged({windowsSnapshot(), {}})};
     if (m_layouts)
@@ -371,6 +379,8 @@ QList<NiriEvent> State::replicate() const
     result.append(NiriEvent::fromOverviewOpenedOrClosed({m_overview, {}}));
     result.append(NiriEvent::fromConfigLoaded({m_config, {}}));
     result.append(NiriEvent::fromCastsChanged({castsSnapshot(), {}}));
+    if (m_touchpad)
+        result.append(NiriEvent::fromTouchpadToggled({*m_touchpad, {}}));
     return result;
 }
 
@@ -388,9 +398,59 @@ QList<NiriCast> State::castsSnapshot() const
 }
 std::optional<quint64> State::focusedWindowId() const
 {
-    return focused(m_windows);
+    return m_focusedWindows.isEmpty()
+            ? std::nullopt
+            : std::optional<quint64>(
+                      *std::min_element(m_focusedWindows.cbegin(), m_focusedWindows.cend()));
 }
 std::optional<quint64> State::focusedWorkspaceId() const
 {
-    return focused(m_workspaces);
+    return m_focusedWorkspaces.isEmpty()
+            ? std::nullopt
+            : std::optional<quint64>(
+                      *std::min_element(m_focusedWorkspaces.cbegin(), m_focusedWorkspaces.cend()));
+}
+
+State::Entry<NiriWorkspace> State::workspaceByName(const QString &name, const Changes *before) const
+{
+    auto ids = m_workspaceNames.value(name);
+    if (before) {
+        for (auto it = before->workspaces.cbegin(); it != before->workspaces.cend(); ++it) {
+            ids.remove(it.key());
+            if (it->before && it->before->name == name)
+                ids.insert(it.key());
+        }
+    }
+    if (ids.isEmpty())
+        return {};
+    const auto id = *std::min_element(ids.cbegin(), ids.cend());
+    if (before && before->workspaces.contains(id))
+        return before->workspaces.value(id).before;
+    return workspace(id);
+}
+
+void State::updateIndexes(const Changes &c)
+{
+    for (auto it = c.windows.cbegin(); it != c.windows.cend(); ++it) {
+        m_focusedWindows.remove(it.key());
+        if (it->after && it->after->isFocused)
+            m_focusedWindows.insert(it.key());
+    }
+    for (auto it = c.workspaces.cbegin(); it != c.workspaces.cend(); ++it) {
+        m_focusedWorkspaces.remove(it.key());
+        if (it->before && it->before->name) {
+            auto name = m_workspaceNames.find(*it->before->name);
+            if (name != m_workspaceNames.end()) {
+                name->remove(it.key());
+                if (name->isEmpty())
+                    m_workspaceNames.erase(name);
+            }
+        }
+        if (it->after) {
+            if (it->after->isFocused)
+                m_focusedWorkspaces.insert(it.key());
+            if (it->after->name)
+                m_workspaceNames[*it->after->name].insert(it.key());
+        }
+    }
 }

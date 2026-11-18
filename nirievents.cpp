@@ -4,7 +4,6 @@
 #include <QPointer>
 #include "nirisession.h"
 #include "generated/niriipccodec_generated.h"
-#include "nirilogging.h"
 
 NiriEvents *NiriEvents::create(QQmlEngine *engine, QJSEngine *jsEngine)
 {
@@ -144,7 +143,6 @@ void NiriEvents::publishDecoded(const NiriWire::Document &document, const NiriEv
         name = wire.objectValue()->first().first;
         payload = &wire.objectValue()->first().second;
     }
-    qCDebug(niriEventsLog) << "Event" << name;
     const auto raw = NiriWire::toQmlProjection(*payload);
     QPointer<NiriEvents> guard(this);
     const auto current = [guard, token] {

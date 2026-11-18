@@ -1,39 +1,33 @@
 import Niri 1.0
 import QtQuick
+import QtQuick.Layouts
 
 Rectangle {
     width: 400
     height: 600
     color: "#1e1e2e"
 
-    Column {
+    ColumnLayout {
         anchors.fill: parent
         anchors.margins: 8
         spacing: 4
-
-        Text {
-            color: "#cdd6f4"
-            text: "Windows: " + NiriState.windowCount
-        }
-
-        Text {
-            color: "#cdd6f4"
-            text: "Focused: " + NiriState.focusedWindowAppId
-        }
-
+        Text { color: "#cdd6f4"; text: "Windows: " + NiriState.windowCount }
+        Text { color: "#cdd6f4"; text: "Focused: " + (NiriState.focusedWindowAppId ?? "(none)") }
         ListView {
-            width: parent.width
-            height: parent.height - 40
+            objectName: "windowList"
+            Layout.fillWidth: true
+            Layout.fillHeight: true
             model: NiriWindows {}
             delegate: Rectangle {
-                width: parent.width
+                id: windowRow
+                required property var model
+                width: ListView.view.width
                 height: 32
-                color: model.window.isFocused ? "#45475a" : "#313244"
-
+                color: model.isFocused ? "#45475a" : "#313244"
                 Text {
                     anchors.centerIn: parent
                     color: "#cdd6f4"
-                    text: model.window.appId + ": " + model.window.title
+                    text: (windowRow.model.appId ?? "(unknown)") + ": " + (windowRow.model.title ?? "(untitled)")
                 }
             }
         }

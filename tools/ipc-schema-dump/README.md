@@ -79,3 +79,48 @@ variants; codec tests cover supporting values, while callable/event tests consum
 the protocol vectors as their generated surfaces are integrated.
 Hand-written unknown/future variants are tested separately; they cannot
 be serialized by the pinned Rust enum. Ordinary CMake builds do not need Rust.
+
+## Selected newer schema
+
+The independent `main/Cargo.toml` and lockfile use the same extraction entry
+point, pinned to niri commit `689c1e914a5af782a476e433b79c15554bf5a312`.
+That source requires schemars 1.2.2 and serde_json 1.0.151, separately pinned;
+the released manifest and schema retain their original versions and bytes.
+
+Inside the same assigned DigitalOcean guest/container, cwd `/w/src`:
+
+```sh
+export CARGO_TARGET_DIR=/w/build/ipc-schema-dump-main
+cargo fmt --check --manifest-path tools/ipc-schema-dump/main/Cargo.toml
+cargo test --locked --manifest-path tools/ipc-schema-dump/main/Cargo.toml
+cargo run --locked --manifest-path tools/ipc-schema-dump/main/Cargo.toml > /w/tmp/schema-main.json
+cmp /w/tmp/schema-main.json schema/niri-ipc-main-689c1e9.schema.json
+cargo run --locked --manifest-path tools/ipc-schema-dump/main/Cargo.toml -- --vectors > /w/tmp/vectors-main.json
+cmp /w/tmp/vectors-main.json tests/fixtures/serde-main-689c1e9/vectors.json
+python3 tools/generate-ipc.py --check
+```
+
+`schema/extensions.json` selects every compatible wire addition from the
+complete v26.04-to-pin lib.rs diff: eight Action variants, MaxBpc control/enum,
+optional Output.max_bpc, two CastKind values and TouchpadToggled. Every selected
+node carries `introducedAfter: v26.04`. Shared types/constraints must match;
+all additions require an explicit selection. Reviewed main-only serde defaults
+are listed separately and do not relax released required fields or encoding.
+Rustdoc changes, MaxBpc CLI conversions and default helper functions add no
+other wire node. PR 4711 changes existing layout-field population, not schema.
+
+The newer vectors use native pinned Rust/serde for all additions, null/present
+window IDs, every MaxBpc string and output max_bpc presence/bounds. Released
+vectors remain independent and unchanged. Generated encoding still emits null
+for absent modeled optionals, including max_bpc; no released field changes.
+
+Pinned state.rs appends touchpad replication after casts. The reducer ports
+its assignment semantics but retains optional availability: 26.04 sends no
+touchpad event, so a fabricated false default would be wrong. Readiness keeps
+its released six-part meaning at CastsChanged; `touchpadOn` is null until the
+extension event, then bool, and resets to null. No version guess, extra query
+or indefinite wait is introduced. Re-check replication order at each pin.
+On a newer compositor, `initialStateReceived` can become true one event before
+`touchpadOn` leaves null. Consumers needing touchpad state bind to `touchpadOn`;
+null means unknown. Moving the readiness terminator is a supported-release
+baseline upgrade decision, not an optional main-extension selection.

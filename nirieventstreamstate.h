@@ -2,9 +2,11 @@
 
 #include "generated/niriipctypes_generated.h"
 #include <QMap>
+#include <QSet>
 #include <memory>
 
-// Native session-owned port of niri v26.04 niri-ipc/src/state.rs.
+// Native session-owned port of niri v26.04 niri-ipc/src/state.rs plus the
+// optional touchpad part from pinned main 689c1e9.
 // Immutable entries and touched before-images support Qt row transitions without
 // cloning the entire state on each delta. No observer runs inside apply/reset.
 class NiriEventStreamState
@@ -60,7 +62,9 @@ public:
         QMap<quint64, RecordChange<NiriWorkspace>> workspaces;
         QMap<quint64, RecordChange<NiriCast>> casts;
         bool keyboardLayouts = false, overview = false, config = false, readiness = false;
+        bool touchpad = false;
         bool reset = false;
+        std::optional<quint64> focusedWindowBefore, focusedWorkspaceBefore;
         QString reason;
         bool changed() const;
     };
@@ -86,14 +90,27 @@ public:
     const std::optional<NiriKeyboardLayouts> &keyboardLayouts() const { return m_layouts; }
     bool overviewOpen() const { return m_overview; }
     bool configFailed() const { return m_config; }
+    const std::optional<bool> &touchpadOn() const { return m_touchpad; }
     std::optional<quint64> focusedWindowId() const;
     std::optional<quint64> focusedWorkspaceId() const;
+    Entry<NiriWorkspace> workspaceByName(const QString &name,
+                                         const Changes *before = nullptr) const;
+    QList<quint64> windowIds() const { return m_windows.keys(); }
+    QList<quint64> workspaceIds() const { return m_workspaces.keys(); }
+    QList<quint64> castIds() const { return m_casts.keys(); }
+    int windowCount() const { return m_windows.size(); }
+    int workspaceCount() const { return m_workspaces.size(); }
+    int castCount() const { return m_casts.size(); }
 
 private:
     QMap<quint64, Entry<NiriWindow>> m_windows;
     QMap<quint64, Entry<NiriWorkspace>> m_workspaces;
     QMap<quint64, Entry<NiriCast>> m_casts;
     std::optional<NiriKeyboardLayouts> m_layouts;
+    std::optional<bool> m_touchpad;
     bool m_overview = false, m_config = false, m_ready = false;
     quint64 m_epoch = 0, m_revision = 0;
+    QSet<quint64> m_focusedWindows, m_focusedWorkspaces;
+    QMap<QString, QSet<quint64>> m_workspaceNames;
+    void updateIndexes(const Changes &changes);
 };

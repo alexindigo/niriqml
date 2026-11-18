@@ -2,6 +2,7 @@
 """Compile the pinned schemars subset. Python stdlib only; never run at build time."""
 
 import argparse
+import copy
 import difflib
 import hashlib
 import json
@@ -12,7 +13,9 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SCHEMA = "schema/niri-ipc-v26.04.schema.json"
 BINDINGS = "schema/qml-bindings.json"
-ANNOTATIONS = {"description", "title", "$schema", "$id", "x-niri-source", "default", "examples", "deprecated"}
+EXTENSIONS = "schema/extensions.json"
+NEWER_SCHEMA = "schema/niri-ipc-main-689c1e9.schema.json"
+ANNOTATIONS = {"description", "title", "$schema", "$id", "x-niri-source", "default", "examples", "deprecated", "introducedAfter"}
 KEYWORDS = {"$defs", "$ref", "type", "const", "enum", "oneOf", "anyOf", "properties", "required", "additionalProperties", "items", "prefixItems", "minItems", "maxItems", "format", "minimum", "maximum"}
 FORMATS = {"uint8", "uint16", "uint32", "uint64", "uint", "int8", "int16", "int32", "int64", "int", "double", "float"}
 CPP_KEYWORDS = set("alignas alignof and asm auto bitand bitor bool break case catch char class compl const constexpr const_cast continue co_await co_return co_yield decltype default delete do double dynamic_cast else enum explicit export extern false float for friend goto if inline int long mutable namespace new noexcept not nullptr operator or private protected public register reinterpret_cast requires return short signed sizeof static static_assert static_cast struct switch template this thread_local throw true try typedef typeid typename union unsigned using virtual void volatile wchar_t while xor".split())
@@ -47,16 +50,112 @@ def identifier(name, path):
     return name
 
 
+def merge_extensions(base, newer, manifest):
+    """Only explicitly reviewed additive nodes enter the released contract.
+
+    Shared wire constraints must match. The separately reviewed newer serde
+    defaults may relax requiredness upstream, but never in our released input.
+    """
+    if set(manifest) != {"formatVersion", "baseline", "schema", "commit", "additions", "ignoredDefaults"} or manifest["formatVersion"] != 1:
+        raise SchemaError("unsupported extension manifest")
+    if manifest["baseline"] != base["x-niri-source"]["release"] or manifest["commit"] != newer["x-niri-source"]["commit"] or manifest["schema"] != NEWER_SCHEMA:
+        raise SchemaError("extension provenance mismatch")
+    selections = {}
+    for entry in manifest["additions"]:
+        if set(entry) != {"path", "introducedAfter", "decision"} or entry["introducedAfter"] != manifest["baseline"] or not entry["decision"]:
+            raise SchemaError("invalid extension selection")
+        if entry["path"] in selections:
+            raise SchemaError("duplicate extension selection")
+        selections[entry["path"]] = entry
+    selected, defaults = set(), set()
+
+    def addition(node, path):
+        if path not in selections:
+            raise SchemaError(f"{path}: unselected newer addition")
+        selected.add(path)
+        return {**copy.deepcopy(node), "introducedAfter": manifest["baseline"]}
+
+    def tag(branch):
+        if "const" in branch:
+            return branch["const"]
+        props = branch.get("properties", {})
+        if len(props) != 1:
+            raise SchemaError("extension comparison requires single-tag branches")
+        return next(iter(props))
+
+    def variants(branches, path):
+        result = {tag(branch): branch for branch in branches}
+        if len(result) != len(branches):
+            raise SchemaError(f"{path}: colliding variant tags")
+        return result
+
+    def merge(old, new, path):
+        if not isinstance(old, dict) or not isinstance(new, dict):
+            if old != new:
+                raise SchemaError(f"{path}: shared field type/constraint changed")
+            return copy.deepcopy(old)
+        result = copy.deepcopy(old)
+        keys = (set(old) | set(new)) - ANNOTATIONS
+        for key in sorted(keys):
+            a, b = old.get(key), new.get(key)
+            child = path + "/" + key
+            if key in {"$defs", "properties"}:
+                if not isinstance(a, dict) or not isinstance(b, dict) or set(a) - set(b):
+                    raise SchemaError(f"{child}: shared fields removed")
+                values = {}
+                for name in sorted(set(a) | set(b)):
+                    location = path if key == "properties" and path.endswith("/variants/" + name) else child + "/" + name
+                    if name not in a:
+                        values[name] = addition(b[name], location)
+                        # New received fields must represent absence honestly.
+                        value = b[name]
+                        nullable = "null" in value.get("type", []) or {"type": "null"} in value.get("anyOf", [])
+                        if key == "properties" and not nullable:
+                            raise SchemaError(f"{location}: newer record field must be nullable")
+                    else:
+                        values[name] = merge(a[name], b[name], location)
+                result[key] = values
+            elif key == "oneOf":
+                before, after = variants(a, path), variants(b, path)
+                if set(before) - set(after):
+                    raise SchemaError(f"{path}: shared variants removed")
+                result[key] = [merge(before[t], after[t], path + "/variants/" + t) if t in before else addition(after[t], path + "/variants/" + t) for t in sorted(after)]
+            elif key == "required":
+                before, after = set(a or []), set(b or [])
+                if (after - before) & set(old.get("properties", {})):
+                    raise SchemaError(f"{child}: shared requiredness tightened")
+                for name in before - after:
+                    location = path + "/properties/" + name
+                    if "default" not in new.get("properties", {}).get(name, {}):
+                        raise SchemaError(f"{location}: shared requiredness changed without serde default")
+                    defaults.add(location)
+                # Baseline requiredness is deliberately retained, even for new
+                # fields required by the newer source.
+            elif a != b:
+                raise SchemaError(f"{child}: shared field type/constraint changed")
+        return result
+
+    merged = merge(base, newer, "")
+    if selected != set(selections):
+        raise SchemaError(f"stale extension selections: {sorted(set(selections) - selected)}")
+    if len(manifest["ignoredDefaults"]) != len(set(manifest["ignoredDefaults"])) or defaults != set(manifest["ignoredDefaults"]):
+        raise SchemaError(f"unreviewed newer defaults: {sorted(defaults)}")
+    return merged
+
+
 class Compiler:
-    def __init__(self, schema, bindings):
+    def __init__(self, schema, bindings, extensions=None):
         self.schema = schema
         self.bindings = bindings
+        self.extensions = extensions
         if set(bindings) - {"formatVersion", "types", "tuples", "actions", "requests", "events"} or bindings.get("formatVersion") != 1:
             raise SchemaError("unsupported binding manifest")
         self.defs = schema.get("$defs", {})
         self.ir = {}
         for name in sorted(self.defs):
             self.ir[name] = self.normalize(self.defs[name], f"#/$defs/{name}")
+            if "introducedAfter" in self.defs[name]:
+                self.ir[name]["introducedAfter"] = self.defs[name]["introducedAfter"]
         self.root = self.normalize(schema, "#")
         self.validate_bindings()
         self.tuples = {}
@@ -141,6 +240,8 @@ class Compiler:
                     variants.append({"tag": field["wire"], "payload": field["type"]})
                 else:
                     raise SchemaError(f"{path}: not a single-key externally tagged union")
+                if "introducedAfter" in branch:
+                    variants[-1]["introducedAfter"] = branch["introducedAfter"]
             tags = [v["tag"] for v in variants]
             if len(tags) != len(set(tags)):
                 raise SchemaError(f"{path}: colliding variant tags")
@@ -169,7 +270,8 @@ class Compiler:
                 result = {"kind": "map", "item": self.normalize(extra, path + "/additionalProperties")}
             elif isinstance(extra, bool):
                 fields = [{"wire": key, "name": camel(key), "required": key in required,
-                           "type": self.normalize(value, path + "/properties/" + key)} for key, value in sorted(props.items())]
+                           "type": self.normalize(value, path + "/properties/" + key),
+                           **({"introducedAfter": value["introducedAfter"]} if "introducedAfter" in value else {})} for key, value in sorted(props.items())]
                 result = {"kind": "record", "fields": fields, "open": extra}
             else:
                 raise SchemaError(f"{path}: invalid additionalProperties")
@@ -318,7 +420,7 @@ class Compiler:
         for name, ir in self.ir.items():
             types[name] = {"cppName": self.name(name), **ir}
         roots = {f["wire"]: f["type"]["name"] for f in self.root["fields"]}
-        return {"formatVersion": 1, "source": self.schema["x-niri-source"], "roots": roots, "types": types, "tupleTypes": self.tuples}
+        return {"formatVersion": 1, "source": self.schema["x-niri-source"], "extensions": self.extensions, "roots": roots, "types": types, "tupleTypes": self.tuples}
 
 
 class SourceBuckets:
@@ -1333,7 +1435,8 @@ class ReferenceEmitter(EventEmitter):
 
     def emit(self):
         docs = ["# Generated IPC API", "", self.header("<!--").replace("\n", " -->\n"),
-                "Pinned to niri v26.04. All literal keys, tags and container shapes below are",
+                "Pinned to niri v26.04 with explicitly selected newer extensions listed below.",
+                "All literal keys, tags and container shapes below are",
                 "wire-exact. Angle-bracket values are type placeholders, NOT wire strings;",
                 "`null / T` means null or T. Named placeholders refer to the value sections.",
                 "Typed encoding emits every known field, including explicit null for absent",
@@ -1347,7 +1450,7 @@ class ReferenceEmitter(EventEmitter):
                 "Enums/unions expose kind, known, valid, wireName/tag and raw; inactive payloads",
                 "are null. Invalid construction exposes valid=false and an error, never a",
                 "default success. Records expose read-only fields and retained extensions.",
-                "", "## Actions", "", "All 141 methods return retainable NiriHandledReply through the one request",
+                "", "## Actions", "", f"All {len(self.c.ir['Action']['variants'])} methods return retainable NiriHandledReply through the one request",
                 "path. Optional positions before required arguments need explicit null to skip;",
                 "trailing optional positions may be omitted. Required bools remain required.",
                 "Union arguments accept NiriArgs values or validated plain wire/camelCase objects.",
@@ -1385,8 +1488,8 @@ class ReferenceEmitter(EventEmitter):
         for i, variant in enumerate(self.c.ir["Response"]["variants"], 1):
             payload = variant["payload"]
             docs.append(f'| {i} | `Niri{variant["tag"]}Reply` | `{self.cpp(payload) if payload else "NiriHandled"}` | `{self.qml_type(payload) if payload else "niriHandled"}` | `{{"Ok":{self.variant_shape(variant)}}}` |')
-        docs += ["", "## Events", "", "The 19 native and QML signals below publish the SAME decoded event after the",
-                 "coordinator's existing state updates. Generated buses do not parse or cache.",
+        docs += ["", "## Events", "", f"The {len(self.c.ir['Event']['variants'])} native and QML signals below publish the SAME decoded event after the",
+                  "session's canonical reducer/model updates. Generated buses do not parse or cache.",
                  "Native C++ uses NiriEvents::nativeEvents() (not invokable from QML). The QML",
                  "singleton inherits the projected signals. An epoch change during a native",
                  "callback suppresses the stale QML/raw continuation.",
@@ -1457,6 +1560,23 @@ class ReferenceEmitter(EventEmitter):
                  "wire encoding. Native optional values use std::optional, arrays use std::array,",
                  "variable lists use QList, heterogeneous tuples use std::tuple, and maps use",
                  "QMap<QString,T>. Named layout-change entries project tuple IDs to strings.", ""]
+        if self.c.extensions:
+            docs += ["", "## Selected post-v26.04 surface", "",
+                     f"Pinned main commit `{self.c.extensions['commit']}`. Each selection below has",
+                     "`introducedAfter: v26.04`; it is not a v26.04 requirement. New output fields",
+                     "are null when omitted. The released required fields/encoding do not acquire",
+                     "main's serde defaults. Sending newer actions to older niri may return Err.", "",
+                     "Touchpad state is null until TouchpadToggled is received, then reflects only",
+                     "the runtime toggle, not hardware/config disablement. Main replicates it AFTER",
+                     "CastsChanged; initialStateReceived still describes the released six-part burst,",
+                     "not availability of this optional extension. touchpadOnChanged signals availability.", "",
+                     "On a newer compositor, initialStateReceived can become true one event before",
+                     "touchpadOn leaves null. Consumers needing touchpad state bind to touchpadOn;",
+                     "null means unknown. Revisit the readiness terminator when adopting a newer",
+                     "supported release baseline, not when selecting optional main extensions.", "",
+                     "| # | Selected schema node | Introduced after | Decision |", "|---|---|---|---|"]
+            for i, entry in enumerate(self.c.extensions["additions"], 1):
+                docs.append(f"| {i} | `{entry['path']}` | `{entry['introducedAfter']}` | {entry['decision']} |")
         inventory = [self.header(), "#pragma once", "", "#include <array>", "", "// clang-format off", "namespace NiriIpcInventory {"]
         for group in ROOT_GROUPS:
             tags = [v["tag"] for v in self.c.ir[group]["variants"]]
@@ -1468,10 +1588,126 @@ class ReferenceEmitter(EventEmitter):
         return {"docs/generated/IPC-API.md": "\n".join(docs), "generated/niriipcinventory_generated.h": "\n".join(inventory)}
 
 
+class GuideEmitter(ReferenceEmitter):
+    """Checked navigation and provenance, derived from the same inventory IR."""
+
+    def guides(self, inventory, released):
+        counts = {name: len(inventory["types"][name]["variants"]) for name in ROOT_GROUPS}
+        base_counts = {name: len(released["$defs"][name]["oneOf"]) for name in ROOT_GROUPS}
+        mapping = ["# Feature mapping", "", self.header("<!--").replace("\n", " -->\n"),
+                   "Generated from schema/ipc-inventory.json's normalized model. Do not edit.",
+                   "The [generated reference](docs/generated/IPC-API.md) supplies every exact",
+                   "wire shape, native/QML signature, field constraint and factory. Raw access",
+                   "remains available for all protocol values, including unknown future data.",
+                   "This inventory describes API availability, not proof of every action effect.",
+                   "", "| # | Root | Released v26.04 | With selected newer additions |",
+                   "|---|---|---|---|"]
+        for i, name in enumerate(ROOT_GROUPS, 1):
+            mapping.append(f"| {i} | {name} | {base_counts[name]} | {counts[name]} |")
+        mapping += ["", "Query replies are snapshots and never seed state. Output/layer metadata",
+                    "are query-only, not invented stream parts. Current-state projections retain",
+                    "windows, workspaces, optional layouts, overview, config and casts, plus optional",
+                    "newer touchpad availability. ScreenshotCaptured is transient; EventLog is",
+                    "bounded history rather than another reducer. Unknown/malformed data remains raw.",
+                    "See [authored contracts](API.md) for readiness, selectors and notification rules.",
+                    "The schema Reply alias Result_of_Response_or_string maps the Ok/Err envelope",
+                    "to NiriPendingReply.document/json, not a fictional Request/Response value gadget."]
+        sections = {"Action": ("actions", "NiriActions"), "Request": ("requests", "NiriRequests"),
+                    "Event": ("events", "NiriEvents"), "OutputAction": ("niriargs-factories", "NiriArgs"),
+                    "Response": ("typed-replies", "")}
+        for group in ROOT_GROUPS:
+            section, facade = sections[group]
+            mapping += ["", f"## {group}", "", "| # | Wire variant / fields | QML entry | Native API | Availability / reference |", "|---|---|---|---|---|"]
+            for i, variant in enumerate(inventory["types"][group]["variants"], 1):
+                tag, payload = variant["tag"], variant["payload"]
+                fields = (", ".join(f["wire"] for f in payload["fields"]) or "empty object") if payload and payload["kind"] == "record" else ("value" if payload else "unit")
+                if group in {"Action", "Request", "Event"}:
+                    method = self.c.bindings.get(section, {}).get(tag, {}).get("name", tag[:1].lower() + tag[1:])
+                    qml = facade + "." + method
+                    native = ("NiriNativeEvents::" if group == "Event" else facade + "::") + method
+                elif group == "Response":
+                    qml, native = "Niri" + tag + "Reply.result", "Niri" + tag + "Reply::result()"
+                else:
+                    qml = "NiriArgs.outputAction" + self.alias(group, tag) + " -> NiriRequests.output"
+                    native = "NiriOutputAction::from" + self.alias(group, tag)
+                availability = "post-v26.04" if variant.get("introducedAfter") else "v26.04"
+                mapping.append(f"| {i} | `{tag}`: {fields} | `{qml}` | `{native}` | {availability}; [reference](docs/generated/IPC-API.md#{section}) |")
+        mapping += ["", "## Supporting values and fields", "", "Every field below maps to a generated read-only QML property and canonical",
+                    "native field; record/variant payload details and enum alternatives are in the",
+                    "linked reference. Wide integers use QML strings; optional fields use null.",
+                    "", "| # | Wire type | Native / QML value | Fields / alternatives | Reference |", "|---|---|---|---|---|"]
+        index = 0
+        for name, ir in inventory["types"].items():
+            if name in {"Request", "Response", "Result_of_Response_or_string"}:
+                continue  # These roots export methods/replies, not fictional value gadgets.
+            index += 1
+            if ir["kind"] == "record":
+                entries = [f['wire'] + " -> " + f['name'] for f in ir["fields"]]
+            else:
+                entries = [v["tag"] for v in ir.get("variants", [])] or ir.get("values", [])
+            section = "records-and-variant-payloads" if ir["kind"] == "record" else "tuple-enum-and-union-values"
+            mapping.append(f"| {index} | `{name}` | `{ir['cppName']}` / `{self.qml_type({'kind': 'ref', 'name': name})}` | {', '.join(entries)} | [reference](docs/generated/IPC-API.md#{section}) |")
+        mapping += ["", "Tuple members and every inline variant field are exhaustively listed in the",
+                    "[record/tuple reference](docs/generated/IPC-API.md#records-and-variant-payloads).",
+                    "[Selected newer nodes](docs/generated/IPC-API.md#selected-post-v2604-surface)",
+                    "carry introducedAfter metadata; they do not relax released required fields.",
+                    "", "## Verification links", "", "| # | Surface | Consumer check |", "|---|---|---|",
+                    "| 1 | Requests/actions/output controls | tests/test_generated_requests.cpp, tests/test_generated_actions.cpp; independent serde socket bytes |",
+                    "| 2 | Replies/events/records | tests/test_codec.cpp, tests/test_generated_events.cpp; native and real QML values |",
+                    "| 3 | Exported surface | tests/test_ipc_inventory.cpp; actual Qt metaobjects vs inventory |",
+                    "| 4 | Retained state/projections | tests/test_state.cpp, tests/test_state_projections.cpp, tests/test_projection_reset.cpp |",
+                    "| 5 | Live outcomes | tests/test_live_acceptance.cpp; representative effects, not every destructive action |",
+                    "| 6 | Mapping/schema/reference drift | tools/generate-ipc.py --check, tests/test_generator.py |", ""]
+        schema = ["# IPC schema and checked inventory", "", self.header("<!--").replace("\n", " -->\n"),
+                  "Generated by tools/generate-ipc.py from the same inventory as the typed API.",
+                  "", "| # | Input | Provenance | SHA256 |", "|---|---|---|---|",
+                  f"| 1 | `{SCHEMA}` | {inventory['source']['release']} / `{inventory['source']['commit']}` | `{self.hashes['schema']}` |",
+                  f"| 2 | `{NEWER_SCHEMA}` | selected main `{self.c.extensions['commit']}` | `{self.hashes['newer_schema']}` |",
+                  f"| 3 | `{EXTENSIONS}` | explicit additive selections, introducedAfter:v26.04 | `{self.hashes['extensions']}` |",
+                  f"| 4 | `{BINDINGS}` | names/order/aliases and cited request-response pairings only | `{self.hashes['bindings']}` |",
+                  "", "Dialect: JSON Schema Draft 2020-12, canonical deserialize contract.",
+                  "The dumper pins schemars/serde_json and emits provenance in x-niri-source.",
+                  "The synthetic six-root schema index is NOT an IPC Request wrapper.",
+                  "", "## Actual protocol examples", "", "Unix socket selected from NIRI_SOCKET or explicit endpoint. One JSON document",
+                  "per LF-delimited frame. Requests can be bare strings or tagged objects:",
+                  "", "```json", '"Version"', '{"Action":{"MoveWindowToWorkspace":{"window_id":123,"reference":{"Id":456},"focus":false}}}',
+                  '{"Output":{"output":"DP-1","action":"Off"}}', '{"Ok":"Handled"}', '{"Ok":{"Version":"26.04"}}', '{"Err":"example server error"}',
+                  '{"WindowFocusChanged":{"id":null}}', "```", "", "Each line above is a separate example, not one combined document. There is",
+                  "no extra Request key. Handled is a string; optional values are real null.",
+                  "Wire u64 values are JSON numbers, while typed QML IDs are decimal strings.",
+                  "Required released fields stay required; CLI/newer serde defaults are not inferred.",
+                  "", "## Coverage", "", "| # | Root | Released | Selected surface |", "|---|---|---|---|"]
+        for i, name in enumerate(ROOT_GROUPS, 1):
+            schema.append(f"| {i} | {name} | {base_counts[name]} | {counts[name]} |")
+        schema += ["", "[FeatureMapping](../FeatureMapping.md) and the [complete generated reference](generated/IPC-API.md)",
+                   "include every field/variant, QML/native name and optional newer selection.",
+                   "schema/ipc-inventory.json is the machine-readable normalized model. Normal",
+                   "builds compile committed C++ and need no Rust or schema generation.",
+                   "", "## Reproduction and release updates", "", "Run only in the named project guest/container from [DESIGN.md](../DESIGN.md#per-release-maintenance-procedure):",
+                   "DigitalOcean niriqml-full-ipc-api, localhost/niriqml-dev:latest, /w/src,",
+                   "TMPDIR=/w/tmp, CARGO_HOME=/w/cargo. The host guest helper transports commands.",
+                   "", "```sh", "export CARGO_TARGET_DIR=/w/build/ipc-schema-dump",
+                   "cargo run --locked --manifest-path tools/ipc-schema-dump/Cargo.toml > /w/tmp/schema.json",
+                   f"cmp /w/tmp/schema.json {SCHEMA}", "python3 tools/generate-ipc.py", "python3 tools/generate-ipc.py --check", "```", "",
+                   "Generation is stdlib-only, deterministic and network-free; --check diffs in",
+                   "memory and never rewrites stale files. It checks C++, manifests, inventory,",
+                   "this file, FeatureMapping and IPC-API together. Review all diffs, do not hand-edit.",
+                   "For each release: dump twice, compare deserialize/serialize, review all schema",
+                   "and extension changes, re-read state.rs/server.rs replication/ack order and",
+                   "readiness, refresh independent native serde vectors, run full non-live/QML/lint",
+                   "and owned live suites plus installed-consumer proof. Follow the exact procedure",
+                   "in DESIGN.md and [dumper README](../tools/ipc-schema-dump/README.md).", ""]
+        return {"FeatureMapping.md": "\n".join(mapping), "docs/SCHEMA.md": "\n".join(schema)}
+
+
 def outputs(root=ROOT):
     schema, bindings = load(root / SCHEMA), load(root / BINDINGS)
-    compiler = Compiler(schema, bindings)
+    extensions = load(root / EXTENSIONS)
+    schema = merge_extensions(schema, load(root / extensions["schema"]), extensions)
+    compiler = Compiler(schema, bindings, extensions)
     hashes = {"schema": hashlib.sha256((root / SCHEMA).read_bytes()).hexdigest(),
+              "newer_schema": hashlib.sha256((root / NEWER_SCHEMA).read_bytes()).hexdigest(),
+              "extensions": hashlib.sha256((root / EXTENSIONS).read_bytes()).hexdigest(),
               "bindings": hashlib.sha256((root / BINDINGS).read_bytes()).hexdigest(),
               "generator": hashlib.sha256(pathlib.Path(__file__).read_bytes()).hexdigest()}
     inventory = compiler.inventory()
@@ -1485,6 +1721,7 @@ def outputs(root=ROOT):
     result.update(request_outputs)
     result.update(EventEmitter(compiler, hashes).emit())
     result.update(ReferenceEmitter(compiler, hashes).emit())
+    result.update(GuideEmitter(compiler, hashes).guides(inventory, load(root / SCHEMA)))
     sources = sorted(p for p in result if p.startswith("generated/") and p.endswith((".h", ".cpp")))
     headers = [p for p in sources if p.endswith(".h")]
     result["generated/ipc-generated.cmake"] = CppEmitter(compiler, hashes).header("#") + "".join(

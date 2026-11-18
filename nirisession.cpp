@@ -9,7 +9,6 @@
 #include <QMetaEnum>
 #include <QPointer>
 #include <QThread>
-#include <QScopeGuard>
 
 struct NiriSession::Attempt : QObject
 {
@@ -43,6 +42,39 @@ struct NiriSession::Snapshot
     bool initialStateReceived;
 };
 
+// Reset and event publication share one outer owner. Nested resets may commit
+// only outside the projection stage, and no stream can drain until all pending
+// resets and their projections have finished.
+struct NiriSession::StateDelivery
+{
+    explicit StateDelivery(NiriSession &session)
+        : session(session), owner(!session.m_deliveringState)
+    {
+        session.m_deliveringState = true;
+    }
+    StateDelivery(const StateDelivery &) = delete;
+    StateDelivery &operator=(const StateDelivery &) = delete;
+    ~StateDelivery()
+    {
+        if (!owner)
+            return;
+        session.m_deliveringState = false;
+        // readyRead may already have fired inside an observer's nested loop.
+        // Keep bytes/EOF on the attempt and resume without needing another signal.
+        if (auto attempt = session.m_attempt;
+            attempt && (attempt->socket->bytesAvailable() || attempt->eof))
+            QMetaObject::invokeMethod(
+                    &session,
+                    [runtime = &session, attempt] {
+                        if (runtime->current(attempt))
+                            runtime->drain(attempt);
+                    },
+                    Qt::QueuedConnection);
+    }
+    NiriSession &session;
+    const bool owner;
+};
+
 bool NiriSession::checkThread(const QObject *consumer)
 {
     auto *app = QCoreApplication::instance();
@@ -70,10 +102,7 @@ NiriSession::NiriSession(QObject *parent) : QObject(parent), m_retry(new QTimer(
 {
     m_announced = std::make_unique<Snapshot>(snapshot());
     m_retry->setSingleShot(true);
-    connect(this, &NiriSession::streamReset, this, [this](quint64 token, const QString &reason) {
-        const auto changes = m_state.reset(token, reason);
-        emit stateUpdated(changes);
-    });
+    connect(this, &NiriSession::streamReset, this, &NiriSession::resetState);
     connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, this, [this] {
         m_shuttingDown = true;
         stop();
@@ -425,7 +454,7 @@ void NiriSession::connected(const std::shared_ptr<Attempt> &attempt)
 
 void NiriSession::drain(const std::shared_ptr<Attempt> &attempt)
 {
-    if (attempt->draining || m_deliveringEvent)
+    if (attempt->draining || m_deliveringState)
         return; // A nested loop cannot recursively drain this framer.
     attempt->draining = true;
     while (current(attempt) && attempt->socket->bytesAvailable() > 0) {
@@ -504,22 +533,13 @@ void NiriSession::applyEvent(const NiriWire::Document &document, quint64 token)
 {
     if (token != m_epoch || m_status != Streaming)
         return;
-    m_deliveringEvent = true;
-    const auto release = qScopeGuard([this] {
-        m_deliveringEvent = false;
-        // Resume a replacement attempt made readable by an observer's nested loop.
-        if (auto attempt = m_attempt;
-            attempt && (attempt->socket->bytesAvailable() || attempt->eof))
-            QMetaObject::invokeMethod(
-                    this,
-                    [this, attempt] {
-                        if (current(attempt))
-                            drain(attempt);
-                    },
-                    Qt::QueuedConnection);
-    });
+    const StateDelivery delivery(*this);
     NiriEvent event;
     NiriIpc::DecodeError detail;
+    qCDebug(niriEventsLog) << "Event"
+                           << (document.root.stringValue()
+                                       ? *document.root.stringValue()
+                                       : document.root.objectValue()->first().first);
     const bool decoded = NiriIpc::decodeEvent(document.root, event, detail);
     if (decoded) {
         const auto applied = m_state.apply(event, token);
@@ -529,7 +549,7 @@ void NiriSession::applyEvent(const NiriWire::Document &document, quint64 token)
         }
         if (applied.status != NiriEventStreamState::ApplyResult::Applied)
             return;
-        emit stateUpdated(applied.changes);
+        publishState(applied.changes);
         if (token != m_epoch || !publish(token))
             return;
     }
@@ -557,6 +577,33 @@ void NiriSession::protocolError(quint64 token, const QString &message, const QBy
 {
     if (checkThread(this) && token == m_epoch)
         fail(QStringLiteral("Protocol"), QStringLiteral("ProtocolError"), message, raw);
+}
+
+void NiriSession::resetState(quint64 token, const QString &reason)
+{
+    const StateDelivery delivery(*this);
+    if (m_projectingState) {
+        m_pendingStateReset = qMakePair(token, reason);
+        return;
+    }
+    publishState(m_state.reset(token, reason));
+}
+
+void NiriSession::publishState(const NiriEventStreamState::Changes &changes)
+{
+    m_projectingState = true;
+    emit stateProject(changes);
+    // A nested reset during a reset's row stage cannot suppress the already
+    // committed clear: the following reset may be equal and have no summary.
+    if (!m_pendingStateReset || changes.reset)
+        emit stateUpdated(changes);
+    m_projectingState = false;
+    if (m_pendingStateReset) {
+        const auto pending = *m_pendingStateReset;
+        m_pendingStateReset.reset();
+        resetState(pending.first, pending.second);
+        publish(m_epoch);
+    }
 }
 
 void NiriSession::fail(const QString &category, const QString &code, const QString &message,
