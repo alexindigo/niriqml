@@ -1,13 +1,13 @@
 #pragma once
 
 #include "niriwire.h"
+#include "socketdirectory.h"
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QPointer>
 #include <QQueue>
-#include <QTemporaryDir>
 
 // Scripted released-protocol peer, not a second production reducer.
 class NiriMock : public QObject
@@ -63,7 +63,7 @@ private:
     static QByteArray line(const NiriWire::WireValue &value);
     static NiriWire::WireValue fixture(const QString &group, const QString &name);
     QLocalServer m_server;
-    QTemporaryDir m_directory;
+    SocketDirectory m_directory;
     QList<QPointer<Client>> m_clients;
     QMap<QString, NiriWire::WireValue> m_responses;
     QQueue<Fault> m_faults;

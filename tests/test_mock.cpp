@@ -3,6 +3,9 @@
 #include "generated/niriipcevents_generated.h"
 #include "ipcsurfacefixtures.h"
 #include <QElapsedTimer>
+#include <QFileInfo>
+#include <QProcess>
+#include <QProcessEnvironment>
 #include <QSignalSpy>
 #include <QTest>
 #include <limits>
@@ -30,6 +33,53 @@ private:
         return bytes;
     }
 private slots:
+    void socketDirectoryRejectsDeepTmp_data()
+    {
+        QTest::addColumn<QString>("leaf");
+        QTest::newRow("deep") << QString(120, QLatin1Char('d'));
+        QTest::newRow("utf8-bytes") << QString(60, QChar(0xe9));
+    }
+    void socketDirectoryRejectsDeepTmp()
+    {
+        QFETCH(QString, leaf);
+        QTemporaryDir scratch;
+        QVERIFY(scratch.isValid());
+        const auto deep = scratch.filePath(leaf);
+        QVERIFY(QDir().mkpath(deep));
+        QProcess child;
+        auto environment = QProcessEnvironment::systemEnvironment();
+        environment.insert("TMPDIR", deep);
+        child.setProcessEnvironment(environment);
+        child.start(QCoreApplication::applicationFilePath(),
+                    {"releasedRequests:Version", "-nocrashhandler"});
+        QVERIFY(child.waitForFinished(5000));
+        QCOMPARE(child.exitStatus(), QProcess::CrashExit);
+        QVERIFY((child.readAllStandardOutput() + child.readAllStandardError())
+                        .contains("TMPDIR is too long for Unix fixture socket paths"));
+        // No fallback directory outside the requested TMPDIR is permitted.
+        QCOMPARE(QDir(deep).entryList(QDir::NoDotAndDotDot | QDir::AllEntries).size(), 0);
+    }
+
+    void socketDirectoryIsShortAndOwned()
+    {
+        QString path;
+        {
+            SocketDirectory directory;
+            QVERIFY(directory.isValid());
+            path = directory.filePath("ipc.sock");
+            QCOMPARE(QFileInfo(path).absolutePath().section('/', -1).size(), 9);
+            QCOMPARE(QFileInfo(QFileInfo(path).absolutePath()).absolutePath(),
+                     QDir(QDir::tempPath()).absolutePath());
+            QVERIFY(QFile::encodeName(path).size() < qsizetype(sizeof(sockaddr_un{}.sun_path)));
+            QLocalServer server;
+            QVERIFY(server.listen(path));
+            QLocalSocket peer;
+            peer.connectToServer(path);
+            QVERIFY(peer.waitForConnected(1000));
+        }
+        QVERIFY(!QFileInfo::exists(QFileInfo(path).absolutePath()));
+    }
+
     void releasedRequests_data()
     {
         QTest::addColumn<QByteArray>("request");

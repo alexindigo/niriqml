@@ -8,7 +8,7 @@
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QSignalSpy>
-#include <QTemporaryDir>
+#include "socketdirectory.h"
 #include <QScopeGuard>
 #include "generated/niriipccodec_generated.h"
 #include "nirievents.h"
@@ -103,7 +103,7 @@ QString camel(const QString &wire)
 class CodecServer : public QObject
 {
 public:
-    QTemporaryDir directory;
+    SocketDirectory directory;
     QLocalServer server;
     QLocalSocket *stream = nullptr;
     QMap<QString, WireValue> responses;

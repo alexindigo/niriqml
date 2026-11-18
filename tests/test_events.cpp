@@ -16,7 +16,7 @@
 #include <QLocalSocket>
 #include <QPointer>
 #include <QScopeGuard>
-#include <QTemporaryDir>
+#include "socketdirectory.h"
 #include <memory>
 
 #include "niriconnection.h"
@@ -184,7 +184,7 @@ private slots:
     void socketTimeoutFailsAfterDelay()
     {
         QFETCH(bool, finishBeforeVerification);
-        QTemporaryDir socketDir(QDir::tempPath() + QStringLiteral("/niriqml-hang-XXXXXX"));
+        SocketDirectory socketDir;
         QVERIFY(socketDir.isValid());
         QLocalServer hangServer;
         QVERIFY(hangServer.listen(socketDir.filePath(QStringLiteral("socket"))));
@@ -248,7 +248,7 @@ private slots:
     void oversizedStreamReconnects()
     {
         QFETCH(bool, terminated);
-        QTemporaryDir socketDir(QDir::tempPath() + QStringLiteral("/niriqml-frame-XXXXXX"));
+        SocketDirectory socketDir;
         QVERIFY(socketDir.isValid());
         QLocalServer server;
         QVERIFY(server.listen(socketDir.filePath(QStringLiteral("socket"))));
@@ -306,7 +306,7 @@ private slots:
     void completeEventsPrecedeFramingFailure()
     {
         QFETCH(bool, combined);
-        QTemporaryDir socketDir;
+        SocketDirectory socketDir;
         QVERIFY(socketDir.isValid());
         QLocalServer server;
         QVERIFY(server.listen(socketDir.filePath(QStringLiteral("socket"))));
@@ -365,7 +365,7 @@ private slots:
     void completeReplyPrecedesFramingFailure()
     {
         QFETCH(bool, terminated);
-        QTemporaryDir socketDir;
+        SocketDirectory socketDir;
         QVERIFY(socketDir.isValid());
         QLocalServer server;
         QVERIFY(server.listen(socketDir.filePath(QStringLiteral("socket"))));
@@ -415,7 +415,7 @@ private slots:
     void oversizedReplyFails()
     {
         QFETCH(bool, terminated);
-        QTemporaryDir socketDir(QDir::tempPath() + QStringLiteral("/niriqml-reply-XXXXXX"));
+        SocketDirectory socketDir;
         QVERIFY(socketDir.isValid());
         QLocalServer server;
         QVERIFY(server.listen(socketDir.filePath(QStringLiteral("socket"))));

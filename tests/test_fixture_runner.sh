@@ -4,9 +4,12 @@ set -euo pipefail
 root=${1:?usage: test_fixture_runner.sh SCRATCH_ROOT [CASE]}
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 runner="$here/live/run-live.sh"
+# shellcheck source=tests/socket-runtime.sh
+source "$here/socket-runtime.sh"
 mkdir -p "$root"
 fixture=$(mktemp -d "$root/fixture-runner.XXXXXXXX")
 owned=""
+runtime=""
 cleanup() {
     # Old/broken start paths can overwrite niri.pid; keep every test-owned PID.
     local pid launches=${NIRIQML_LIVE_RUN:-$fixture/run}/launches
@@ -19,15 +22,19 @@ cleanup() {
         builtin kill -KILL "$owned" 2>/dev/null || true
         wait "$owned" 2>/dev/null || true
     fi
+    [[ -z "$runtime" ]] || rm -rf -- "$runtime"
     rm -rf -- "$fixture"
 }
 trap cleanup EXIT
+runtime=$(niriqml_socket_runtime)
 mkdir "$fixture/bin"
 cat > "$fixture/bin/niri" <<'PY'
 #!/usr/bin/env python3
 import json, os, pathlib, signal, socket, sys
 run = pathlib.Path(os.environ["NIRIQML_LIVE_RUN"])
-if sys.argv[1] == "--config":
+if sys.argv[1] == "--version":
+    print("niri 26.04 fixture")
+elif sys.argv[1] == "--config":
     with (run / "launches").open("a") as log:
         log.write(f"{os.getpid()}\n")
     sock = socket.socket(socket.AF_UNIX)
@@ -43,7 +50,7 @@ elif "spawn" in sys.argv:
 elif "windows" in sys.argv:
     spawns = (run / "spawns").read_text().splitlines()
     # Simulate the first window arriving only after another window was spawned.
-    count = 0 if len(spawns) == 1 else len(spawns)
+    count = 0 if len(spawns) == 1 and os.environ.get("STUB_WINDOWS_READY") != "1" else len(spawns)
     print(json.dumps([{"app_id": f"niriqml-e9-{i}"} for i in range(1, count + 1)]))
 elif "version" in sys.argv:
     print('"26.04 fixture"')
@@ -54,13 +61,20 @@ cat > "$fixture/bin/sleep" <<'SH'
 exec /usr/bin/sleep .001
 SH
 chmod +x "$fixture/bin/niri" "$fixture/bin/sleep"
+cat > "$fixture/bin/cage" <<'SH'
+#!/usr/bin/env bash
+shift # --
+exec "$@"
+SH
+cp "$fixture/bin/cage" "$fixture/bin/foot"
+chmod +x "$fixture/bin/cage" "$fixture/bin/foot"
 export PATH="$fixture/bin:$PATH"
 export NIRIQML_LIVE_RUN="$fixture/run"
-export XDG_RUNTIME_DIR="$NIRIQML_LIVE_RUN/runtime"
-export NIRI_SOCKET="$NIRIQML_LIVE_RUN/ipc.sock"
+export XDG_RUNTIME_DIR="$runtime"
+export NIRI_SOCKET="$XDG_RUNTIME_DIR/ipc.sock"
 
 prepare() {
-    mkdir -p "$XDG_RUNTIME_DIR"
+    mkdir -p "$NIRIQML_LIVE_RUN"
 }
 start_stub() {
     STUB_IGNORE_TERM=1 niri --config unused &
@@ -137,15 +151,58 @@ timeout_case() {
     test ! -e "$NIRIQML_LIVE_RUN/niri.pid"
 }
 
+runtime_case() {
+    local deep status suite_runtime
+    deep="$fixture/$(printf '%0120d' 0)"
+    mkdir -p "$deep"
+    # Both success and wrapped-command failure must reclaim the suite runtime,
+    # leaving its deep evidence directory intact. Neither cage nor niri may bind
+    # beneath that evidence path (even a connect via a long symlink would fail).
+    for status in 0 1; do
+        local actual=0
+        STUB_WINDOWS_READY=1 NIRIQML_LIVE_SCRATCH_ROOT="$deep" \
+            bash "$runner" --suite bash -c '
+                test -S "$NIRI_SOCKET" || exit 2
+                test "$(stat -c %a "$XDG_RUNTIME_DIR")" = 700 || exit 2
+                printf "%s\n" "$XDG_RUNTIME_DIR" > "$1"
+                exit "$2"
+            ' bash "$fixture/runtime-path" "$status" > "$fixture/suite.log" 2>&1 || actual=$?
+        [[ $actual == "$status" ]] || { cat "$fixture/suite.log" >&2; return 1; }
+        suite_runtime=$(cat "$fixture/runtime-path")
+        test ! -e "$suite_runtime"
+        compgen -G "$deep/niriqml-live.*/suite.log" >/dev/null
+    done
+    # A long TMPDIR is not permission to silently use /tmp or the build tree.
+    if TMPDIR="$deep" bash "$runner" --suite true > "$fixture/long-tmp.log" 2>&1; then
+        echo 'Runner accepted an overlong TMPDIR' >&2
+        return 1
+    fi
+    grep -q 'TMPDIR is too long for Unix fixture socket paths' "$fixture/long-tmp.log"
+    # Check the unset/empty fallback without writing to the guest's /tmp.
+    bash -c '
+        unset TMPDIR
+        source "$1"
+        mktemp() { test "$1" = -d && test "$2" = /tmp/nqr.XXXXXXXX; }
+        niriqml_socket_runtime
+    ' bash "$here/socket-runtime.sh"
+    TMPDIR="" bash -c '
+        source "$1"
+        mktemp() { test "$1" = -d && test "$2" = /tmp/nqr.XXXXXXXX; }
+        niriqml_socket_runtime
+    ' bash "$here/socket-runtime.sh"
+}
+
 case ${2:-all} in
     stop) stop_case ;;
     refuse-start) refuse_start_case ;;
     refuse-inside) refuse_start_case --inside ;;
     unreclaimed) unreclaimed_case ;;
     timeout) timeout_case ;;
+    runtime) runtime_case ;;
     all)
-        for name in stop refuse-start refuse-inside unreclaimed timeout; do
-            bash "$0" "$root" "$name"
+        deep_root="$fixture/$(printf '%0120d' 0)"
+        for name in stop refuse-start refuse-inside unreclaimed timeout runtime; do
+            bash "$0" "$deep_root" "$name"
         done ;;
     *) exit 2 ;;
 esac

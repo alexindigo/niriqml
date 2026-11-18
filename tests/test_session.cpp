@@ -23,7 +23,7 @@
 #include <QQmlEngine>
 #include <QScopeGuard>
 #include <QSignalSpy>
-#include <QTemporaryDir>
+#include "socketdirectory.h"
 #include <QTest>
 #include <QThread>
 #include <cerrno>
@@ -85,7 +85,7 @@ public:
     int subscriptions = 0;
     QList<QByteArray> requests;
     QList<QPointer<QLocalSocket>> peers;
-    QTemporaryDir directory;
+    SocketDirectory directory;
     QLocalServer server;
 };
 

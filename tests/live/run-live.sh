@@ -2,6 +2,8 @@
 # Run only in the assigned guest/container. Every suite owns its compositor.
 set -euo pipefail
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=tests/socket-runtime.sh
+source "$here/../socket-runtime.sh"
 started_niri=0
 
 owned_pid() {
@@ -133,15 +135,16 @@ case ${1:-} in
         [[ $(niri --version) == 'niri 26.04 '* ]] || {
             echo "Live suite requires released niri 26.04" >&2; exit 1;
         }
-        : "${TMPDIR:?Set disk-backed TMPDIR inside the project guest workspace}"
+        # Keep evidence where requested, but never bind sockets beneath it.
+        runtime=$(niriqml_socket_runtime)
+        trap 'rm -rf -- "$runtime"' EXIT
         export NIRIQML_LIVE_RUN
-        NIRIQML_LIVE_RUN=$(mktemp -d "$TMPDIR/niriqml-live.XXXXXXXX")
-        export XDG_RUNTIME_DIR="$NIRIQML_LIVE_RUN/runtime"
-        mkdir -m 700 "$XDG_RUNTIME_DIR"
+        NIRIQML_LIVE_RUN=$(mktemp -d "${NIRIQML_LIVE_SCRATCH_ROOT:-${TMPDIR:-/tmp}}/niriqml-live.XXXXXXXX")
+        export XDG_RUNTIME_DIR="$runtime"
         export XDG_CACHE_HOME="$NIRIQML_LIVE_RUN/cache"
         export XDG_CONFIG_HOME="$NIRIQML_LIVE_RUN/config"
         mkdir -p "$XDG_CACHE_HOME" "$XDG_CONFIG_HOME"
-        export NIRI_SOCKET="$NIRIQML_LIVE_RUN/ipc.sock"
+        export NIRI_SOCKET="$XDG_RUNTIME_DIR/ipc.sock"
         export NIRIQML_LIVE_CONTROL="$here/run-live.sh"
         export WLR_BACKENDS=headless WLR_RENDERER=pixman
         export LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe
@@ -153,7 +156,7 @@ case ${1:-} in
             > "$NIRIQML_LIVE_RUN/suite.log" 2>&1 || status=$?
         cat "$NIRIQML_LIVE_RUN/suite.log"
         if ((status)); then
-            cat "$NIRIQML_LIVE_RUN/niri.log" >&2
+            [[ ! -f "$NIRIQML_LIVE_RUN/niri.log" ]] || cat "$NIRIQML_LIVE_RUN/niri.log" >&2
         fi
         exit "$status" ;;
     *)

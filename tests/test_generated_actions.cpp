@@ -7,7 +7,7 @@
 #include <QMetaMethod>
 #include <QQmlComponent>
 #include <QQmlEngine>
-#include <QTemporaryDir>
+#include "socketdirectory.h"
 #include <QTest>
 #include <algorithm>
 #include <limits>
@@ -35,7 +35,7 @@ public:
         });
     }
     bool listen() { return directory.isValid() && server.listen(directory.filePath("socket")); }
-    QTemporaryDir directory;
+    SocketDirectory directory;
     QLocalServer server;
     QList<QByteArray> arrivals;
     QByteArray response = "{\"Ok\":\"Handled\"}\n";

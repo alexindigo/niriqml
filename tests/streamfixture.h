@@ -1,10 +1,10 @@
 #pragma once
 
 #include "nirisession.h"
+#include "socketdirectory.h"
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QPointer>
-#include <QTemporaryDir>
 #include <QTest>
 
 // Deliberately no automatic initial burst: tests observe each exact prefix.
@@ -52,7 +52,7 @@ public:
         peer->write(bytes + '\n');
         peer->flush();
     }
-    QTemporaryDir directory;
+    SocketDirectory directory;
     QLocalServer server;
     QPointer<QLocalSocket> peer;
     QByteArray request;

@@ -26,9 +26,18 @@ software EGL renderer. Test commands receive only the wrapper's explicit socket.
 Mutating cases are serialized by CTest. Normal unit/QML runs exclude the live
 label (or names beginning `test_live_`).
 
-Each run prints its disk-backed `TMPDIR/niriqml-live.*` evidence directory:
+Each run prints its disk-backed `TMPDIR/niriqml-live.*` evidence directory
+(`NIRIQML_LIVE_SCRATCH_ROOT` can select a separate evidence root):
 suite/cage log, niri log, exact seeded windows and owned niri PID. EXIT cleanup
-terminates only that nested niri; cage exits with its runner. No host compositor
+terminates only that nested niri; cage exits with its runner. Socket storage is
+a separate private `TMPDIR/nqr.*` directory, removed on suite exit, including
+failures. The stable IPC symlink also lives there so clients never connect via
+a long evidence path. The runner checks the maximum niri/Wayland socket path
+before launch and rejects an overlong TMPDIR with an actionable error. Qt mock
+fixtures likewise use short owned `TMPDIR/nq.*` directories and validate every
+socket path in bytes. With TMPDIR unset, the helpers follow the system temporary
+directory; guest verification supplies disk-backed temporary storage.
+No host compositor
 or shell is involved. The installed cage 0.3.1 has no runtime option to disable
 its compiled-in Xwayland integration: its released `cage.c` calls
 `wlr_xwayland_create` unconditionally when `CAGE_HAS_XWAYLAND` is set.

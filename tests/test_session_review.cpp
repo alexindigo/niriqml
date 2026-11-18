@@ -9,7 +9,6 @@
 #include <QLocalSocket>
 #include <QQmlEngine>
 #include <QSignalSpy>
-#include <QTemporaryDir>
 #include <QTest>
 #include <QThread>
 #include <memory>
@@ -26,7 +25,7 @@ private slots:
 
     void pendingFacadeReleasesCallback()
     {
-        QTemporaryDir directory;
+        SocketDirectory directory;
         QLocalServer server;
         QVERIFY(server.listen(directory.filePath("socket")));
         NiriSession::instance()->selectEndpoint(server.fullServerName());
@@ -58,7 +57,7 @@ private slots:
     void actionEngineDestruction()
     {
         QFETCH(bool, replyArrives);
-        QTemporaryDir directory;
+        SocketDirectory directory;
         QLocalServer server;
         QVERIFY(server.listen(directory.filePath("socket")));
         NiriSession::instance()->selectEndpoint(server.fullServerName());
@@ -94,7 +93,7 @@ private slots:
     void staleEventRejected()
     {
         QFETCH(bool, switchEndpoint);
-        QTemporaryDir directory;
+        SocketDirectory directory;
         QLocalServer server;
         QVERIFY(server.listen(directory.filePath("socket")));
         auto *connection = NiriConnection::instance();

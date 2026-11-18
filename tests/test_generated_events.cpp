@@ -10,7 +10,7 @@
 #include <QQmlComponent>
 #include <QQmlEngine>
 #include <QSignalSpy>
-#include <QTemporaryDir>
+#include "socketdirectory.h"
 #include <QTest>
 #include <limits>
 
@@ -36,7 +36,7 @@ public:
         });
     }
     bool listen() { return directory.isValid() && server.listen(directory.filePath("socket")); }
-    QTemporaryDir directory;
+    SocketDirectory directory;
     QLocalServer server;
     QList<QByteArray> arrivals;
     QByteArray event;

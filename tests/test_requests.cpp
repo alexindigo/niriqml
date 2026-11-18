@@ -10,7 +10,7 @@
 #include <QQmlComponent>
 #include <QQmlEngine>
 #include <QSignalSpy>
-#include <QTemporaryDir>
+#include "socketdirectory.h"
 #include <QTest>
 #include <QMetaMethod>
 #include <limits>
@@ -46,7 +46,7 @@ public:
     QList<QByteArray> arrivals;
     QList<QPointer<QLocalSocket>> peers;
     int connections = 0;
-    QTemporaryDir directory;
+    SocketDirectory directory;
     QLocalServer server;
 };
 
