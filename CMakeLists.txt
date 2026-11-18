@@ -8,6 +8,17 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+option(ENABLE_COVERAGE "Instrument targets for code coverage collection" OFF)
+
+function(niriqml_enable_coverage target)
+    if(ENABLE_COVERAGE)
+        # Tests also exercise shared code concurrently, so counters must be atomic.
+        set(_coverage_flags --coverage -fprofile-abs-path -fprofile-update=atomic)
+        target_compile_options(${target} PRIVATE ${_coverage_flags})
+        target_link_options(${target} PRIVATE ${_coverage_flags})
+    endif()
+endfunction()
+
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core Qml Quick Network)
 qt_policy(SET QTP0001 NEW)
 
@@ -87,6 +98,8 @@ qt_add_qml_module(niriqml
     SOURCES
         ${NIRIQML_SOURCES}
 )
+niriqml_enable_coverage(niriqml)
+niriqml_enable_coverage(niriqmlplugin)
 
 target_include_directories(niriqml PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
@@ -181,6 +194,7 @@ if(BUILD_TEST_MODE)
     find_package(Qt6 REQUIRED COMPONENTS QuickTest Test)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
     add_library(nirimock STATIC tests/nirimock.cpp tests/nirimock.h)
+    niriqml_enable_coverage(nirimock)
     target_link_libraries(nirimock PUBLIC niriqml Qt6::Network)
     target_compile_definitions(nirimock PRIVATE
         NIRIQML_TEST_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
@@ -207,10 +221,7 @@ if(BUILD_TEST_MODE)
         set_tests_properties(${NAME} PROPERTIES
             ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
         )
-        if(ENABLE_COVERAGE)
-            target_compile_options(${NAME} PRIVATE --coverage -fprofile-abs-path)
-            target_link_options(${NAME} PRIVATE --coverage -fprofile-abs-path)
-        endif()
+        niriqml_enable_coverage(${NAME})
     endmacro()
 
     add_niriqml_test(test_framing)
@@ -244,6 +255,7 @@ if(BUILD_TEST_MODE)
     add_executable(test_api
         tests/test_api.cpp
     )
+    niriqml_enable_coverage(test_api)
     target_include_directories(test_api PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(test_api PRIVATE
         Qt6::Core Qt6::Quick Qt6::QuickTest Qt6::Network niriqml nirimock
@@ -257,6 +269,7 @@ if(BUILD_TEST_MODE)
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QML_IMPORT_PATH=${CMAKE_CURRENT_BINARY_DIR}"
     )
     add_executable(test_examples tests/test_examples.cpp)
+    niriqml_enable_coverage(test_examples)
     target_link_libraries(test_examples PRIVATE
         Qt6::Core Qt6::Quick Qt6::QuickTest Qt6::Network niriqml nirimock)
     target_compile_definitions(test_examples PRIVATE
@@ -271,14 +284,10 @@ if(BUILD_TEST_MODE)
         --qmllint $<TARGET_FILE:Qt6::qmllint>
         --imports ${CMAKE_CURRENT_BINARY_DIR}
         --output ${CMAKE_CURRENT_BINARY_DIR}/documentation-snippets)
-    if(ENABLE_COVERAGE)
-        target_compile_options(test_api PRIVATE --coverage -fprofile-abs-path)
-        target_link_options(test_api PRIVATE --coverage -fprofile-abs-path)
-    endif()
-
     add_executable(test_connection
         tests/test_connection.cpp
     )
+    niriqml_enable_coverage(test_connection)
     target_include_directories(test_connection PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(test_connection PRIVATE
         Qt6::Core Qt6::Quick Qt6::Test Qt6::Network niriqml nirimock
@@ -306,21 +315,4 @@ if(BUILD_TEST_MODE)
     set_property(TEST test_session test_session_review test_requests test_codec
         test_generated_actions test_generated_requests test_generated_events test_state
         test_state_projections test_projection_reset APPEND PROPERTY LABELS qml)
-    if(ENABLE_COVERAGE)
-        target_compile_options(test_connection PRIVATE --coverage -fprofile-abs-path)
-        target_link_options(test_connection PRIVATE --coverage -fprofile-abs-path)
-    endif()
-endif()
-
-# ==================== COVERAGE ====================
-
-option(ENABLE_COVERAGE "Instrument targets for code coverage collection" OFF)
-
-if(ENABLE_COVERAGE)
-    message(STATUS "Enabling code coverage flags")
-
-    target_compile_options(niriqml PRIVATE --coverage -fprofile-abs-path)
-    target_link_options(niriqml PRIVATE --coverage -fprofile-abs-path)
-
-    # coverage flags are set per-test via add_niriqml_test macro above
 endif()
