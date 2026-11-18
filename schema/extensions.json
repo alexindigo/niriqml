@@ -1,0 +1,39 @@
+{
+  "formatVersion": 1,
+  "baseline": "v26.04",
+  "schema": "schema/niri-ipc-main-689c1e9.schema.json",
+  "commit": "689c1e914a5af782a476e433b79c15554bf5a312",
+  "additions": [
+    {"path": "/$defs/Action/variants/ChangeVt", "introducedAfter": "v26.04", "decision": "Generate typed change-vt with checked u8 vt."},
+    {"path": "/$defs/Action/variants/ToggleTouchpad", "introducedAfter": "v26.04", "decision": "Generate runtime touchpad toggle action."},
+    {"path": "/$defs/Action/variants/SetWindowFullscreen", "introducedAfter": "v26.04", "decision": "Generate explicit set fullscreen with optional window ID."},
+    {"path": "/$defs/Action/variants/UnsetWindowFullscreen", "introducedAfter": "v26.04", "decision": "Generate explicit unset fullscreen with optional window ID."},
+    {"path": "/$defs/Action/variants/SetWindowMaximizedToEdges", "introducedAfter": "v26.04", "decision": "Generate explicit set maximized-to-edges with optional window ID."},
+    {"path": "/$defs/Action/variants/UnsetWindowMaximizedToEdges", "introducedAfter": "v26.04", "decision": "Generate explicit unset maximized-to-edges with optional window ID."},
+    {"path": "/$defs/Action/variants/SetWindowedFullscreen", "introducedAfter": "v26.04", "decision": "Generate explicit set windowed fullscreen with optional window ID."},
+    {"path": "/$defs/Action/variants/UnsetWindowedFullscreen", "introducedAfter": "v26.04", "decision": "Generate explicit unset windowed fullscreen with optional window ID."},
+    {"path": "/$defs/Output/properties/max_bpc", "introducedAfter": "v26.04", "decision": "Generate optional u8 maxBpc; absent/null on v26.04."},
+    {"path": "/$defs/OutputAction/variants/MaxBpc", "introducedAfter": "v26.04", "decision": "Generate typed max-bpc output control."},
+    {"path": "/$defs/MaxBpc", "introducedAfter": "v26.04", "decision": "Generate six string values 6, 8, 10, 12, 14, 16; native enum names Bits6 through Bits16."},
+    {"path": "/$defs/CastKind/variants/ExtImageCopyCapture", "introducedAfter": "v26.04", "decision": "Generate typed cast kind; retain separate stream IDs for a shared session."},
+    {"path": "/$defs/CastKind/variants/ExtImageCopyCaptureCursor", "introducedAfter": "v26.04", "decision": "Generate typed cursor cast kind; retain separate stream IDs for a shared session."},
+    {"path": "/$defs/Event/variants/TouchpadToggled", "introducedAfter": "v26.04", "decision": "Generate native/QML signal and port touchpad state; optional until received, excluded from released readiness."}
+  ],
+  "ignoredDefaults": [
+    "/$defs/Action/variants/Quit/properties/skip_confirmation",
+    "/$defs/Action/variants/Screenshot/properties/show_pointer",
+    "/$defs/Action/variants/ScreenshotScreen/properties/write_to_disk",
+    "/$defs/Action/variants/ScreenshotScreen/properties/show_pointer",
+    "/$defs/Action/variants/ScreenshotWindow/properties/write_to_disk",
+    "/$defs/Action/variants/ScreenshotWindow/properties/show_pointer",
+    "/$defs/Action/variants/MoveWindowToWorkspaceDown/properties/focus",
+    "/$defs/Action/variants/MoveWindowToWorkspaceUp/properties/focus",
+    "/$defs/Action/variants/MoveWindowToWorkspace/properties/focus",
+    "/$defs/Action/variants/MoveColumnToWorkspaceDown/properties/focus",
+    "/$defs/Action/variants/MoveColumnToWorkspaceUp/properties/focus",
+    "/$defs/Action/variants/MoveColumnToWorkspace/properties/focus",
+    "/$defs/Action/variants/MoveFloatingWindow/properties/x",
+    "/$defs/Action/variants/MoveFloatingWindow/properties/y",
+    "/$defs/VrrToSet/properties/on_demand"
+  ]
+}

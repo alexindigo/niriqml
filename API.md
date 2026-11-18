@@ -108,18 +108,20 @@ keeps its own record cache or applies IPC events. Late creation needs no query.
 | 7 | `keyboardLayouts` | complete generated record or null | `keyboardLayoutsChanged` |
 | 8 | `overview`, `overviewOpen` | niriOverview, bool | `overviewOpenChanged` |
 | 9 | `configFailed` | bool | `configFailedChanged` |
+| 10 | `touchpadOn` (post-v26.04) | null until received, then bool | `touchpadOnChanged` |
 
 All six stream parts are readable from QML and C++. Native keyed access uses
 `nativeWindow(quint64)`, `nativeWorkspace(quint64)`, `nativeWorkspaceByName(name)`
 and `nativeCast(quint64)`, returning optional records. Native snapshot lists use
 `nativeWindowsSnapshot()`, `nativeWorkspacesSnapshot()`, `nativeCastsSnapshot()`.
 Native focus IDs and strings remain std::optional; IDs remain quint64.
+Native `touchpadOn()` returns std::optional<bool>.
 
 | # | QML-invokable getter | Returns |
 |---|---|---|
 | 1 | `window(id)`, `workspace(id)`, `workspaceByName(name)`, `cast(streamId)` | complete generated record or null |
 | 2 | `windowsSnapshot()`, `workspacesSnapshot()`, `castsSnapshot()` | complete record lists in numeric ID order |
-| 3 | `snapshot()` | value map with all three keyed maps, keyboardLayouts, overview/overviewOpen, configFailed, initialStateReceived, focused IDs and activeOutput |
+| 3 | `snapshot()` | value map with all three keyed maps, keyboardLayouts, overview/overviewOpen, configFailed, touchpadOn, initialStateReceived, focused IDs and activeOutput |
 
 Snapshots are frozen copies, not live objects. ID inputs accept exact numeric
 values or decimal strings; use strings for arbitrary u64 IDs. No output metadata
@@ -137,6 +139,19 @@ This rule follows niri v26.04's initial burst: workspaces, windows, optional
 keyboard layouts, overview, config, casts. Recheck upstream `state.rs` and
 `server.rs` when updating the supported release. Query replies never write
 stream state; before readiness, snapshot values may be partial/defaults.
+
+The selected post-v26.04 surface is pinned to main `689c1e9`, not moving main.
+It includes optional `Output.maxBpc`, MaxBpc output control/enum, eight actions,
+two ext-image-copy cast kinds and TouchpadToggled. See the generated reference's
+selected-newer table and `schema/extensions.json` for every addition. Newer
+actions use the normal request path; older niri may return a compositor error.
+Main's touchpad event follows CastsChanged, so readiness does not imply touchpad
+availability. `touchpadOn` stays null until received, then reports the runtime
+toggle only, not hardware/config disablement; reset clears it to null.
+On a newer compositor, `initialStateReceived` can become true one event before
+`touchpadOn` leaves null. Consumers needing touchpad state bind to `touchpadOn`;
+null means unknown. Revisit the readiness terminator when adopting a newer
+supported release baseline, not when selecting optional main extensions.
 
 Reset clears all six parts, focused properties and readiness together. Models
 remove their rows and reactives become invalid, with the appropriate NOTIFYs;

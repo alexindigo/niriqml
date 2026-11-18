@@ -19,7 +19,8 @@
     "ScreenshotCaptured": {},
     "CastsChanged": {},
     "CastStartedOrChanged": {},
-    "CastStopped": {}
+    "CastStopped": {},
+    "TouchpadToggled": {}
   },
   "requests": {
     "Version": {"response": "Version", "source": "v26.04:src/ipc/server.rs:274"},
@@ -56,6 +57,9 @@
     }
   },
   "types": {
+    "MaxBpc": {
+      "variants": {"6": "Bits6", "8": "Bits8", "10": "Bits10", "12": "Bits12", "14": "Bits14", "16": "Bits16"}
+    },
     "LayerSurface": {
       "fields": {
         "namespace": "namespaceName"

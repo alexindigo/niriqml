@@ -142,6 +142,10 @@ bool NiriState::configFailed() const
 {
     return state().configFailed();
 }
+std::optional<bool> NiriState::touchpadOn() const
+{
+    return state().touchpadOn();
+}
 std::optional<NiriWindow> NiriState::nativeWindow(quint64 id) const
 {
     return copy(state().window(id));
@@ -222,6 +226,7 @@ QVariantMap NiriState::snapshot() const
             {"overview", QVariant::fromValue(overview())},
             {"overviewOpen", overviewOpen()},
             {"configFailed", configFailed()},
+            {"touchpadOn", qmlTouchpadOn()},
             {"initialStateReceived", initialStateReceived()},
             {"focusedWindowId", qmlFocusedWindowId()},
             {"focusedWorkspaceId", qmlFocusedWorkspaceId()},
@@ -266,6 +271,7 @@ void NiriState::updated(const NiriEventStreamState::Changes &c)
     NOTIFY(c.keyboardLayouts, keyboardLayoutsChanged)
     NOTIFY(c.overview, overviewOpenChanged)
     NOTIFY(c.config, configFailedChanged)
+    NOTIFY(c.touchpad, touchpadOnChanged)
     NOTIFY(c.readiness, initialStateReceivedChanged)
     NOTIFY(true, stateChanged)
 #undef NOTIFY

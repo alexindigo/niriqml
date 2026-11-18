@@ -32,6 +32,7 @@ class NiriState : public QObject
     Q_PROPERTY(NiriOverview overview READ overview NOTIFY overviewOpenChanged)
     Q_PROPERTY(bool overviewOpen READ overviewOpen NOTIFY overviewOpenChanged)
     Q_PROPERTY(bool configFailed READ configFailed NOTIFY configFailedChanged)
+    Q_PROPERTY(QVariant touchpadOn READ qmlTouchpadOn NOTIFY touchpadOnChanged)
 
 public:
     static NiriState *create(QQmlEngine *qmlEngine, QJSEngine *jsEngine);
@@ -59,6 +60,8 @@ public:
     NiriOverview overview() const;
     bool overviewOpen() const;
     bool configFailed() const;
+    std::optional<bool> touchpadOn() const;
+    QVariant qmlTouchpadOn() const { return NiriIpc::qmlValue(touchpadOn()); }
     std::optional<NiriWindow> nativeWindow(quint64 id) const;
     std::optional<NiriWorkspace> nativeWorkspace(quint64 id) const;
     std::optional<NiriWorkspace> nativeWorkspaceByName(const QString &name) const;
@@ -97,6 +100,7 @@ signals:
     void keyboardLayoutsChanged();
     void overviewOpenChanged();
     void configFailedChanged();
+    void touchpadOnChanged();
 
 private:
     explicit NiriState(QObject *parent = nullptr);

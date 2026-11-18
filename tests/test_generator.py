@@ -1,6 +1,7 @@
 """Maintenance compiler contracts. Execute only inside the assigned test guest."""
 
 import importlib.util
+import copy
 import json
 import os
 import pathlib
@@ -19,6 +20,8 @@ class GeneratorTest(unittest.TestCase):
     def setUp(self):
         self.schema = GEN.load(ROOT / GEN.SCHEMA)
         self.bindings = GEN.load(ROOT / GEN.BINDINGS)
+        self.bindings["types"].pop("MaxBpc", None)
+        self.bindings["events"].pop("TouchpadToggled", None)
 
     def compiler(self):
         return GEN.Compiler(self.schema, self.bindings)
@@ -64,7 +67,7 @@ class GeneratorTest(unittest.TestCase):
         self.bindings["actions"]["MoveWindowToMonitor"]["arguments"] = ["window_id", "output"]
         with self.assertRaisesRegex(GEN.SchemaError, "field permutation"):
             self.compiler()
-        self.bindings = GEN.load(ROOT / GEN.BINDINGS)
+        self.setUp()
         self.bindings["actions"]["FocusWindow"]["fields"] = {"id": "uint64"}
         with self.assertRaisesRegex(GEN.SchemaError, "more than names/order"):
             self.compiler()
@@ -76,11 +79,11 @@ class GeneratorTest(unittest.TestCase):
         self.bindings["requests"]["Windows"]["response"] = "Typo"
         with self.assertRaisesRegex(GEN.SchemaError, "invalid request/response"):
             self.compiler()
-        self.bindings = GEN.load(ROOT / GEN.BINDINGS)
+        self.setUp()
         self.bindings["requests"]["Output"]["arguments"] = ["output", "typo"]
         with self.assertRaisesRegex(GEN.SchemaError, "field permutation"):
             self.compiler()
-        self.bindings = GEN.load(ROOT / GEN.BINDINGS)
+        self.setUp()
         del self.bindings["requests"]["EventStream"]
         with self.assertRaisesRegex(GEN.SchemaError, "exactly the request inventory"):
             self.compiler()
@@ -137,7 +140,7 @@ class GeneratorTest(unittest.TestCase):
         self.bindings["tuples"]["Event/WindowLayoutsChanged/changes/items"]["qmlName"] = "niriWindow"
         with self.assertRaisesRegex(GEN.SchemaError, "tuple name collision"):
             self.compiler()
-        self.bindings = GEN.load(ROOT / GEN.BINDINGS)
+        self.setUp()
         self.bindings["types"]["Window"] = {"cppName": "NiriCastTargetWindowPayload"}
         with self.assertRaisesRegex(GEN.SchemaError, "colliding generated type"):
             GEN.CppEmitter(self.compiler(), {}).emit()
@@ -215,7 +218,7 @@ class GeneratorTest(unittest.TestCase):
     def test_determinism_and_read_only_check(self):
         with tempfile.TemporaryDirectory(prefix="niriqml-generator-") as temporary:
             root = pathlib.Path(temporary)
-            for name in (GEN.SCHEMA, GEN.BINDINGS, "tools/generate-ipc.py"):
+            for name in (GEN.SCHEMA, GEN.BINDINGS, GEN.EXTENSIONS, GEN.NEWER_SCHEMA, "tools/generate-ipc.py"):
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(ROOT / name, path)
@@ -262,6 +265,74 @@ class GeneratorTest(unittest.TestCase):
         output = chunks.outputs()
         self.assertEqual(len(output), 2)
         self.assertIn("first complete definition", output["generated/test_001_generated.cpp"])
+
+    def test_selected_extensions_and_released_requiredness(self):
+        newer, manifest = GEN.load(ROOT / GEN.NEWER_SCHEMA), GEN.load(ROOT / GEN.EXTENSIONS)
+        merged = GEN.merge_extensions(self.schema, newer, manifest)
+        compiler = GEN.Compiler(merged, GEN.load(ROOT / GEN.BINDINGS), manifest)
+        self.assertEqual({name: len(compiler.ir[name]["variants"]) for name in GEN.ROOT_GROUPS},
+                         {"Request": 16, "Action": 149, "OutputAction": 10, "Response": 14, "Event": 20})
+        output = next(f for f in compiler.ir["Output"]["fields"] if f["wire"] == "max_bpc")
+        self.assertEqual(output["type"]["kind"], "optional")
+        self.assertFalse(output["required"])
+        self.assertEqual(output["introducedAfter"], "v26.04")
+        self.assertEqual(compiler.ir["MaxBpc"]["introducedAfter"], "v26.04")
+        for name in self.schema["$defs"]:
+            # All shared required sets survive exactly, despite main's defaults.
+            def compare(a, b):
+                if isinstance(a, dict):
+                    self.assertEqual(a.get("required"), b.get("required"))
+                    if "oneOf" in a:
+                        for branch in a["oneOf"]:
+                            tag = branch.get("const") or next(iter(branch["properties"]))
+                            other = next(v for v in b["oneOf"] if (v.get("const") or next(iter(v.get("properties", {})), None)) == tag)
+                            compare(branch, other)
+                    for key, value in a.items():
+                        if key not in {"oneOf", "required"} and isinstance(value, dict):
+                            compare(value, b[key])
+            compare(self.schema["$defs"][name], merged["$defs"][name])
+        for entry in manifest["additions"]:
+            self.assertIn(entry["path"], GEN.ReferenceEmitter(compiler, {}).emit()["docs/generated/IPC-API.md"])
+        self.assertIn("true one event before", GEN.ReferenceEmitter(compiler, {}).emit()["docs/generated/IPC-API.md"])
+
+    def test_extension_merge_rejects_unreviewed_drift(self):
+        newer, manifest = GEN.load(ROOT / GEN.NEWER_SCHEMA), GEN.load(ROOT / GEN.EXTENSIONS)
+        for mutation, message in [
+            (lambda n, m: n["$defs"]["Output"]["properties"]["name"].update(type="boolean"), "shared field type"),
+            (lambda n, m: m["additions"].pop(), "unselected newer addition"),
+            (lambda n, m: m["ignoredDefaults"].pop(), "unreviewed newer defaults"),
+            (lambda n, m: m.update(commit="moving-main"), "provenance"),
+            (lambda n, m: m["additions"].append(dict(m["additions"][0])), "duplicate extension"),
+            (lambda n, m: n["$defs"]["Action"]["oneOf"].append(copy.deepcopy(n["$defs"]["Action"]["oneOf"][0])), "colliding variant"),
+        ]:
+            n, m = copy.deepcopy(newer), copy.deepcopy(manifest)
+            mutation(n, m)
+            with self.assertRaisesRegex(GEN.SchemaError, message):
+                GEN.merge_extensions(self.schema, n, m)
+
+    def test_newer_serde_selection_coverage(self):
+        manifest = GEN.load(ROOT / GEN.EXTENSIONS)
+        newer = GEN.load(ROOT / GEN.NEWER_SCHEMA)
+        merged = GEN.merge_extensions(self.schema, newer, manifest)
+        compiler = GEN.Compiler(merged, GEN.load(ROOT / GEN.BINDINGS), manifest)
+        document = GEN.load(ROOT / "tests/fixtures/serde-main-689c1e9/vectors.json")
+        self.assertEqual(document["source"]["commit"], manifest["commit"])
+        rows = document["vectors"]
+        for selection in manifest["additions"]:
+            parts = selection["path"].split("/")
+            name = parts[2]
+            values = [row["value"] for row in rows if row["type"] == name]
+            self.assertTrue(values, name)
+            if len(parts) == 3: # Complete new supporting type.
+                variants = compiler.ir[name].get("variants", [])
+                self.assertEqual(set(values), {v["tag"] for v in variants})
+            elif parts[3] == "variants":
+                tag = parts[4]
+                self.assertTrue(any(value == tag or isinstance(value, dict) and tag in value for value in values), selection)
+            else:
+                field = parts[4]
+                self.assertTrue(any(value[field] is None for value in values))
+                self.assertTrue(any(value[field] is not None for value in values))
 
 
 if __name__ == "__main__":

@@ -68,6 +68,15 @@ NiriState materializes complete keyed maps/snapshots only when requested; it
 exposes all six parts and readiness with string IDs and real null optionals.
 Reset notifications empty all projections and clear readiness together.
 
+The compatible newer surface comes from a second immutable schema at main
+`689c1e9`, selected explicitly by `schema/extensions.json`. Shared wire types
+must match; main-only serde defaults never relax the released contract.
+Touchpad assignment follows that pin's seventh state part, replicated after
+casts. Its availability is optional: `NiriState.touchpadOn` is null until the
+first event, then bool, and resets to null. Readiness still means the released
+six-part burst is complete at CastsChanged; it does not promise this optional
+extension has arrived. Neither version guessing nor query seeding is used.
+
 - Unix socket at `$NIRI_SOCKET`
 - JSON line-oriented: send one `Request` object, receive one `Reply` per line
 - `EventStream` keeps the socket open and streams `Event` JSON objects forever

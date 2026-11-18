@@ -77,6 +77,8 @@ private slots:
     void initTestCase()
     {
         vectors = loadFixture(QFINDTESTDATA("fixtures/serde-v26.04/vectors.json"));
+        vectors = withNewerSurface(
+                vectors, loadFixture(QFINDTESTDATA("fixtures/serde-main-689c1e9/vectors.json")));
         manifest = loadFixture(QFINDTESTDATA("../generated/ipc-actions.json"));
     }
     void init()
@@ -86,7 +88,7 @@ private slots:
     }
     void inventory()
     {
-        QCOMPARE(manifest.arrayValue()->size(), 141);
+        QCOMPARE(manifest.arrayValue()->size(), 149);
         QSet<QByteArray> expected;
         for (const auto &entry : *manifest.arrayValue())
             expected.insert(entry.lookup("method")->stringValue()->toLatin1());
@@ -186,6 +188,13 @@ private slots:
         QTest::newRow("missing-required-id") << QString("focusWindow") << QVariantList{};
         QTest::newRow("missing-required-boolean") << QString("moveWindowToWorkspace")
                                                   << QVariantList{null, QVariantMap{{"Id", "456"}}};
+        for (const auto &method :
+             {"quit", "screenshot", "screenshotScreen", "screenshotWindow",
+              "moveWindowToWorkspaceDown", "moveColumnToWorkspaceUp", "moveFloatingWindow"})
+            QTest::newRow(qPrintable(QString("newer-default-not-imported-") + method))
+                    << QString(method) << QVariantList{};
+        QTest::newRow("newer-vt-overflow") << QString("changeVt") << QVariantList{256};
+        QTest::newRow("newer-vt-missing") << QString("changeVt") << QVariantList{};
     }
     void omittedOptionalId()
     {

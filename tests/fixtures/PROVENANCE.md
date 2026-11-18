@@ -25,3 +25,11 @@ registrations are tested separately from the production transport.
 
 Live tests use only the isolated cage/niri session and foot windows created by
 `tests/live/run-live.sh`. No captured user's desktop data is part of this corpus.
+
+`serde-main-689c1e9/vectors.json` is independently serialized by
+`tools/ipc-schema-dump/main/Cargo.toml -- --vectors` at immutable niri commit
+`689c1e914a5af782a476e433b79c15554bf5a312`. It covers the explicitly selected
+newer surface, not a replacement v26.04 contract. The action/request/event
+suites append these cases to their released fixtures; no released bytes are
+changed. Main-only serde default examples are evidence only, not generator
+inputs. See `schema/extensions.json` and the dumper README for every decision.
